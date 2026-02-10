@@ -27,22 +27,22 @@
 
 **Правило:** Вызывай skill ДО начала работы, не после.
 
-## Conditional Superpowers (после основных)
+## Execution Superpowers (после planning)
 
 Выбор execution path после writing-plans:
 
 | Условие | Skill | Примечание |
 |---------|-------|-----------|
-| Execution в текущей сессии | `superpowers:subagent-driven-development` | Свежий subagent + review между tasks |
-| Execution в отдельной сессии | `superpowers:executing-plans` | Batch execution с checkpoints |
-| Завершение development | `superpowers:finishing-a-development-branch` | После всех задач branch |
-| Setup workspace | `superpowers:using-git-worktrees` | ДО начала implementation |
+| Execution в текущей сессии | `superpowers:subagent-driven-development` | Fresh subagent + review checkpoints |
+| Execution в отдельной сессии | `superpowers:executing-plans` | Batch execution + checkpoints |
+| Завершение development | `superpowers:finishing-a-development-branch` | Merge strategy + cleanup |
+| Setup workspace | `superpowers:using-git-worktrees` | Isolated workspace creation |
 
 ## Meta Superpowers (обязательные)
 
 | Skill | Когда | Примечание |
 |-------|-------|-----------|
-| `superpowers:using-superpowers` | ВСЕГДА первым | 1% chance = MUST invoke |
+| `superpowers:using-superpowers` | Перед любой задачей | Выбирает оптимальные skills |
 
 ## Project-Specific Skills
 
@@ -57,12 +57,12 @@
 
 | Category | Location | Triggers |
 |----------|----------|----------|
-| n8n Expert | `~/.claude/skills/n8n-expert/` | Любой запрос про n8n workflows, MCP tools |
+| n8n Expert (MCP tools) | `~/.claude/skills/n8n-expert/` | Advanced n8n patterns, MCP tools |
+| n8n Workflows | `~/.claude/skills/n8n.md` | n8n workflow automation (16+ operations) |
 | FAL-AI | `~/.claude/skills/fal-ai/` | Image generation, audio synthesis, AI models |
 | External | `~/.claude/skills/external.md` | Telegram bot, webhooks, n8n integration |
 | Legal | `~/.claude/skills/legal.md` | Estonian law, OÜ, GDPR, contracts, tax |
 | Content Creator | `~/.claude/skills/content-creator.md` | YouTube, Telegram strategy, SEO |
-| n8n | `~/.claude/skills/n8n.md` | n8n workflow automation (16+ operations) |
 | Assistant | `~/.claude/skills/assistant.md` | Task management, Eisenhower, Pomodoro |
 | Knowledge | `~/.claude/skills/knowledge.md` | Knowledge DB, decisions, logs, snippets |
 
