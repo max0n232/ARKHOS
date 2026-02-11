@@ -2,10 +2,11 @@
 /**
  * Stop Hook: Pattern Detector
  *
- * Realtime detection of dangerous patterns:
+ * Realtime detection of patterns:
  * - P1: Loop (same command failing repeatedly)
  * - P2: Budget burn (high call rate with errors)
  * - P3: Destructive (blocked commands repeated)
+ * - P4: Success (5+ consecutive successful operations)
  */
 
 const fs = require('fs');
@@ -147,6 +148,35 @@ function detectDestructive(db, sessionId) {
     return null;
 }
 
+// P4: Success Pattern Detection (5+ consecutive successes)
+function detectSuccessPatterns(db, sessionId) {
+    const result = db.exec(`
+        SELECT COUNT(*) as streak
+        FROM (
+            SELECT exit_code,
+                   ROW_NUMBER() OVER (ORDER BY timestamp DESC) as rn
+            FROM traces WHERE session_id = ${escapeSQL(sessionId)}
+        ) WHERE rn <= 10 AND exit_code = 0
+    `);
+
+    const streak = result.length ? result[0].values[0][0] : 0;
+
+    if (streak >= 5) {
+        db.exec(`
+            INSERT INTO detections (session_id, pattern_type, severity, description, context)
+            VALUES (
+                ${escapeSQL(sessionId)},
+                'P4',
+                'low',
+                'Success pattern: ${streak} consecutive successful operations',
+                '{"type":"success_streak","count":${streak}}'
+            )
+        `);
+        return { type: 'P4', count: streak };
+    }
+    return null;
+}
+
 // Record detection to database
 function recordDetection(db, sessionId, detection) {
     const description = detection.message.split('\n')[0];
@@ -193,6 +223,7 @@ async function detect() {
         const p3 = detectDestructive(db, sessionId);
         const p1 = detectLoop(db, sessionId);
         const p2 = detectBudgetBurn(db, sessionId);
+        const p4 = detectSuccessPatterns(db, sessionId);
 
         const detections = [p3, p1, p2].filter(d => d !== null);
 
