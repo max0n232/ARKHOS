@@ -744,20 +744,6 @@
       "frecency": 0.5923057194444444,
       "auto_priority": "normal"
     },
-    "debug/2b3817d4-5957-44d2-94e9-5b86293e7015.txt": {
-      "created_at": "2026-02-08T19:37:05.746Z",
-      "last_accessed": "2026-02-08T19:37:33.675Z",
-      "access_count": 0,
-      "size_bytes": 19248,
-      "ttl_days": 3,
-      "expires_at": "2026-02-11T19:37:05.746Z",
-      "priority": "normal",
-      "category": "debug",
-      "deletable": true,
-      "requires_confirmation": false,
-      "frecency": 0.552792780787037,
-      "auto_priority": "normal"
-    },
     "debug/315aba6e-f2da-434c-a6d5-93fd4a1c1fe6.txt": {
       "created_at": "2026-02-09T18:49:57.802Z",
       "last_accessed": "2026-02-09T18:50:08.348Z",
@@ -910,20 +896,6 @@
       "deletable": true,
       "requires_confirmation": false,
       "frecency": 0.5744805395833332,
-      "auto_priority": "normal"
-    },
-    "debug/4715b0ec-adcc-4bf7-a0ca-49f56ffcb479.txt": {
-      "created_at": "2026-02-08T19:36:13.786Z",
-      "last_accessed": "2026-02-08T19:36:59.851Z",
-      "access_count": 0,
-      "size_bytes": 20035,
-      "ttl_days": 3,
-      "expires_at": "2026-02-11T19:36:13.786Z",
-      "priority": "normal",
-      "category": "debug",
-      "deletable": true,
-      "requires_confirmation": false,
-      "frecency": 0.5527849511574073,
       "auto_priority": "normal"
     },
     "debug/492ea0ad-307a-40a0-9031-b44cda1915f1.txt": {
@@ -1204,20 +1176,6 @@
       "deletable": true,
       "requires_confirmation": false,
       "frecency": 0.5916599141203703,
-      "auto_priority": "normal"
-    },
-    "debug/6e66625e-aa8a-4a6d-9f3a-e02d89d49655.txt": {
-      "created_at": "2026-02-08T19:37:39.920Z",
-      "last_accessed": "2026-02-08T19:38:33.171Z",
-      "access_count": 0,
-      "size_bytes": 19129,
-      "ttl_days": 3,
-      "expires_at": "2026-02-11T19:37:39.920Z",
-      "priority": "normal",
-      "category": "debug",
-      "deletable": true,
-      "requires_confirmation": false,
-      "frecency": 0.5528065527777777,
       "auto_priority": "normal"
     },
     "debug/6f0abbb8-6464-4d93-a855-817dd3b973b3.txt": {
@@ -2144,20 +2102,6 @@
       "frecency": 0.5717045456018518,
       "auto_priority": "normal"
     },
-    "debug/c8a3cf53-558d-4309-b134-5486106ed096.txt": {
-      "created_at": "2026-02-08T19:29:22.759Z",
-      "last_accessed": "2026-02-08T19:36:07.920Z",
-      "access_count": 0,
-      "size_bytes": 22273,
-      "ttl_days": 3,
-      "expires_at": "2026-02-11T19:29:22.759Z",
-      "priority": "normal",
-      "category": "debug",
-      "deletable": true,
-      "requires_confirmation": false,
-      "frecency": 0.5527729296296297,
-      "auto_priority": "normal"
-    },
     "debug/c941d57a-fd65-422a-a1a6-97c5c9f8ad90.txt": {
       "created_at": "2026-02-10T18:51:17.007Z",
       "last_accessed": "2026-02-10T18:51:29.513Z",
@@ -2226,20 +2170,6 @@
       "deletable": true,
       "requires_confirmation": false,
       "frecency": 0.5621172805555555,
-      "auto_priority": "normal"
-    },
-    "debug/d269328d-c317-4519-9311-b704282b7e5b.txt": {
-      "created_at": "2026-02-08T19:38:39.089Z",
-      "last_accessed": "2026-02-09T05:53:48.116Z",
-      "access_count": 0,
-      "size_bytes": 19244,
-      "ttl_days": 3,
-      "expires_at": "2026-02-11T19:38:39.089Z",
-      "priority": "normal",
-      "category": "debug",
-      "deletable": true,
-      "requires_confirmation": false,
-      "frecency": 0.5613516787037036,
       "auto_priority": "normal"
     },
     "debug/d3edfc99-dc4c-499f-927f-7630f3376606.txt": {
@@ -7254,20 +7184,6 @@
       "frecency": 0.5717073837962963,
       "auto_priority": "normal"
     },
-    "projects/C--Users-sorte-AppData-Local-Programs-Microsoft-VS-Code/2df40aa6-b516-4af3-a721-2c344d314838.jsonl": {
-      "created_at": "2026-02-04T19:31:13.539Z",
-      "last_accessed": "2026-02-09T18:19:24.775Z",
-      "access_count": 0,
-      "size_bytes": 1974279,
-      "ttl_days": 7,
-      "expires_at": "2026-02-11T19:31:13.539Z",
-      "priority": "normal",
-      "category": "session",
-      "deletable": true,
-      "requires_confirmation": false,
-      "frecency": 0.5717073842592593,
-      "auto_priority": "normal"
-    },
     "projects/C--Users-sorte-AppData-Local-Programs-Microsoft-VS-Code/4aa802c0-1e06-450e-a0e9-06f7d8d10eaa.jsonl": {
       "created_at": "2026-02-06T22:16:17.700Z",
       "last_accessed": "2026-02-09T18:19:24.773Z",
@@ -7506,90 +7422,6 @@
       "frecency": 0.571707836574074,
       "auto_priority": "normal"
     },
-    "projects/c--Users-sorte-Desktop-ClaudeCode-n8n/9be8f749-faea-4c32-befc-73e004321edb/subagents/agent-a0c41f8.jsonl": {
-      "created_at": "2026-02-04T19:39:12.562Z",
-      "last_accessed": "2026-02-09T18:19:27.192Z",
-      "access_count": 0,
-      "size_bytes": 98065,
-      "ttl_days": 7,
-      "expires_at": "2026-02-11T19:39:12.562Z",
-      "priority": "normal",
-      "category": "session",
-      "deletable": true,
-      "requires_confirmation": false,
-      "frecency": 0.57170794375,
-      "auto_priority": "normal"
-    },
-    "projects/c--Users-sorte-Desktop-ClaudeCode-n8n/9be8f749-faea-4c32-befc-73e004321edb/subagents/agent-a353d48.jsonl": {
-      "created_at": "2026-02-04T19:35:36.647Z",
-      "last_accessed": "2026-02-09T18:19:27.192Z",
-      "access_count": 0,
-      "size_bytes": 17274,
-      "ttl_days": 7,
-      "expires_at": "2026-02-11T19:35:36.647Z",
-      "priority": "normal",
-      "category": "session",
-      "deletable": true,
-      "requires_confirmation": false,
-      "frecency": 0.57170794375,
-      "auto_priority": "normal"
-    },
-    "projects/c--Users-sorte-Desktop-ClaudeCode-n8n/9be8f749-faea-4c32-befc-73e004321edb/subagents/agent-a6002d4.jsonl": {
-      "created_at": "2026-02-04T19:10:46.500Z",
-      "last_accessed": "2026-02-09T18:19:27.194Z",
-      "access_count": 0,
-      "size_bytes": 264322,
-      "ttl_days": 7,
-      "expires_at": "2026-02-11T19:10:46.500Z",
-      "priority": "normal",
-      "category": "session",
-      "deletable": true,
-      "requires_confirmation": false,
-      "frecency": 0.5717079442129629,
-      "auto_priority": "normal"
-    },
-    "projects/c--Users-sorte-Desktop-ClaudeCode-n8n/9be8f749-faea-4c32-befc-73e004321edb/subagents/agent-a6da59b.jsonl": {
-      "created_at": "2026-02-04T17:27:25.145Z",
-      "last_accessed": "2026-02-09T18:19:27.194Z",
-      "access_count": 0,
-      "size_bytes": 53918,
-      "ttl_days": 7,
-      "expires_at": "2026-02-11T17:27:25.145Z",
-      "priority": "normal",
-      "category": "session",
-      "deletable": true,
-      "requires_confirmation": false,
-      "frecency": 0.5717079442129629,
-      "auto_priority": "normal"
-    },
-    "projects/c--Users-sorte-Desktop-ClaudeCode-n8n/9be8f749-faea-4c32-befc-73e004321edb/subagents/agent-acompact-183803.jsonl": {
-      "created_at": "2026-02-04T17:07:39.366Z",
-      "last_accessed": "2026-02-09T18:19:27.194Z",
-      "access_count": 0,
-      "size_bytes": 22336,
-      "ttl_days": 7,
-      "expires_at": "2026-02-11T17:07:39.366Z",
-      "priority": "normal",
-      "category": "session",
-      "deletable": true,
-      "requires_confirmation": false,
-      "frecency": 0.5717079442129629,
-      "auto_priority": "normal"
-    },
-    "projects/c--Users-sorte-Desktop-ClaudeCode-n8n/9be8f749-faea-4c32-befc-73e004321edb/subagents/agent-acompact-50a4af.jsonl": {
-      "created_at": "2026-02-04T19:39:29.997Z",
-      "last_accessed": "2026-02-09T18:19:27.194Z",
-      "access_count": 0,
-      "size_bytes": 30928,
-      "ttl_days": 7,
-      "expires_at": "2026-02-11T19:39:29.997Z",
-      "priority": "normal",
-      "category": "session",
-      "deletable": true,
-      "requires_confirmation": false,
-      "frecency": 0.5717079442129629,
-      "auto_priority": "normal"
-    },
     "projects/c--Users-sorte-Desktop-ClaudeCode-n8n/9be8f749-faea-4c32-befc-73e004321edb/subagents/agent-acompact-ee172e.jsonl": {
       "created_at": "2026-02-05T18:56:01.076Z",
       "last_accessed": "2026-02-09T18:19:27.194Z",
@@ -7597,34 +7429,6 @@
       "size_bytes": 17624,
       "ttl_days": 7,
       "expires_at": "2026-02-12T18:56:01.076Z",
-      "priority": "normal",
-      "category": "session",
-      "deletable": true,
-      "requires_confirmation": false,
-      "frecency": 0.5717079442129629,
-      "auto_priority": "normal"
-    },
-    "projects/c--Users-sorte-Desktop-ClaudeCode-n8n/9be8f749-faea-4c32-befc-73e004321edb/subagents/agent-adfc28d.jsonl": {
-      "created_at": "2026-02-04T17:52:00.887Z",
-      "last_accessed": "2026-02-09T18:19:27.194Z",
-      "access_count": 0,
-      "size_bytes": 8579,
-      "ttl_days": 7,
-      "expires_at": "2026-02-11T17:52:00.887Z",
-      "priority": "normal",
-      "category": "session",
-      "deletable": true,
-      "requires_confirmation": false,
-      "frecency": 0.5717079442129629,
-      "auto_priority": "normal"
-    },
-    "projects/c--Users-sorte-Desktop-ClaudeCode-n8n/9be8f749-faea-4c32-befc-73e004321edb/subagents/agent-af40323.jsonl": {
-      "created_at": "2026-02-04T17:52:28.395Z",
-      "last_accessed": "2026-02-09T18:19:27.194Z",
-      "access_count": 0,
-      "size_bytes": 38950,
-      "ttl_days": 7,
-      "expires_at": "2026-02-11T17:52:28.395Z",
       "priority": "normal",
       "category": "session",
       "deletable": true,
@@ -12694,6 +12498,24 @@
         "trigger": "ttl_expired",
         "deleted_count": 2,
         "freed_bytes": 4830804
+      },
+      {
+        "timestamp": "2026-02-11T17:37:13.065Z",
+        "trigger": "ttl_expired",
+        "deleted_count": 2,
+        "freed_bytes": 76254
+      },
+      {
+        "timestamp": "2026-02-11T18:12:00.950Z",
+        "trigger": "ttl_expired",
+        "deleted_count": 2,
+        "freed_bytes": 47529
+      },
+      {
+        "timestamp": "2026-02-11T19:50:49.207Z",
+        "trigger": "ttl_expired",
+        "deleted_count": 10,
+        "freed_bytes": 2484797
       }
     ]
   }
