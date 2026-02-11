@@ -4,7 +4,7 @@
 
 ## References
 
-@CONSTITUTION.md
+@rules/constitution.md
 @rules/code-style.md
 @rules/security.md
 @docs/routing.md
