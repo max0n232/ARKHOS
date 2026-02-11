@@ -52,7 +52,7 @@ async function shouldAnalyze(db) {
     return newTraces >= threshold;
 }
 
-function gatherData(db) {
+async function gatherData(db) {
     const lastTs = getConfig(db, 'last_analysis_timestamp', 0);
     const now = Math.floor(Date.now() / 1000);
 
@@ -89,8 +89,10 @@ function gatherData(db) {
 
     // Current patterns
     let currentPatterns = '';
-    if (fs.existsSync(PATTERNS_MD)) {
-        currentPatterns = fs.readFileSync(PATTERNS_MD, 'utf-8');
+    try {
+        currentPatterns = await fs.promises.readFile(PATTERNS_MD, 'utf-8');
+    } catch (e) {
+        // File doesn't exist
     }
 
     return {
@@ -214,7 +216,7 @@ async function report(forceRun = false) {
     }
 
     console.log('Gathering analysis data...');
-    const data = gatherData(db);
+    const data = await gatherData(db);
 
     if (data.totalTraces === 0) {
         console.log('No traces to analyze');
