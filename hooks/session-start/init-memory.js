@@ -15,6 +15,21 @@ const CLAUDE_DIR = path.join(process.env.HOME || process.env.USERPROFILE, '.clau
 const CAPSULE_PATH = path.join(CLAUDE_DIR, 'memory', 'session', 'capsule.json');
 const GLOBAL_MEMORY = path.join(CLAUDE_DIR, 'memory', 'global');
 
+// Token budget configuration
+const TOKEN_BUDGET = 200000;
+const WARNING_THRESHOLD = 0.05; // 5%
+
+/**
+ * Estimate token count from text (rough approximation: ~4 chars per token)
+ */
+function estimateTokens(text) {
+    if (!text) return 0;
+    return Math.ceil(text.length / 4);
+}
+
+// Track total tokens loaded during init
+let totalTokensLoaded = 0;
+
 /**
  * Generate session ID
  */
@@ -54,13 +69,46 @@ function detectProject(cwd) {
 function loadPreviousCapsule() {
     try {
         if (fs.existsSync(CAPSULE_PATH)) {
-            return JSON.parse(fs.readFileSync(CAPSULE_PATH, 'utf-8'));
+            const content = fs.readFileSync(CAPSULE_PATH, 'utf-8');
+            totalTokensLoaded += estimateTokens(content);
+            return JSON.parse(content);
         }
     } catch (e) {
         // Return empty capsule
     }
 
     return null;
+}
+
+/**
+ * Load global memory files and track tokens
+ */
+function loadGlobalMemory() {
+    const loaded = [];
+
+    try {
+        if (fs.existsSync(GLOBAL_MEMORY)) {
+            const files = fs.readdirSync(GLOBAL_MEMORY);
+
+            for (const file of files) {
+                if (file.endsWith('.json') || file.endsWith('.md')) {
+                    const filePath = path.join(GLOBAL_MEMORY, file);
+                    try {
+                        const content = fs.readFileSync(filePath, 'utf-8');
+                        const tokens = estimateTokens(content);
+                        totalTokensLoaded += tokens;
+                        loaded.push({ file, tokens });
+                    } catch (e) {
+                        // Skip unreadable files
+                    }
+                }
+            }
+        }
+    } catch (e) {
+        // Continue without global memory
+    }
+
+    return loaded;
 }
 
 /**
@@ -88,6 +136,9 @@ async function initSession() {
     const cwd = process.cwd();
     const previous = loadPreviousCapsule();
     const timeSince = timeSinceLastSession(previous);
+
+    // Load global memory and track tokens
+    const globalMemoryFiles = loadGlobalMemory();
 
     // Create new session state
     const capsule = {
@@ -131,7 +182,9 @@ async function initSession() {
     const output = {
         session_id: capsule.session_id,
         project: capsule.project,
-        previous_session: timeSince ? `Last session: ${timeSince}` : 'First session'
+        previous_session: timeSince ? `Last session: ${timeSince}` : 'First session',
+        tokenEstimate: totalTokensLoaded,
+        tokenBudgetPercent: ((totalTokensLoaded / TOKEN_BUDGET) * 100).toFixed(2)
     };
 
     // Check for project-specific context loader
@@ -139,6 +192,12 @@ async function initSession() {
     if (fs.existsSync(projectContextLoader)) {
         output.project_context = 'Loading project context...';
         // Project loader will be called separately
+    }
+
+    // Token budget warning
+    if (totalTokensLoaded > TOKEN_BUDGET * WARNING_THRESHOLD) {
+        console.error(`Warning: Session init loaded ~${totalTokensLoaded} tokens (${(totalTokensLoaded / TOKEN_BUDGET * 100).toFixed(1)}% of budget)`);
+        output.tokenWarning = true;
     }
 
     console.log(JSON.stringify(output));
