@@ -7,7 +7,7 @@ const CLAUDE_DIR = path.join(process.env.HOME || process.env.USERPROFILE, '.clau
 const TRACKER_DB = path.join(CLAUDE_DIR, 'patterns', 'tracker.db');
 
 let initSqlJs;
-try { initSqlJs = require('sql.js'); } catch (e) { process.exit(1); }
+try { initSqlJs = require('../db/node_modules/sql.js'); } catch (e) { process.exit(1); }
 
 function escapeSQL(str) {
     if (str === null || str === undefined) return 'NULL';

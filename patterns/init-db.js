@@ -6,7 +6,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const initSqlJs = require('sql.js');
+const initSqlJs = require('../db/node_modules/sql.js');
 
 const CLAUDE_DIR = path.join(process.env.HOME || process.env.USERPROFILE, '.claude');
 const DB_PATH = path.join(CLAUDE_DIR, 'patterns', 'tracker.db');

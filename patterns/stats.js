@@ -12,7 +12,7 @@ const TRACKER_DB = path.join(CLAUDE_DIR, 'patterns', 'tracker.db');
 
 let initSqlJs;
 try {
-    initSqlJs = require('sql.js');
+    initSqlJs = require('../db/node_modules/sql.js');
 } catch (e) {
     console.log('sql.js not installed. Run: npm install sql.js');
     process.exit(1);

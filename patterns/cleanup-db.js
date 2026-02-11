@@ -7,7 +7,7 @@ const TRACKER_DB = path.join(CLAUDE_DIR, 'patterns', 'tracker.db');
 const TTL_DAYS = 30;
 
 let initSqlJs;
-try { initSqlJs = require('sql.js'); } catch (e) { process.exit(1); }
+try { initSqlJs = require('../db/node_modules/sql.js'); } catch (e) { process.exit(1); }
 
 async function cleanup() {
     const SQL = await initSqlJs();

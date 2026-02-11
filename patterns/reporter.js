@@ -16,7 +16,7 @@ const TROUBLESHOOTING_MD = path.join(CLAUDE_DIR, 'memory', 'global', 'troublesho
 
 let initSqlJs;
 try {
-    initSqlJs = require('sql.js');
+    initSqlJs = require('../db/node_modules/sql.js');
 } catch (e) {
     process.exit(0);
 }

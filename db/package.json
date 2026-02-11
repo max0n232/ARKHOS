@@ -1,0 +1,17 @@
+{
+  "name": "claude-db",
+  "version": "1.0.0",
+  "description": "Database utilities for Claude global workspace",
+  "main": "db-manager.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "better-sqlite3": "^12.6.2",
+    "sql.js": "^1.13.0"
+  }
+}

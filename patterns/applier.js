@@ -13,7 +13,7 @@ const BACKUP_DIR = path.join(CLAUDE_DIR, 'patterns', 'backups');
 
 let initSqlJs;
 try {
-    initSqlJs = require('sql.js');
+    initSqlJs = require('../db/node_modules/sql.js');
 } catch (e) {
     console.log('sql.js not installed');
     process.exit(1);

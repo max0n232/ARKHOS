@@ -14,7 +14,7 @@ const ANALYZER_PATH = path.join(CLAUDE_DIR, 'patterns', 'analyzer.js');
 
 let initSqlJs;
 try {
-    initSqlJs = require('sql.js');
+    initSqlJs = require('../db/node_modules/sql.js');
 } catch (e) {
     console.error('sql.js not installed');
     process.exit(1);

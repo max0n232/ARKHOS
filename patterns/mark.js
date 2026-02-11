@@ -7,7 +7,7 @@ const TRACKER_DB = path.join(CLAUDE_DIR, 'patterns', 'tracker.db');
 const CAPSULE_PATH = path.join(CLAUDE_DIR, 'memory', 'session', 'capsule.json');
 
 let initSqlJs;
-try { initSqlJs = require('sql.js'); } catch (e) { process.exit(1); }
+try { initSqlJs = require('../db/node_modules/sql.js'); } catch (e) { process.exit(1); }
 
 function escapeSQL(str) {
     if (str === null || str === undefined) return 'NULL';

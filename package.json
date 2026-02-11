@@ -1,8 +1,0 @@
-{
-  "name": "claude-global",
-  "version": "1.0.0",
-  "private": true,
-  "dependencies": {
-    "sql.js": "^1.13.0"
-  }
-}
