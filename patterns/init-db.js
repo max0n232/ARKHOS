@@ -35,8 +35,17 @@ async function initTrackerDB() {
             db = new SQL.Database();
         }
 
+        // Enable foreign key constraints
+        db.run("PRAGMA foreign_keys = ON;");
+
         // Execute schema
         db.run(schema);
+
+        // Validate schema execution
+        const tables = db.exec("SELECT name FROM sqlite_master WHERE type='table'");
+        if (!tables.length || !tables[0].values.length) {
+            throw new Error('Schema execution failed - no tables created');
+        }
 
         // Save to file
         const data = db.export();
@@ -49,6 +58,9 @@ async function initTrackerDB() {
         return true;
     } catch (e) {
         console.error(`Failed to initialize tracker DB: ${e.message}`);
+        console.error(`Schema path: ${SCHEMA_PATH}`);
+        console.error(`DB path: ${DB_PATH}`);
+        if (e.stack) console.error(e.stack);
         return false;
     }
 }

@@ -2,6 +2,10 @@
 
 Automated behavioral pattern detection and correction system.
 
+## Dependencies
+
+- sql.js
+
 ## Architecture
 
 - **analyzer.js** (PostToolUse hook): Captures tool execution traces
