@@ -38,6 +38,6 @@ Stored in `config` table. Edit via `/pattern-config` command.
 ## Status
 
 - **Phase 1**: Collector + Loop Detection (MVP)
-- Phase 2: Reporter + Applier
+- **Phase 2**: Reporter + Applier
 - Phase 3: Feedback Loop + Metrics
 - Phase 4: Polish + Cleanup

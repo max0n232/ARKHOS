@@ -99,6 +99,12 @@
             "command": "node C:\\Users\\sorte\\.claude\\memory\\save-state.js",
             "timeout": 5000,
             "statusMessage": "Saving state before compact..."
+          },
+          {
+            "type": "command",
+            "command": "node C:\\Users\\sorte\\.claude\\patterns\\reporter.js",
+            "timeout": 30000,
+            "statusMessage": "Analyzing patterns..."
           }
         ]
       }
