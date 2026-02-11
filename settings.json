@@ -28,12 +28,6 @@
             "command": "node C:\\Users\\sorte\\.claude\\hooks\\session-end\\cleanup.js",
             "timeout": 30000,
             "statusMessage": "Cleaning up..."
-          },
-          {
-            "type": "command",
-            "command": "node C:\\Users\\sorte\\.claude\\hooks\\session-end\\auto-cleanup.js",
-            "timeout": 15000,
-            "statusMessage": "Auto-cleanup..."
           }
         ]
       }
