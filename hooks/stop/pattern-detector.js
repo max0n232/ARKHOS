@@ -18,7 +18,7 @@ const CAPSULE_PATH = path.join(CLAUDE_DIR, 'memory', 'session', 'capsule.json');
 
 let initSqlJs;
 try {
-    initSqlJs = require('../db/node_modules/sql.js');
+    initSqlJs = require('../../db/node_modules/sql.js');
 } catch (e) {
     process.exit(0);
 }
