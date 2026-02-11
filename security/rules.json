@@ -1,0 +1,114 @@
+{
+  "global": {
+    "default_action": "prompt",
+    "log_level": "matched"
+  },
+
+  "deny": {
+    "commands": [
+      "rm -rf /",
+      "rm -rf /*",
+      "rm -rf ~",
+      "rm -rf .",
+      "del /s /q",
+      "format",
+      "mkfs",
+      ":(){:|:&};:",
+      "chmod 777",
+      "chmod -R 777",
+      "> /dev/sda",
+      "dd if=/dev/zero"
+    ],
+    "commands_regex": [
+      "rm\\s+(-rf|-fr)\\s+[/~]",
+      "^sudo\\s+",
+      "git\\s+push\\s+.*--force",
+      "git\\s+reset\\s+--hard",
+      "curl.*\\|.*sh",
+      "wget.*\\|.*sh",
+      "eval\\s*\\(",
+      "npm\\s+publish"
+    ],
+    "file_patterns": [
+      "**/.env",
+      "**/.env.*",
+      "**/credentials/**",
+      "**/*.pem",
+      "**/*.key",
+      "**/*secret*",
+      "**/*password*",
+      "**/id_rsa*",
+      "**/.ssh/*",
+      "**/token.json",
+      "**/.credentials.json"
+    ]
+  },
+
+  "allow": {
+    "commands": [
+      "git status",
+      "git log",
+      "git diff",
+      "git branch",
+      "npm test",
+      "npm run test",
+      "npm run build",
+      "npm run lint"
+    ],
+    "commands_regex": [
+      "^git\\s+(status|log|diff|branch|show|blame)",
+      "^npm\\s+(install|run|test|list|outdated)",
+      "^node\\s+",
+      "^python\\s+",
+      "^pip\\s+(install|list|show)",
+      "^npx\\s+",
+      "^pnpm\\s+(install|run|test)",
+      "^yarn\\s+(install|run|test)",
+      "^code\\s+",
+      "^cursor\\s+"
+    ],
+    "file_patterns": [
+      "**/*.md",
+      "**/*.json",
+      "**/*.js",
+      "**/*.ts",
+      "**/*.py",
+      "**/*.html",
+      "**/*.css",
+      "**/*.scss",
+      "**/*.yaml",
+      "**/*.yml",
+      "**/*.toml",
+      "**/*.sql",
+      "**/*.sh"
+    ]
+  },
+
+  "passthrough": {
+    "commands": [
+      "ls",
+      "dir",
+      "pwd",
+      "cd",
+      "echo",
+      "cat",
+      "head",
+      "tail",
+      "grep",
+      "find",
+      "which",
+      "where",
+      "whoami",
+      "date",
+      "time"
+    ]
+  },
+
+  "audit": {
+    "enabled": true,
+    "file_pattern": "audit/{date}.jsonl",
+    "include_allowed": false,
+    "include_denied": true,
+    "include_prompted": true
+  }
+}

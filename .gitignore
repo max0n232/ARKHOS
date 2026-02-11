@@ -1,0 +1,35 @@
+# Regeneratable (rebuild on demand)
+mcp-gsc/venv/
+db/node_modules/
+plugins/cache/
+
+# Session data (local only)
+projects/
+debug/
+todos/
+shell-snapshots/
+session-env/
+
+# Temp files
+*.tmp
+nul
+
+# Secrets (never commit)
+.credentials.json
+**/credentials/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# Logs
+*.log
+
+# Cache
+cache/
+statsig/
+stats-cache.json

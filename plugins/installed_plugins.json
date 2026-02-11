@@ -1,0 +1,25 @@
+{
+  "version": 2,
+  "plugins": {
+    "claude-wordpress-skills@claude-wordpress-skills": [
+      {
+        "scope": "user",
+        "installPath": "C:\\Users\\sorte\\.claude\\plugins\\cache\\claude-wordpress-skills\\claude-wordpress-skills\\1.3.1",
+        "version": "1.3.1",
+        "installedAt": "2026-02-02T17:36:12.846Z",
+        "lastUpdated": "2026-02-02T17:36:12.846Z",
+        "gitCommitSha": "0ac0bbd5fd7c2a91f45af8ec3f5282537e52b075"
+      }
+    ],
+    "superpowers@superpowers-marketplace": [
+      {
+        "scope": "user",
+        "installPath": "C:\\Users\\sorte\\.claude\\plugins\\cache\\superpowers-marketplace\\superpowers\\4.1.1",
+        "version": "4.1.1",
+        "installedAt": "2026-02-02T17:36:58.435Z",
+        "lastUpdated": "2026-02-02T17:36:58.435Z",
+        "gitCommitSha": "06b92f36820f38175b2ed6ff3f8df45157d54731"
+      }
+    ]
+  }
+}

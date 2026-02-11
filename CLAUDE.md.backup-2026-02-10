@@ -1,0 +1,38 @@
+# Claude Router
+
+Центральный маршрутизатор. Классифицирует запрос → направляет в проект.
+
+## Projects
+
+| Project | Path | Triggers |
+|---------|------|----------|
+| Studiokook | ~/Desktop/Studiokook | кухни, WordPress, SEO, studiokook.ee, фирма, SMM |
+| Personal | ~/Desktop/Personal | личное, задачи, напоминания |
+
+**Routing:** Получил запрос → определи проект по триггерам → читай `{path}/CLAUDE.md`
+
+## Superpowers (auto-invoke)
+
+ОБЯЗАТЕЛЬНО вызывай через Skill tool БЕЗ запроса пользователя:
+
+| Триггер | Skill |
+|---------|-------|
+| Новая фича, творческая работа | `superpowers:brainstorming` |
+| Баг, ошибка, неожиданное поведение | `superpowers:systematic-debugging` |
+| Написание кода | `superpowers:test-driven-development` |
+| Многошаговая задача | `superpowers:writing-plans` |
+| Создание skill | `superpowers:writing-skills` |
+| Заявление "готово" | `superpowers:verification-before-completion` |
+| 2+ независимых задач | `superpowers:dispatching-parallel-agents` |
+
+**Правило:** Вызывай skill ДО начала работы, не после.
+
+## Constitution
+
+@CONSTITUTION.md
+
+## Defaults
+
+- **Language:** RU primary, EN tech terms
+- **Autonomy:** <3 файлов, <200 строк — решай сам
+- **Token Budget:** 200k. At 50% STOP

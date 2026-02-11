@@ -1,0 +1,28 @@
+{
+  "session_id": "fb67df27",
+  "started_at": "2026-02-11T06:50:13.052Z",
+  "project": ".claude",
+  "context": {
+    "current_task": null,
+    "loaded_skills": [],
+    "active_credentials": [],
+    "files_accessed": []
+  },
+  "decisions_this_session": [],
+  "token_budget": {
+    "total": 200000,
+    "used": 0,
+    "thresholds": {
+      "notify": 60000,
+      "stop": 100000,
+      "emergency": 140000
+    }
+  },
+  "last_updated": "2026-02-11T06:50:13.053Z",
+  "previous_session": {
+    "id": "130533b7",
+    "project": ".claude",
+    "last_task": null,
+    "ended": "2026-02-11T06:21:30.627Z"
+  }
+}

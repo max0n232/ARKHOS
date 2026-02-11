@@ -1,0 +1,136 @@
+# Global Security Rules for Claude CLI
+# Deny rules checked first, then allow, then passthrough
+# Default action: prompt user
+
+[global]
+default_action = "prompt"
+log_level = "matched"  # off, matched, all
+
+# =============================================================================
+# DENY RULES - Blocked immediately, no exceptions
+# =============================================================================
+[deny]
+
+# Dangerous shell commands
+commands = [
+    "rm -rf /",
+    "rm -rf /*",
+    "rm -rf ~",
+    "rm -rf .",
+    "del /s /q",
+    "format",
+    "mkfs",
+    ":(){:|:&};:",  # Fork bomb
+    "chmod 777",
+    "chmod -R 777",
+    "> /dev/sda",
+    "dd if=/dev/zero",
+]
+
+# Dangerous command patterns (regex)
+commands_regex = [
+    "rm\\s+(-rf|-fr)\\s+[/~]",           # rm -rf with root paths
+    "^sudo\\s+",                          # Any sudo command
+    "git\\s+push\\s+.*--force",           # Force push
+    "git\\s+reset\\s+--hard",             # Hard reset
+    "curl.*\\|.*sh",                       # Pipe curl to shell
+    "wget.*\\|.*sh",                       # Pipe wget to shell
+    "eval\\s*\\(",                         # eval() calls
+    "npm\\s+publish",                      # Accidental publish
+]
+
+# Protected file patterns
+file_patterns = [
+    "**/.env",
+    "**/.env.*",
+    "**/credentials/**",
+    "**/*.pem",
+    "**/*.key",
+    "**/*secret*",
+    "**/*password*",
+    "**/id_rsa*",
+    "**/.ssh/*",
+    "**/token.json",
+    "**/.credentials.json",
+]
+
+# =============================================================================
+# ALLOW RULES - Permitted without prompting
+# =============================================================================
+[allow]
+
+# Safe shell commands (exact match)
+commands = [
+    "git status",
+    "git log",
+    "git diff",
+    "git branch",
+    "npm test",
+    "npm run test",
+    "npm run build",
+    "npm run lint",
+]
+
+# Safe command patterns (regex)
+commands_regex = [
+    "^git\\s+(status|log|diff|branch|show|blame)",  # Read-only git
+    "^npm\\s+(install|run|test|list|outdated)",      # npm operations
+    "^node\\s+",                                      # Node execution
+    "^python\\s+",                                    # Python execution
+    "^pip\\s+(install|list|show)",                   # pip operations
+    "^npx\\s+",                                       # npx execution
+    "^pnpm\\s+(install|run|test)",                   # pnpm operations
+    "^yarn\\s+(install|run|test)",                   # yarn operations
+    "^code\\s+",                                      # VS Code
+    "^cursor\\s+",                                    # Cursor IDE
+]
+
+# Safe file patterns for read/write
+file_patterns = [
+    "**/*.md",
+    "**/*.json",
+    "**/*.js",
+    "**/*.ts",
+    "**/*.py",
+    "**/*.html",
+    "**/*.css",
+    "**/*.scss",
+    "**/*.yaml",
+    "**/*.yml",
+    "**/*.toml",
+    "**/*.sql",
+    "**/*.sh",
+]
+
+# =============================================================================
+# PASSTHROUGH - Skip validation entirely (very safe commands)
+# =============================================================================
+[passthrough]
+
+commands = [
+    "ls",
+    "dir",
+    "pwd",
+    "cd",
+    "echo",
+    "cat",
+    "head",
+    "tail",
+    "grep",
+    "find",
+    "which",
+    "where",
+    "whoami",
+    "date",
+    "time",
+]
+
+# =============================================================================
+# AUDIT SETTINGS
+# =============================================================================
+[audit]
+enabled = true
+file_pattern = "audit/{date}.jsonl"
+include_allowed = false
+include_denied = true
+include_prompted = true
