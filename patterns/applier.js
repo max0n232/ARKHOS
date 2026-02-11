@@ -4,7 +4,7 @@
  * Applies corrections from analyses with backup and safety checks
  */
 
-const fs = require('fs');
+const { promises: fs } = require('fs');
 const path = require('path');
 
 const CLAUDE_DIR = path.join(process.env.HOME || process.env.USERPROFILE, '.claude');
@@ -26,13 +26,15 @@ function escapeSQL(str) {
 
 async function ensureBackupDir() {
     try {
-        await fs.promises.mkdir(BACKUP_DIR, { recursive: true });
-    } catch (e) {}
+        await fs.mkdir(BACKUP_DIR, { recursive: true });
+    } catch (e) {
+        // Intentionally silent - directory may already exist
+    }
 }
 
 async function backupFile(filePath) {
     try {
-        await fs.promises.access(filePath);
+        await fs.access(filePath);
     } catch (e) {
         return null; // File doesn't exist
     }
@@ -42,7 +44,7 @@ async function backupFile(filePath) {
     const timestamp = new Date().toISOString().replace(/:/g, '-').split('.')[0];
     const backupPath = path.join(BACKUP_DIR, `${filename}.${timestamp}.backup`);
 
-    await fs.promises.copyFile(filePath, backupPath);
+    await fs.copyFile(filePath, backupPath);
     return backupPath;
 }
 
@@ -77,40 +79,38 @@ async function applyCorrection(correction) {
     // Check if parent directory exists
     const dir = path.dirname(targetPath);
     try {
-        await fs.promises.mkdir(dir, { recursive: true });
-    } catch (e) {}
+        await fs.mkdir(dir, { recursive: true });
+    } catch (e) {
+        // Intentionally silent - directory may already exist
+    }
 
     let backupPath = null;
     let fileExists = false;
 
     try {
-        await fs.promises.access(targetPath);
+        await fs.access(targetPath);
         fileExists = true;
         backupPath = await backupFile(targetPath);
-    } catch (e) {}
+    } catch (e) {
+        // File doesn't exist, will be created
+    }
 
     try {
         if (!fileExists) {
             // Create new file
-            await fs.promises.writeFile(targetPath, correction.content + '\n', 'utf-8');
+            await fs.writeFile(targetPath, correction.content + '\n', 'utf-8');
             return { success: true, action: 'created', backup: null };
         }
 
-        const currentContent = await fs.promises.readFile(targetPath, 'utf-8');
+        const currentContent = await fs.readFile(targetPath, 'utf-8');
 
         if (correction.action === 'add') {
-            // Append to file
             const newContent = currentContent + '\n\n' + correction.content + '\n';
-            await fs.promises.writeFile(targetPath, newContent, 'utf-8');
+            await fs.writeFile(targetPath, newContent, 'utf-8');
             return { success: true, action: 'appended', backup: backupPath };
-        } else if (correction.action === 'update') {
-            // For now, just append (real update would need more context)
-            const newContent = currentContent + '\n\n' + correction.content + '\n';
-            await fs.promises.writeFile(targetPath, newContent, 'utf-8');
-            return { success: true, action: 'updated', backup: backupPath };
+        } else {
+            return { success: false, error: `Unsupported action: ${correction.action}` };
         }
-
-        return { success: false, error: 'Unknown action' };
     } catch (e) {
         return { success: false, error: e.message };
     }
@@ -129,10 +129,24 @@ async function getPendingCorrections(db) {
 
     const [analysisId, correctionsJson] = result[0].values[0];
 
+    // Check if this analysis already has applied corrections
+    const appliedResult = db.exec(`
+        SELECT COUNT(*) FROM applied_corrections
+        WHERE analysis_id = ${analysisId}
+    `);
+    const appliedCount = appliedResult.length ? appliedResult[0].values[0][0] : 0;
+
     let corrections = [];
     try {
         corrections = JSON.parse(correctionsJson);
-    } catch (e) {}
+    } catch (e) {
+        // Invalid JSON, return empty corrections
+    }
+
+    // Skip if all corrections already applied
+    if (appliedCount >= corrections.length) {
+        return { analysisId: null, corrections: [] };
+    }
 
     // Filter to auto-applicable
     const autoApplicable = corrections.filter(c =>
@@ -165,14 +179,14 @@ function recordCorrection(db, analysisId, correction, result) {
 
 async function apply() {
     try {
-        await fs.promises.access(TRACKER_DB);
+        await fs.access(TRACKER_DB);
     } catch (e) {
         console.log('No tracker database found');
         process.exit(0);
     }
 
     const SQL = await initSqlJs();
-    const buffer = await fs.promises.readFile(TRACKER_DB);
+    const buffer = await fs.readFile(TRACKER_DB);
     const db = new SQL.Database(buffer);
 
     const { analysisId, corrections } = await getPendingCorrections(db);
@@ -205,7 +219,7 @@ async function apply() {
     }
 
     // Save database
-    await fs.promises.writeFile(TRACKER_DB, Buffer.from(db.export()));
+    await fs.writeFile(TRACKER_DB, Buffer.from(db.export()));
     db.close();
 
     console.log(`\n✅ Applied: ${applied}, Failed: ${failed}`);
