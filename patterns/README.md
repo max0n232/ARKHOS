@@ -34,3 +34,10 @@ Stored in `config` table. Edit via `/pattern-config` command.
 - `/pattern-stats` - Show statistics
 - `/pattern-corrections` - Review pending corrections
 - `/analyze-patterns` - Force analysis run
+
+## Status
+
+- **Phase 1**: Collector + Loop Detection (MVP)
+- Phase 2: Reporter + Applier
+- Phase 3: Feedback Loop + Metrics
+- Phase 4: Polish + Cleanup
