@@ -5,6 +5,8 @@
 ## References
 
 @CONSTITUTION.md
+@rules/code-style.md
+@rules/security.md
 @docs/routing.md
 @docs/skills-reference.md
 
