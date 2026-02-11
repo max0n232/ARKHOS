@@ -22,6 +22,23 @@ try {
     process.exit(0);
 }
 
+// SQL escaping for sql.js (no prepared statements)
+function escapeSQL(str) {
+    if (str === null || str === undefined) return 'NULL';
+    return "'" + String(str).replace(/'/g, "''") + "'";
+}
+
+// Validate session ID format (alphanumeric, dash, underscore only)
+function validateSessionId(sessionId) {
+    return /^[a-zA-Z0-9_-]+$/.test(sessionId);
+}
+
+// Sanitize output (remove ANSI escape codes and control characters)
+function sanitizeOutput(str) {
+    if (!str) return '';
+    return String(str).replace(/[\x00-\x1F\x7F]/g, '');
+}
+
 async function loadCapsule() {
     try {
         const content = await fs.promises.readFile(CAPSULE_PATH, 'utf-8');
@@ -33,7 +50,7 @@ async function loadCapsule() {
 
 function getConfig(db, key, defaultValue) {
     try {
-        const result = db.exec(`SELECT value FROM config WHERE key = '${key}'`);
+        const result = db.exec(`SELECT value FROM config WHERE key = ${escapeSQL(key)}`);
         if (result.length && result[0].values.length) {
             return parseFloat(result[0].values[0][0]);
         }
@@ -48,7 +65,7 @@ function detectLoop(db, sessionId) {
     const result = db.exec(`
         SELECT tool_input, COUNT(*) as cnt, MAX(error_output) as last_error
         FROM traces
-        WHERE session_id = '${sessionId}' AND exit_code != 0
+        WHERE session_id = ${escapeSQL(sessionId)} AND exit_code != 0
         GROUP BY tool_input
         HAVING cnt >= ${threshold}
         ORDER BY cnt DESC
@@ -61,9 +78,9 @@ function detectLoop(db, sessionId) {
             type: 'P1',
             severity: cnt >= 5 ? 'critical' : 'high',
             count: cnt,
-            tool_input,
-            last_error,
-            message: `WARNING LOOP DETECTED: Command failed ${cnt} times.\n\nCommand: ${tool_input}\n\nSTOP. Analyze the error before repeating:\n${last_error || 'Unknown error'}`,
+            tool_input: sanitizeOutput(tool_input),
+            last_error: sanitizeOutput(last_error),
+            message: `WARNING LOOP DETECTED: Command failed ${cnt} times.\n\nCommand: ${sanitizeOutput(tool_input)}\n\nSTOP. Analyze the error before repeating:\n${sanitizeOutput(last_error) || 'Unknown error'}`,
             forceStop: cnt >= 5
         };
     }
@@ -84,7 +101,7 @@ function detectBudgetBurn(db, sessionId) {
             COUNT(*) as total,
             SUM(CASE WHEN exit_code != 0 THEN 1 ELSE 0 END) as errors
         FROM traces
-        WHERE session_id = '${sessionId}' AND timestamp > ${windowStart}
+        WHERE session_id = ${escapeSQL(sessionId)} AND timestamp > ${windowStart}
     `);
 
     if (result.length && result[0].values.length) {
@@ -111,7 +128,7 @@ function detectDestructive(db, sessionId) {
     const result = db.exec(`
         SELECT tool_input, COUNT(*) as cnt
         FROM traces
-        WHERE session_id = '${sessionId}' AND tool_name = 'Bash' AND exit_code = -1
+        WHERE session_id = ${escapeSQL(sessionId)} AND tool_name = 'Bash' AND exit_code = -1
         GROUP BY tool_input
         HAVING cnt >= 2
         LIMIT 1
@@ -123,8 +140,8 @@ function detectDestructive(db, sessionId) {
             type: 'P3',
             severity: 'critical',
             count: cnt,
-            tool_input,
-            message: `CRITICAL DESTRUCTIVE PATTERN: Attempting blocked command repeatedly.\n\nCommand: ${tool_input}\n\nThis command is blocked by security. Find an alternative approach.`
+            tool_input: sanitizeOutput(tool_input),
+            message: `CRITICAL DESTRUCTIVE PATTERN: Attempting blocked command repeatedly.\n\nCommand: ${sanitizeOutput(tool_input)}\n\nThis command is blocked by security. Find an alternative approach.`
         };
     }
     return null;
@@ -132,16 +149,19 @@ function detectDestructive(db, sessionId) {
 
 // Record detection to database
 function recordDetection(db, sessionId, detection) {
-    db.run(`
+    const description = detection.message.split('\n')[0];
+    const context = JSON.stringify(detection);
+
+    db.exec(`
         INSERT INTO detections (session_id, pattern_type, severity, description, context)
-        VALUES (?, ?, ?, ?, ?)
-    `, [
-        sessionId,
-        detection.type,
-        detection.severity,
-        detection.message.split('\n')[0],
-        JSON.stringify(detection)
-    ]);
+        VALUES (
+            ${escapeSQL(sessionId)},
+            ${escapeSQL(detection.type)},
+            ${escapeSQL(detection.severity)},
+            ${escapeSQL(description)},
+            ${escapeSQL(context)}
+        )
+    `);
 }
 
 async function detect() {
@@ -154,6 +174,11 @@ async function detect() {
 
     const capsule = await loadCapsule();
     if (!capsule?.session_id) {
+        process.exit(0);
+    }
+
+    // Validate session_id format to prevent injection
+    if (!validateSessionId(capsule.session_id)) {
         process.exit(0);
     }
 
