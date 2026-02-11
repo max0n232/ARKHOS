@@ -20,11 +20,11 @@ try {
     process.exit(0);
 }
 
-function loadCapsule() {
+async function loadCapsule() {
     try {
-        if (fs.existsSync(CAPSULE_PATH)) {
-            return JSON.parse(fs.readFileSync(CAPSULE_PATH, 'utf-8'));
-        }
+        await fs.promises.access(CAPSULE_PATH);
+        const content = await fs.promises.readFile(CAPSULE_PATH, 'utf-8');
+        return JSON.parse(content);
     } catch (e) {}
     return null;
 }
@@ -39,8 +39,8 @@ function extractExitCode(output) {
     if (!output) return 0;
     const str = String(output);
     if (str.includes('BLOCKED') || str.includes('denied by security')) return -1;
-    if (str.includes('Error:') || str.includes('error:') ||
-        str.includes('Exception:') || str.includes('Failed')) return 1;
+    // More comprehensive pattern matching for errors
+    if (/error|exception|failed|enoent|eacces|fatal|syntaxerror|typeerror/i.test(str)) return 1;
     return 0;
 }
 
@@ -66,10 +66,10 @@ async function analyze() {
     }
 
     // Load session context
-    const capsule = loadCapsule();
+    const capsule = await loadCapsule();
     const sessionId = capsule?.session_id || 'unknown';
     const project = capsule?.project || 'unknown';
-    const tokenBudgetPct = capsule?.token_budget
+    const tokenBudgetPct = capsule?.token_budget && capsule.token_budget.total > 0
         ? capsule.token_budget.used / capsule.token_budget.total
         : 0;
 
@@ -78,7 +78,9 @@ async function analyze() {
         timestamp: Math.floor(Date.now() / 1000),
         tool_name: data.tool_name || data.tool || 'unknown',
         tool_input: truncate(data.tool_input || data.command || data.file_path, 500),
-        exit_code: data.exit_code !== undefined ? data.exit_code : extractExitCode(data.tool_output),
+        exit_code: data.exit_code !== undefined
+            ? data.exit_code
+            : extractExitCode(data.tool_output || data.output || data.stdout || data.stderr || ''),
         error_output: truncate(data.error_output || data.stderr, 1000),
         duration_ms: data.duration_ms || (Date.now() - startTime),
         token_budget_pct: tokenBudgetPct,
@@ -87,7 +89,7 @@ async function analyze() {
 
     try {
         const SQL = await initSqlJs();
-        const buffer = fs.readFileSync(TRACKER_DB);
+        const buffer = await fs.promises.readFile(TRACKER_DB);
         const db = new SQL.Database(buffer);
 
         db.run(`
@@ -109,7 +111,7 @@ async function analyze() {
 
         // Save database
         const newData = db.export();
-        fs.writeFileSync(TRACKER_DB, Buffer.from(newData));
+        await fs.promises.writeFile(TRACKER_DB, Buffer.from(newData));
         db.close();
     } catch (e) {
         // Silent fail - don't block tool execution
