@@ -6,13 +6,13 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node C:\\Users\\sorte\\.claude\\memory\\session-init.js",
+            "command": "node C:\\Users\\sorte\\.claude\\hooks\\session-start\\init-memory.js",
             "timeout": 5000,
             "statusMessage": "Initializing session..."
           },
           {
             "type": "command",
-            "command": "node C:\\Users\\sorte\\.claude\\lifecycle\\session-scan.js",
+            "command": "node C:\\Users\\sorte\\.claude\\hooks\\session-start\\scan-lifecycle.js",
             "timeout": 10000,
             "statusMessage": "Checking lifecycle..."
           }
@@ -25,13 +25,13 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node C:\\Users\\sorte\\.claude\\lifecycle\\session-cleanup.js",
+            "command": "node C:\\Users\\sorte\\.claude\\hooks\\session-end\\cleanup.js",
             "timeout": 30000,
             "statusMessage": "Cleaning up..."
           },
           {
             "type": "command",
-            "command": "node C:\\Users\\sorte\\.claude\\scripts\\auto-cleanup.js",
+            "command": "node C:\\Users\\sorte\\.claude\\hooks\\session-end\\auto-cleanup.js",
             "timeout": 15000,
             "statusMessage": "Auto-cleanup..."
           }
@@ -44,7 +44,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node C:\\Users\\sorte\\.claude\\security\\validate-command.js",
+            "command": "node C:\\Users\\sorte\\.claude\\hooks\\pre-tool-use\\validate-bash.js",
             "timeout": 5000,
             "statusMessage": "Validating command..."
           }
@@ -55,7 +55,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node C:\\Users\\sorte\\.claude\\security\\validate-file-access.js",
+            "command": "node C:\\Users\\sorte\\.claude\\hooks\\pre-tool-use\\validate-file-access.js",
             "timeout": 5000,
             "statusMessage": "Validating file access..."
           }
@@ -68,12 +68,12 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node C:\\Users\\sorte\\.claude\\security\\audit-log.js",
+            "command": "node C:\\Users\\sorte\\.claude\\hooks\\post-tool-use\\audit-log.js",
             "timeout": 3000
           },
           {
             "type": "command",
-            "command": "node C:\\Users\\sorte\\.claude\\patterns\\analyzer.js",
+            "command": "node C:\\Users\\sorte\\.claude\\hooks\\post-tool-use\\pattern-analyzer.js",
             "timeout": 3000
           }
         ]
@@ -85,7 +85,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node C:\\Users\\sorte\\.claude\\patterns\\detector.js",
+            "command": "node C:\\Users\\sorte\\.claude\\hooks\\stop\\pattern-detector.js",
             "timeout": 5000
           }
         ]
@@ -96,13 +96,13 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node C:\\Users\\sorte\\.claude\\memory\\save-state.js",
+            "command": "node C:\\Users\\sorte\\.claude\\hooks\\pre-compact\\save-state.js",
             "timeout": 5000,
             "statusMessage": "Saving state before compact..."
           },
           {
             "type": "command",
-            "command": "node C:\\Users\\sorte\\.claude\\patterns\\reporter.js",
+            "command": "node C:\\Users\\sorte\\.claude\\hooks\\pre-compact\\pattern-reporter.js",
             "timeout": 30000,
             "statusMessage": "Analyzing patterns..."
           }
@@ -115,7 +115,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node C:\\Users\\sorte\\.claude\\security\\audit-log.js agent-start",
+            "command": "node C:\\Users\\sorte\\.claude\\hooks\\subagent-start\\audit-log.js agent-start",
             "timeout": 3000
           }
         ]
