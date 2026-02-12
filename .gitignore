@@ -4,7 +4,9 @@ db/node_modules/
 plugins/cache/
 
 # Session data (local only)
-projects/
+/projects/
+# Exception: skill project knowledge is tracked
+!skills/**/projects/
 debug/
 todos/
 shell-snapshots/

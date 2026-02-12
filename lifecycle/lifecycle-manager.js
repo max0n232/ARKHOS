@@ -66,13 +66,15 @@ const DEFAULT_CONFIG = {
         },
         postMortem: {
             patterns: ['logs/post-mortem/**'],
-            ttl_days: 30,
+            ttl_days: 14,
             priority: 'normal',
             deletable: true,
-            max_files: 50
+            max_files: 30
         },
         patternsData: {
-            patterns: ['patterns/*.md', 'patterns/*.json'],
+            // ONLY unconfirmed patterns get TTL cleanup
+            // Confirmed patterns (no prefix) are permanent
+            patterns: ['patterns/UNCONFIRMED-*.md', 'patterns/UNCONFIRMED-*.json'],
             ttl_days: 90,
             priority: 'normal',
             deletable: true

@@ -1,18 +1,21 @@
 #!/usr/bin/env node
 /**
- * Post-Mortem Analyzer (Phase 2)
+ * Post-Mortem Analyzer (Phase 3)
  *
  * Analyzes session errors and applies auto-fixes:
  * - Reads tmp/post-mortem-pending.json
  * - Classifies findings with confidence scoring
+ * - Cross-session analysis: boost, regression detection, priority scoring
  * - Patches SKILL.md (confidence ≥0.8)
  * - Writes to patterns/ (confidence ≥0.5)
+ * - Appends to project KNOWLEDGE.md (confidence ≥0.7, project-specific)
  * - Git commits after auto-patch
  *
  * Limits (Context Protection):
  * - Max 5 findings processed
  * - Max 3 SKILL.md patches per session
  * - Max 50 lines per log file
+ * - Max 500 tokens for previous logs (~2000 chars per file)
  */
 
 const fs = require('fs');
@@ -23,6 +26,11 @@ const CLAUDE_DIR = path.join(process.env.HOME || process.env.USERPROFILE, '.clau
 const PENDING_FILE = path.join(CLAUDE_DIR, 'tmp', 'post-mortem-pending.json');
 const LOGS_DIR = path.join(CLAUDE_DIR, 'logs', 'post-mortem');
 const PATTERNS_DIR = path.join(CLAUDE_DIR, 'patterns');
+
+// Project knowledge files for project-specific patterns
+const PROJECT_KNOWLEDGE = {
+    studiokook: path.join(CLAUDE_DIR, 'skills', 'wordpress', 'projects', 'studiokook', 'KNOWLEDGE.md')
+};
 
 // Protected files - NEVER modify
 const PROTECTED_FILES = [
@@ -35,6 +43,7 @@ const PROTECTED_FILES = [
 // Confidence thresholds
 const THRESHOLD = {
     AUTO_FIX: 0.8,
+    KNOWLEDGE: 0.7,
     PATTERN: 0.5,
     IGNORE: 0.3
 };
@@ -43,7 +52,9 @@ const THRESHOLD = {
 const LIMITS = {
     MAX_FINDINGS: 5,
     MAX_PATCHES: 3,
-    MAX_LOG_LINES: 50
+    MAX_LOG_LINES: 50,
+    MAX_CHARS_PER_LOG: 2000,
+    MAX_LINES_PER_LOG: 50
 };
 
 /**
@@ -73,9 +84,11 @@ function calculateBaseConfidence(finding) {
 
 /**
  * Load previous post-mortem logs for cross-session boost
+ * Token limit: ~500 tokens = ~2000 chars = ~50 lines per file
  */
 function loadPreviousLogs(maxFiles = 5) {
     const logs = [];
+
     try {
         if (!fs.existsSync(LOGS_DIR)) return logs;
 
@@ -85,7 +98,12 @@ function loadPreviousLogs(maxFiles = 5) {
             .slice(-maxFiles);
 
         for (const file of files) {
-            const content = fs.readFileSync(path.join(LOGS_DIR, file), 'utf-8');
+            let content = fs.readFileSync(path.join(LOGS_DIR, file), 'utf-8');
+
+            // Truncate to token limit
+            const lines = content.split('\n').slice(0, LIMITS.MAX_LINES_PER_LOG);
+            content = lines.join('\n').substring(0, LIMITS.MAX_CHARS_PER_LOG);
+
             logs.push({ file, content });
         }
     } catch (e) {
@@ -118,6 +136,83 @@ function calculateCrossSessionBoost(finding, previousLogs) {
 }
 
 /**
+ * Detect regression: error in domain that previously worked
+ * Returns true if domain had [AUTO-FIXED] entries but now has new errors
+ */
+function detectRegression(finding, previousLogs) {
+    const domain = extractDomain(finding.location);
+    if (!domain) return false;
+
+    // Check if domain had successful fixes before
+    for (const log of previousLogs) {
+        if (log.content.includes('[AUTO-FIXED]') && log.content.includes(domain)) {
+            // Domain was working, now has error = regression
+            return true;
+        }
+    }
+
+    return false;
+}
+
+/**
+ * Extract domain from location (e.g., studiokook.ee, n8n, etc.)
+ */
+function extractDomain(location) {
+    if (!location) return null;
+
+    const domainPatterns = [
+        /studiokook/i,
+        /wordpress|wp/i,
+        /n8n/i,
+        /fal[-.]?ai/i
+    ];
+
+    for (const pattern of domainPatterns) {
+        if (pattern.test(location)) {
+            return pattern.source.replace(/[\\[\]|]/g, '');
+        }
+    }
+
+    // Try to extract hostname
+    const urlMatch = location.match(/(?:https?:\/\/)?([^\/]+)/);
+    if (urlMatch) return urlMatch[1];
+
+    return null;
+}
+
+/**
+ * Calculate priority score based on frequency across sessions
+ * Higher score = more frequent = higher priority
+ */
+function calculatePriorityScore(finding, previousLogs) {
+    let occurrences = 0;
+    const errorType = finding.errorType;
+
+    for (const log of previousLogs) {
+        // Count occurrences of same error type
+        const matches = (log.content.match(new RegExp(errorType, 'gi')) || []).length;
+        occurrences += matches;
+    }
+
+    // Priority tiers: 0-1 = low, 2-3 = medium, 4+ = high
+    if (occurrences >= 4) return 'high';
+    if (occurrences >= 2) return 'medium';
+    return 'low';
+}
+
+/**
+ * Detect project from finding location
+ */
+function detectProject(finding) {
+    const location = finding.location || '';
+
+    if (/studiokook/i.test(location)) return 'studiokook';
+    // Add more projects as needed
+
+    return null;
+}
+
+/**
  * Classify finding category
  */
 function classifyFinding(finding) {
@@ -127,7 +222,7 @@ function classifyFinding(finding) {
     if (finding.hasWorkaround && !finding.docMethod) {
         return 'new-pattern';
     }
-    if (finding.wasWorking) {
+    if (finding.wasWorking || finding.isRegression) {
         return 'regression';
     }
     return 'anomaly';
@@ -309,8 +404,11 @@ function patchSkillMd(skillPath, finding) {
  */
 function writePattern(finding, confidence) {
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-    const status = confidence >= THRESHOLD.AUTO_FIX ? 'confirmed' : '[UNCONFIRMED]';
-    const filename = `${timestamp}-${finding.errorType.replace(/[^a-z0-9]/gi, '-')}.md`;
+    const isConfirmed = confidence >= THRESHOLD.AUTO_FIX;
+    const status = isConfirmed ? 'confirmed' : '[UNCONFIRMED]';
+    // Filename prefix determines TTL cleanup eligibility
+    const prefix = isConfirmed ? '' : 'UNCONFIRMED-';
+    const filename = `${prefix}${timestamp}-${finding.errorType.replace(/[^a-z0-9]/gi, '-')}.md`;
     const filepath = path.join(PATTERNS_DIR, filename);
 
     const content = `# ${status} Pattern: ${finding.errorType}
@@ -318,7 +416,8 @@ function writePattern(finding, confidence) {
 Date: ${new Date().toISOString()}
 Confidence: ${confidence.toFixed(2)}
 Category: ${classifyFinding(finding)}
-
+Priority: ${finding.priority || 'low'}
+${finding.isRegression ? 'Regression: YES\n' : ''}
 ## Problem
 ${finding.original || 'Unknown'}
 
@@ -343,6 +442,59 @@ ${finding.retryCount}
 }
 
 /**
+ * Append finding to project KNOWLEDGE.md
+ * Only for project-specific findings with confidence ≥0.7
+ */
+function appendToProjectKnowledge(finding, confidence) {
+    const project = detectProject(finding);
+    if (!project || !PROJECT_KNOWLEDGE[project]) return false;
+
+    const knowledgePath = PROJECT_KNOWLEDGE[project];
+    if (!fs.existsSync(knowledgePath)) return false;
+
+    const date = new Date().toISOString().split('T')[0];
+    const entry = `
+### ${date}: ${finding.errorType}
+- **Location:** ${finding.location || 'unknown'}
+- **Problem:** ${finding.original?.substring(0, 100) || 'Unknown'}
+- **Resolution:** ${finding.workaround?.method || 'Pending'}
+- **Confidence:** ${confidence.toFixed(2)}
+`;
+
+    try {
+        let content = fs.readFileSync(knowledgePath, 'utf-8');
+
+        // Find "## Patterns" section and append
+        const patternsMarker = '## Patterns (Project-Specific)';
+        const markerIndex = content.indexOf(patternsMarker);
+
+        if (markerIndex !== -1) {
+            // Insert after the marker and any existing content
+            const afterMarker = content.substring(markerIndex + patternsMarker.length);
+            const nextSection = afterMarker.indexOf('\n## ');
+
+            if (nextSection !== -1) {
+                // Insert before next section
+                const insertPoint = markerIndex + patternsMarker.length + nextSection;
+                content = content.substring(0, insertPoint) + entry + content.substring(insertPoint);
+            } else {
+                // Append at end
+                content = content.trimEnd() + entry + '\n';
+            }
+        } else {
+            // No patterns section, append at end
+            content = content.trimEnd() + '\n\n## Patterns (Project-Specific)\n' + entry;
+        }
+
+        fs.writeFileSync(knowledgePath, content);
+        return true;
+    } catch (e) {
+        console.error(`Knowledge append error: ${e.message}`);
+        return false;
+    }
+}
+
+/**
  * Write post-mortem log
  */
 function writeLog(sessionId, findings, results) {
@@ -363,17 +515,30 @@ function writeLog(sessionId, findings, results) {
                            status === 'pattern' ? '[UNCONFIRMED]' :
                            '[LOGGED]';
 
-        lines.push(`### ${statusLabel} ${classifyFinding(finding)}: ${finding.location || 'unknown'} (confidence: ${confidence.toFixed(2)})`);
+        // Add regression/priority tags
+        const tags = [];
+        if (finding.isRegression) tags.push('REGRESSION');
+        if (finding.priority === 'high') tags.push('HIGH-PRIORITY');
+        const tagStr = tags.length > 0 ? ` [${tags.join(', ')}]` : '';
+
+        lines.push(`### ${statusLabel}${tagStr} ${classifyFinding(finding)}: ${finding.location || 'unknown'} (confidence: ${confidence.toFixed(2)})`);
         lines.push(`- Problem: ${finding.original?.substring(0, 100) || 'Unknown'}`);
         lines.push(`- Resolution: ${finding.workaround?.method || 'None'}`);
+        lines.push(`- Priority: ${finding.priority || 'low'}`);
         lines.push(`- Action: ${action}`);
         lines.push('');
     }
+
+    // Count regressions and high-priority
+    const regressions = results.filter(r => r.finding.isRegression).length;
+    const highPriority = results.filter(r => r.finding.priority === 'high').length;
 
     lines.push('## Stats');
     lines.push(`- Errors: ${findings.length}`);
     lines.push(`- Patched: ${results.filter(r => r.status === 'patched').length}`);
     lines.push(`- Patterns: ${results.filter(r => r.status === 'pattern').length}`);
+    if (regressions > 0) lines.push(`- Regressions: ${regressions}`);
+    if (highPriority > 0) lines.push(`- High Priority: ${highPriority}`);
 
     // Truncate to limit
     const content = lines.slice(0, LIMITS.MAX_LOG_LINES).join('\n');
@@ -442,11 +607,22 @@ async function analyze() {
         const boost = calculateCrossSessionBoost(finding, previousLogs);
         const confidence = Math.min(baseConfidence + boost, 1.0);
 
+        // Phase 3: Detect regression and calculate priority
+        const isRegression = detectRegression(finding, previousLogs);
+        const priority = calculatePriorityScore(finding, previousLogs);
+
+        // Boost confidence for regressions (+0.1)
+        const adjustedConfidence = isRegression ? Math.min(confidence + 0.1, 1.0) : confidence;
+
+        // Tag finding with metadata
+        finding.isRegression = isRegression;
+        finding.priority = priority;
+
         let action = 'ignored';
         let status = 'ignored';
 
         // Auto-fix (confidence ≥0.8)
-        if (confidence >= THRESHOLD.AUTO_FIX && patchCount < LIMITS.MAX_PATCHES) {
+        if (adjustedConfidence >= THRESHOLD.AUTO_FIX && patchCount < LIMITS.MAX_PATCHES) {
             const skillPath = findSkillMd(finding);
             if (skillPath && patchSkillMd(skillPath, finding)) {
                 action = `patched ${path.basename(skillPath)}`;
@@ -457,21 +633,28 @@ async function analyze() {
         }
 
         // Write pattern (confidence ≥0.5)
-        if (confidence >= THRESHOLD.PATTERN) {
-            const patternFile = writePattern(finding, confidence);
+        if (adjustedConfidence >= THRESHOLD.PATTERN) {
+            const patternFile = writePattern(finding, adjustedConfidence);
             if (patternFile) {
                 action = action === 'ignored' ? `pattern: ${patternFile}` : `${action}, pattern: ${patternFile}`;
                 status = status === 'ignored' ? 'pattern' : status;
             }
         }
 
+        // Append to project knowledge (confidence ≥0.7, project-specific)
+        if (adjustedConfidence >= THRESHOLD.KNOWLEDGE && detectProject(finding)) {
+            if (appendToProjectKnowledge(finding, adjustedConfidence)) {
+                action = `${action}, knowledge`;
+            }
+        }
+
         // Log only (confidence ≥0.3)
-        if (confidence >= THRESHOLD.IGNORE) {
+        if (adjustedConfidence >= THRESHOLD.IGNORE) {
             status = status === 'ignored' ? 'logged' : status;
             action = action === 'ignored' ? 'logged' : action;
         }
 
-        results.push({ finding, confidence, action, status });
+        results.push({ finding, confidence: adjustedConfidence, action, status });
     }
 
     // Write log

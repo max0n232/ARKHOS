@@ -10,6 +10,7 @@ Shared skills available across all projects.
 | assistant | skills/assistant/ | General task management |
 | knowledge | skills/knowledge/ | Knowledge DB operations |
 | task-router | skills/task-router/ | Task mode routing (solo/subagent/team) |
+| post-mortem | skills/post-mortem/ | Session error analysis, auto-patching SKILL.md |
 
 ### Automation
 | Skill | Path | Description |
@@ -37,6 +38,7 @@ Shared skills available across all projects.
 | Skill | Path | Description |
 |-------|------|-------------|
 | wordpress | skills/wordpress/ | studiokook.ee REST API, TranslatePress, Elementor |
+| studiokook-knowledge | skills/wordpress/projects/studiokook/ | Project-specific knowledge, patterns, decisions |
 
 ## Project Routing
 
