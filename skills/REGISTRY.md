@@ -33,6 +33,11 @@ Shared skills available across all projects.
 |-------|------|-------------|
 | legal | skills/legal.md | Estonian law, GDPR |
 
+### WordPress
+| Skill | Path | Description |
+|-------|------|-------------|
+| wordpress | skills/wordpress/ | studiokook.ee REST API, TranslatePress, Elementor |
+
 ## Project Routing
 
 Skills are loaded based on:

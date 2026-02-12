@@ -7,10 +7,12 @@
 @rules/constitution.md
 @rules/code-style.md
 @rules/security.md
+@rules/integration-checklist.md
 @docs/routing.md
 @docs/skills-reference.md
 @skills/task-router/SKILL.md
 @skills/task-router/registry.json
+@skills/wordpress/SKILL.md
 
 ## Defaults
 

@@ -141,14 +141,22 @@ See: [Claude Code Hooks Documentation](https://code.claude.com/docs/en/hooks)
 
 ## Adding New Components
 
+**ОБЯЗАТЕЛЬНО:** При добавлении любого компонента следуй @rules/integration-checklist.md
+
+Quick reference:
+1. Создай/обнови SKILL.md
+2. Зарегистрируй в skills/REGISTRY.md
+3. Настрой triggers (skills-reference.md или _triggers.json)
+4. Привяжи к routing (routing.md, task-router, agents)
+5. Задокументируй dependencies
+6. Добавь @reference в CLAUDE.md (только для критических)
+7. Проверь что CLI находит при релевантном запросе
+
+Полный чеклист: rules/integration-checklist.md
+
 ### New Security Rule
 1. Edit `.claude/security/rules.toml`
 2. Add to [deny] or [allow] section
-
-### New Skill
-1. Create `skills/{name}/SKILL.md`
-2. Add triggers to `_triggers.json`
-3. Update `REGISTRY.md`
 
 ### New Project
 1. Add to `projects.json`

@@ -16,4 +16,5 @@
 | Project | Skills | Triggers |
 |---------|--------|----------|
 | Studiokook | `claude-wordpress-skills:wp-performance-review` | "performance", "slow site", "timeout", "500 error", "optimization" |
+| Studiokook | `skills/wordpress/SKILL.md` | "перевод", "translation", "контент", "страница", "TRP", "SEO", "snippet" |
 | Personal | n/a | n/a |

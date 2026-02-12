@@ -47,3 +47,4 @@
 | Content Creator | `~/.claude/skills/content-creator.md` | YouTube, Telegram strategy, SEO |
 | Assistant | `~/.claude/skills/assistant.md` | Task management, Eisenhower, Pomodoro |
 | Knowledge | `~/.claude/skills/knowledge.md` | Knowledge DB, decisions, logs, snippets |
+| WordPress | `~/.claude/skills/wordpress/` | WordPress, WP, сайт, studiokook, перевод, translation, TRP, Elementor, SEO, snippets |
