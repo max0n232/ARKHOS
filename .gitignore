@@ -33,3 +33,9 @@ Thumbs.db
 cache/
 statsig/
 stats-cache.json
+
+# Local Claude settings (IDE-specific permissions)
+.claude/settings.local.json
+
+# Database files (use schema-*.sql + migrate.js to recreate)
+*.db

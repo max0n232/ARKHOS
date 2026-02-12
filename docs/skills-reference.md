@@ -48,3 +48,39 @@
 | Assistant | `~/.claude/skills/assistant.md` | Task management, Eisenhower, Pomodoro |
 | Knowledge | `~/.claude/skills/knowledge.md` | Knowledge DB, decisions, logs, snippets |
 | WordPress | `~/.claude/skills/wordpress/` | WordPress, WP, сайт, studiokook, перевод, translation, TRP, Elementor, SEO, snippets |
+| Task Router | `~/.claude/skills/task-router/` | (implicit) Automatic routing to Solo/Subagent/Team mode |
+
+## Marketing Skills (`skills/marketing/`)
+
+Источник: [coreyhaines31/marketingskills](https://github.com/coreyhaines31/marketingskills)
+
+| Skill | Применение |
+|-------|-----------|
+| SEO Audit | Аудит studiokook.ee |
+| Schema Markup | Product, LocalBusiness, FAQ |
+| Programmatic SEO | Лендинги по городам/продуктам |
+| Social Content | Instagram/LinkedIn посты |
+| Copywriting | Тексты для сайта и рекламы |
+| Content Strategy | Контент-план |
+| Analytics Tracking | GA4, UTM, события |
+| Page CRO | Конверсия страниц |
+
+## MCP Integrations
+
+| MCP | Инструменты |
+|-----|-------------|
+| **WordPress** | Abilities API (ngg-gallery/query, page management) |
+| **n8n** | Workflows CRUD, templates, validation, execution |
+| **Playwright** | Browser automation, scraping |
+
+## DAL (Data Access Layer)
+
+```python
+from data_access_layer import dal
+
+dal.decisions.add(title=..., decision=..., reasoning=...)
+dal.logs.add(summary=..., details=..., project="Studiokook")
+dal.snippets.add(name=..., code=..., language="python")
+dal.errors.add(title=..., solution=..., lesson=...)
+dal.decisions.search("query")
+```
