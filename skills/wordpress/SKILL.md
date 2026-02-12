@@ -243,6 +243,15 @@ Full reset:       POST sk/v1/full-clear                (auth)
 8. After bulk translation changes: run `fix-trp-dicts` to rebuild dictionary.
 9. After content changes: run `touch-page` to clear cache.
 
+## Windows/Bash Gotchas
+
+1. **UTF-8:** Никогда не передавай Unicode (ö, ü, ä, кириллицу) inline в curl -d. Используй:
+   - `curl -d @file.json` (JSON записан в файл)
+   - Node.js скрипт с https модулем
+2. **Символ `!`:** Bash интерпретирует как history expansion. Записывай в файл.
+3. **Content-Length:** Для Node.js https.request ВСЕГДА указывай Content-Length: Buffer.byteLength(data)
+4. **Pipe blocking:** `curl | node -e` блокируется security pattern. Используй промежуточный файл.
+
 ## Common Workflows
 
 ### Translate a page to Russian
