@@ -336,6 +336,30 @@ curl -X POST ".../sk/v1/update-seo" \
 
 Each row: id, original, translated, status, original_id
 
+### Table Architecture (КРИТИЧНО)
+
+TranslatePress хранит переводы в ОТДЕЛЬНЫХ таблицах для каждой языковой пары:
+
+| Таблица | Пара | Примечание |
+|---|---|---|
+| `wp_trp_dictionary_et_en_gb` | Estonian → English | **Основная** — trp-search и trp-untranslated читают отсюда |
+| `wp_trp_dictionary_et_ru_ru` | Estonian → Russian | Отдельная таблица, свои ID |
+| `wp_trp_dictionary_et_fi` | Estonian → Finnish | Отдельная таблица, свои ID |
+
+**Критические правила:**
+
+1. `trp-search` и `trp-untranslated` возвращают данные ТОЛЬКО из EN-таблицы
+2. `?lang=` параметр в этих endpoints ИГНОРИРУЕТСЯ
+3. `trp-update-by-id` обновляет записи ТОЛЬКО в EN-таблице
+4. Для добавления RU перевода: `trp-add` с `lang: 'ru'` — пишет в `et_ru_ru`
+5. Для добавления FI перевода: `trp-add` с `lang: 'fi'` — пишет в `et_fi`
+6. ID в EN-таблице ≠ ID в RU-таблице для одной и той же строки
+
+**Последствия:**
+- "success: true" от trp-update-by-id НЕ означает что RU перевод обновлён
+- После добавления перевода — ВСЕГДА открыть страницу и визуально проверить
+- Для bulk RU переводов — использовать ТОЛЬКО `trp-add` с `lang: 'ru'`
+
 ## Page IDs Reference
 
 | Page | ID | URL slug |
