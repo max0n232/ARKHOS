@@ -9,6 +9,7 @@ Shared skills available across all projects.
 |-------|------|-------------|
 | assistant | skills/assistant/ | General task management |
 | knowledge | skills/knowledge/ | Knowledge DB operations |
+| task-router | skills/task-router/ | Task mode routing (solo/subagent/team) |
 
 ### Automation
 | Skill | Path | Description |

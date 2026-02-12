@@ -4,6 +4,9 @@ description: Debugging specialist. Use when investigating bugs, errors, or unexp
 tools: Read, Grep, Glob, Bash
 model: sonnet
 permissionMode: default
+domain: code
+role: debugger
+team_eligible: true
 ---
 
 You are a debugging specialist.

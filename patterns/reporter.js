@@ -87,6 +87,16 @@ async function gatherData(db) {
     `);
     const detections = result.length ? result[0].values : [];
 
+    // Routing mode distribution
+    result = db.exec(`
+        SELECT routing_mode, routing_domain, COUNT(*) as cnt
+        FROM traces
+        WHERE timestamp > ${lastTs} AND routing_mode IS NOT NULL
+        GROUP BY routing_mode, routing_domain
+        ORDER BY cnt DESC
+    `);
+    const routingStats = result.length ? result[0].values : [];
+
     // Current patterns
     let currentPatterns = '';
     try {
@@ -103,7 +113,8 @@ async function gatherData(db) {
         avgDuration: avgDuration || 0,
         topErrors,
         detections,
-        currentPatterns
+        currentPatterns,
+        routingStats
     };
 }
 
@@ -118,6 +129,10 @@ function formatPrompt(data) {
         `- **${d[0]}** (${d[1]}): ${d[2]}`
     ).join('\n');
 
+    let routingText = data.routingStats.map(r =>
+        `- ${r[0] || 'unknown'}/${r[1] || 'unknown'}: ${r[2]} calls`
+    ).join('\n');
+
     return `Проанализируй данные выполнения CLI-агента:
 
 ## Статистика
@@ -128,6 +143,9 @@ ${errorsText || 'Нет ошибок'}
 
 ## Обнаруженные паттерны
 ${detectionsText || 'Нет паттернов'}
+
+## Routing Distribution
+${routingText || 'No routing data'}
 
 ## Текущие правила (excerpt)
 ${data.currentPatterns.substring(0, 1000)}

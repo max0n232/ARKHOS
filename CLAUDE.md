@@ -9,6 +9,8 @@
 @rules/security.md
 @docs/routing.md
 @docs/skills-reference.md
+@skills/task-router/SKILL.md
+@skills/task-router/registry.json
 
 ## Defaults
 

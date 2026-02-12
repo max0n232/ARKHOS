@@ -4,6 +4,9 @@ description: Codebase exploration agent. Use for understanding code structure an
 tools: Read, Grep, Glob
 model: haiku
 permissionMode: default
+domain: research
+role: searcher
+team_eligible: true
 ---
 
 You are a codebase research specialist.

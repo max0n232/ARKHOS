@@ -177,6 +177,34 @@ function detectSuccessPatterns(db, sessionId) {
     return null;
 }
 
+// P5: Routing Mismatch Detection
+function detectRoutingMismatch(db, sessionId) {
+    // Team used for simple task (completed in <2 min with <5 ops)
+    const teamResult = db.exec(`
+        SELECT routing_template, COUNT(*) as ops,
+               (MAX(timestamp) - MIN(timestamp)) as duration_sec
+        FROM traces
+        WHERE session_id = ${escapeSQL(sessionId)}
+          AND routing_mode = 'team'
+        GROUP BY routing_template
+        HAVING duration_sec < 120 AND ops < 5
+    `);
+
+    if (teamResult.length && teamResult[0].values.length) {
+        const [template, ops, duration] = teamResult[0].values[0];
+        return {
+            type: 'P5',
+            subtype: 'team_overuse',
+            severity: 'low',
+            template: template,
+            duration_sec: duration,
+            message: `ROUTING MISMATCH: Team "${template}" used for task that completed in ${duration}s. Consider solo next time.`
+        };
+    }
+
+    return null;
+}
+
 // Record detection to database
 function recordDetection(db, sessionId, detection) {
     const description = detection.message.split('\n')[0];
@@ -224,8 +252,9 @@ async function detect() {
         const p1 = detectLoop(db, sessionId);
         const p2 = detectBudgetBurn(db, sessionId);
         const p4 = detectSuccessPatterns(db, sessionId);
+        const p5 = detectRoutingMismatch(db, sessionId);
 
-        const detections = [p3, p1, p2].filter(d => d !== null);
+        const detections = [p3, p1, p2, p5].filter(d => d !== null);
 
         if (detections.length > 0) {
             // Record all detections

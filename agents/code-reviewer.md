@@ -4,6 +4,9 @@ description: Proactive code review agent. Use for reviewing code quality, securi
 tools: Read, Grep, Glob
 model: sonnet
 permissionMode: default
+domain: code
+role: quality
+team_eligible: true
 ---
 
 You are a code review specialist.

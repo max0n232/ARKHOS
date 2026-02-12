@@ -84,7 +84,13 @@ async function analyze() {
         error_output: truncate(data.error_output || data.stderr, 1000),
         duration_ms: data.duration_ms || (Date.now() - startTime),
         token_budget_pct: tokenBudgetPct,
-        project: project
+        project: project,
+        // Routing data (if present in input)
+        routing_mode: data.routing?.mode || null,
+        routing_domain: data.routing?.domain || null,
+        routing_template: data.routing?.template || null,
+        team_name: data.routing?.team_name || null,
+        agent_role: data.routing?.agent_role || null
     };
 
     try {
@@ -95,8 +101,9 @@ async function analyze() {
         db.run(`
             INSERT INTO traces (
                 session_id, timestamp, tool_name, tool_input,
-                exit_code, error_output, duration_ms, token_budget_pct, project
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                exit_code, error_output, duration_ms, token_budget_pct, project,
+                routing_mode, routing_domain, routing_template, team_name, agent_role
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `, [
             trace.session_id,
             trace.timestamp,
@@ -106,7 +113,12 @@ async function analyze() {
             trace.error_output,
             trace.duration_ms,
             trace.token_budget_pct,
-            trace.project
+            trace.project,
+            trace.routing_mode,
+            trace.routing_domain,
+            trace.routing_template,
+            trace.team_name,
+            trace.agent_role
         ]);
 
         // Save database

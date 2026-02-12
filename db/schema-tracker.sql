@@ -13,6 +13,11 @@ CREATE TABLE IF NOT EXISTS traces (
     duration_ms INTEGER,
     token_budget_pct REAL,
     project TEXT,
+    routing_mode TEXT,
+    routing_domain TEXT,
+    routing_template TEXT,
+    team_name TEXT,
+    agent_role TEXT,
     created_at TEXT DEFAULT (datetime('now'))
 );
 
