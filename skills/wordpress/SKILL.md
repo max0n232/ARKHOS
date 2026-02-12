@@ -34,9 +34,9 @@ Base URL: `https://studiokook.ee/wp-json/sk/v1/`
 | update-seo | **Yes** | POST |
 | elementor/{id} | **Yes** | GET |
 | elementor/{id}/replace | **Yes** | POST |
-| fix-trp-dicts | **Yes** | POST |
-| fix-trp-tasuta | **Yes** | POST |
-| touch-page | **Yes** | POST |
+| fix-trp-dicts | **Yes** | GET |
+| fix-trp-tasuta | **Yes** | GET |
+| touch-page | **Yes** | GET |
 | clear-seraph | **Yes** | POST |
 | trp-clean-emoji | **Yes** | POST |
 
@@ -113,8 +113,11 @@ Insert new dictionary entry.
 #### `POST trp-update-id` (auth required)
 Update entry by specific ID.
 
-#### `POST fix-trp-dicts` (auth required)
+#### `GET fix-trp-dicts` (auth required)
 Repair/rebuild TranslatePress dictionaries. Run after bulk changes.
+
+#### `GET fix-trp-tasuta` (auth required)
+Fix specific TRP dictionary issue with "tasuta" translations.
 
 #### `POST trp-clean-emoji` (auth required)
 Remove emoji artifacts from translation entries.
@@ -139,7 +142,7 @@ curl -X POST "https://studiokook.ee/wp-json/sk/v1/elementor/8/replace" \
   -d '{"search": " Täitke vorm", "replace": "Täitke vorm"}'
 ```
 
-#### `POST touch-page` (auth required)
+#### `GET touch-page` (auth required)
 Invalidate page cache. Run after content changes.
 
 ### SEO Endpoints
@@ -205,7 +208,7 @@ Step 2: CHOOSE METHOD (in priority order)
 Step 3: VERIFY
   → GET the page on target language
   → Confirm text displays correctly
-  → If cache: POST touch-page or clear-seraph
+  → If cache: GET touch-page or clear-seraph
 
 Step 4: LOG
   → Record what was changed and why
@@ -217,7 +220,7 @@ Step 4: LOG
 Read content:     GET sk/v1/elementor/{page_id}        (auth)
 Modify content:   POST sk/v1/elementor/{page_id}/replace (auth)
 Update SEO:       POST sk/v1/update-seo                (auth)
-Clear cache:      POST sk/v1/touch-page or clear-seraph (auth)
+Clear cache:      GET sk/v1/touch-page or clear-seraph (auth)
 ```
 
 ### When debugging issues
@@ -260,10 +263,12 @@ curl -X POST ".../sk/v1/trp-add" \
   -d '{"original": "Estonian text", "translated": "Русский текст", "lang": "ru"}'
 
 # 4. After all translations: rebuild dictionary
-curl -X POST ".../sk/v1/fix-trp-dicts"
+curl "https://studiokook.ee/wp-json/sk/v1/fix-trp-dicts" \
+  -H "Authorization: Basic $WP_AUTH"
 
 # 5. Clear cache
-curl -X POST ".../sk/v1/touch-page"
+curl "https://studiokook.ee/wp-json/sk/v1/touch-page" \
+  -H "Authorization: Basic $WP_AUTH"
 ```
 
 ### Fix whitespace duplicate in TRP
@@ -283,8 +288,10 @@ curl -X POST ".../sk/v1/trp-update-by-id" \
   -d '{"id": "2544", "translated": "Заполните форму...", "status": "2"}'
 
 # 4. Rebuild + clear cache
-curl -X POST ".../sk/v1/fix-trp-dicts"
-curl -X POST ".../sk/v1/touch-page"
+curl "https://studiokook.ee/wp-json/sk/v1/fix-trp-dicts" \
+  -H "Authorization: Basic $WP_AUTH"
+curl "https://studiokook.ee/wp-json/sk/v1/touch-page" \
+  -H "Authorization: Basic $WP_AUTH"
 ```
 
 ### Audit existing snippets
