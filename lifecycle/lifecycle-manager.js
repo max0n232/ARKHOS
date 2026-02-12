@@ -64,6 +64,19 @@ const DEFAULT_CONFIG = {
             deletable: true,
             max_files: 20
         },
+        postMortem: {
+            patterns: ['logs/post-mortem/**'],
+            ttl_days: 30,
+            priority: 'normal',
+            deletable: true,
+            max_files: 50
+        },
+        patternsData: {
+            patterns: ['patterns/*.md', 'patterns/*.json'],
+            ttl_days: 90,
+            priority: 'normal',
+            deletable: true
+        },
         user: {
             patterns: ['memory/**', 'knowledge/**', 'plans/**', 'history.jsonl'],
             ttl_days: 90,

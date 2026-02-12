@@ -19,6 +19,20 @@ const GLOBAL_MEMORY = path.join(CLAUDE_DIR, 'memory', 'global');
 const TOKEN_BUDGET = 200000;
 const WARNING_THRESHOLD = 0.05; // 5%
 
+// Baseline files that are always loaded into context
+const BASELINE_PATHS = [
+    'CLAUDE.md',
+    'rules/constitution.md',
+    'rules/code-style.md',
+    'rules/security.md',
+    'rules/integration-checklist.md',
+    'docs/routing.md',
+    'docs/skills-reference.md',
+    'skills/task-router/SKILL.md',
+    'skills/task-router/registry.json',
+    'skills/wordpress/SKILL.md'
+];
+
 /**
  * Estimate token count from text (rough approximation: ~4 chars per token)
  */
@@ -81,6 +95,31 @@ function loadPreviousCapsule() {
 }
 
 /**
+ * Load baseline files (CLAUDE.md + @imports) and track tokens
+ */
+function loadBaselineFiles() {
+    const loaded = [];
+    let baselineTokens = 0;
+
+    for (const relativePath of BASELINE_PATHS) {
+        const filePath = path.join(CLAUDE_DIR, relativePath);
+        try {
+            if (fs.existsSync(filePath)) {
+                const content = fs.readFileSync(filePath, 'utf-8');
+                const tokens = estimateTokens(content);
+                baselineTokens += tokens;
+                totalTokensLoaded += tokens;
+                loaded.push({ file: relativePath, tokens });
+            }
+        } catch (e) {
+            // Skip unreadable files
+        }
+    }
+
+    return { files: loaded, totalTokens: baselineTokens };
+}
+
+/**
  * Load global memory files and track tokens
  */
 function loadGlobalMemory() {
@@ -137,6 +176,9 @@ async function initSession() {
     const previous = loadPreviousCapsule();
     const timeSince = timeSinceLastSession(previous);
 
+    // Load baseline files (CLAUDE.md + @imports)
+    const baseline = loadBaselineFiles();
+
     // Load global memory and track tokens
     const globalMemoryFiles = loadGlobalMemory();
 
@@ -183,9 +225,19 @@ async function initSession() {
         session_id: capsule.session_id,
         project: capsule.project,
         previous_session: timeSince ? `Last session: ${timeSince}` : 'First session',
+        baseline: {
+            tokens: baseline.totalTokens,
+            percent: ((baseline.totalTokens / TOKEN_BUDGET) * 100).toFixed(2),
+            files: baseline.files.length
+        },
         tokenEstimate: totalTokensLoaded,
         tokenBudgetPercent: ((totalTokensLoaded / TOKEN_BUDGET) * 100).toFixed(2)
     };
+
+    // Baseline warning (separate from total warning)
+    if (baseline.totalTokens > TOKEN_BUDGET * WARNING_THRESHOLD) {
+        process.stderr.write(`[ContextBudget] Baseline: ${baseline.totalTokens} tokens (${(baseline.totalTokens / TOKEN_BUDGET * 100).toFixed(1)}% of 200k)\n`);
+    }
 
     // Check for project-specific context loader
     const projectContextLoader = path.join(cwd, '.claude', 'context-loader.js');
