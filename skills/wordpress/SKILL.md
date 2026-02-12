@@ -248,27 +248,49 @@ Full reset:       POST sk/v1/full-clear                (auth)
 ### Translate a page to Russian
 
 ```bash
-# 1. Find untranslated strings
-curl "https://studiokook.ee/wp-json/sk/v1/trp-untranslated?lang=ru"
+# ВАЖНО: trp-search показывает только EN-таблицу!
+# Для RU переводов используй trp-add с lang='ru'
 
-# 2. For each string, check if entry exists
-curl "https://studiokook.ee/wp-json/sk/v1/trp-search?q=Original+Estonian+text"
+# 1. Найти непереведённые строки (это EN-таблица, но оригиналы те же)
+curl "https://studiokook.ee/wp-json/sk/v1/trp-untranslated"
 
-# 3a. If entry exists (status=0), update it
-curl -X POST ".../sk/v1/trp-update-by-id" \
-  -d '{"id": "2544", "translated": "Русский текст", "status": "2"}'
+# 2. Для каждой строки — добавить RU перевод
+# Используй Node.js скрипт из-за UTF-8 проблем в Windows bash
 
-# 3b. If no entry, add new
-curl -X POST ".../sk/v1/trp-add" \
-  -d '{"original": "Estonian text", "translated": "Русский текст", "lang": "ru"}'
+node -e "
+const https = require('https');
+const data = JSON.stringify({
+  original: 'Estonian original text',
+  translated: 'Русский перевод',
+  lang: 'ru'
+});
+const req = https.request({
+  hostname: 'studiokook.ee',
+  path: '/wp-json/sk/v1/trp-add',
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json; charset=utf-8',
+    'Content-Length': Buffer.byteLength(data),
+    'Authorization': 'Basic ' + Buffer.from(process.env.WP_USER + ':' + process.env.WP_APP_PASS).toString('base64')
+  }
+}, res => {
+  let body = '';
+  res.on('data', d => body += d);
+  res.on('end', () => console.log(body));
+});
+req.write(data);
+req.end();
+"
 
-# 4. After all translations: rebuild dictionary
+# 3. После всех переводов: пересобрать словари
 curl "https://studiokook.ee/wp-json/sk/v1/fix-trp-dicts" \
   -H "Authorization: Basic $WP_AUTH"
 
-# 5. Clear cache
+# 4. Очистить кеш
 curl "https://studiokook.ee/wp-json/sk/v1/touch-page" \
   -H "Authorization: Basic $WP_AUTH"
+
+# 5. ОБЯЗАТЕЛЬНО: открыть страницу в браузере и проверить визуально
 ```
 
 ### Fix whitespace duplicate in TRP
