@@ -144,7 +144,7 @@ If >5 findings: top 5 by confidence, rest in `[DEFERRED]`.
 
 | Script | Location | Purpose |
 |--------|----------|---------|
-| post-mortem-trigger.js | scripts/ | Stop hook: detects errors, creates pending.json |
+| post-mortem-trigger.js | hooks/stop/ | Stop hook: detects errors, creates pending.json |
 | post-mortem-analyzer.js | scripts/ | Skill: processes pending, patches SKILL.md, writes patterns/ |
 
 ## Integration

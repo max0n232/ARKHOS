@@ -75,7 +75,7 @@ const DEFAULT_CONFIG = {
             // ONLY unconfirmed patterns get TTL cleanup
             // Confirmed patterns (no prefix) are permanent
             patterns: ['patterns/UNCONFIRMED-*.md', 'patterns/UNCONFIRMED-*.json'],
-            ttl_days: 90,
+            ttl_days: 14,
             priority: 'normal',
             deletable: true
         },
