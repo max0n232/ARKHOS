@@ -7,7 +7,7 @@
 
 | Component | Technology | Notes |
 |-----------|------------|-------|
-| CMS | WordPress 6.x | Self-hosted |
+| CMS | WordPress 6.9.1 | Self-hosted on ZoneOS |
 | Page Builder | Elementor 3.25.11 | Content in widgets, not post_content |
 | Translation | TranslatePress 2.7.4 | Multi-table: et_en_gb, et_ru_ru, et_fi |
 | Theme | Astra + Xpro Themer | Child theme for customizations |
@@ -37,10 +37,43 @@
 
 ## Page IDs
 
-| Page | ID | Slug | Notes |
-|------|----|----- |-------|
-| Главная | 8 | / | Homepage, most complex |
-| (discovered pages added here) | | | |
+> Full page map with hierarchy: see INFRASTRUCTURE.md
+
+### Key Pages (Quick Reference)
+| Page | ID | Slug | Builder |
+|------|----|----- |---------|
+| Главная | 8 | home | Elementor |
+| Кухни (портфолио) | 21 | koogid | Elementor |
+| Запрос цены | 25 | hinnaparing | Elementor |
+| Контакт | 2465 | kontakt | Elementor |
+| Материалы | 2530 | materjalid | Elementor |
+| Столешницы | 2776 | toopinnad | Native |
+| Фасады | 5800 | fassaadid | Native |
+| Egger каталог | 5802 | egger | Native |
+| Производство | 3010 | valmistamine | Elementor |
+| Privacy | 5161 | privacy | Native |
+
+### Page Hierarchy
+```
+/ (8)
+├── /koogid/ (21) - ~1575 images from NextGEN
+├── /toopinnad/ (2776)
+│   ├── /laminaadist-tootasapinnad/ (2943)
+│   ├── /kividest-tootasapinnad/ (2951)
+│   └── /hpl-tootasapinnad/ (6335)
+├── /fassaadid/ (5800)
+│   ├── /fenix/ (5804)
+│   └── /egger-fassaadid/ (6309)
+├── /egger/ (5802)
+│   ├── /kivi/ (6291)
+│   ├── /puit/ (6293)
+│   └── /monokroom/ (6295)
+└── /meie-furnituur/ (2706)
+    ├── /sahtlid/ (2619)
+    ├── /nurgamehhanismid/ (2651)
+    ├── /ladustamissusteemid/ (2674)
+    └── /tostemehhanismid/ (536)
+```
 
 ## Decisions
 
@@ -76,8 +109,14 @@
 | Changes not visible | Cache | Run touch-page, wait 30s |
 | trp-update-by-id success but RU unchanged | Wrong table | Use trp-add with lang='ru' |
 
+## Related Files
+
+- [INFRASTRUCTURE.md](./INFRASTRUCTURE.md) — Full technical reference (plugins, API, pages, media)
+- [SKILL.md](../../SKILL.md) — WordPress skill with API reference
+
 ## Links
 
 - [Admin Panel](https://studiokook.ee/wp-admin/)
 - [TranslatePress Editor](https://studiokook.ee/wp-admin/admin.php?page=translate-press)
 - [Code Snippets](https://studiokook.ee/wp-admin/admin.php?page=snippets)
+- [Elementor Templates](https://studiokook.ee/wp-admin/edit.php?post_type=elementor_library)

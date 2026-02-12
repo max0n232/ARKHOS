@@ -38,7 +38,8 @@ Shared skills available across all projects.
 | Skill | Path | Description |
 |-------|------|-------------|
 | wordpress | skills/wordpress/ | studiokook.ee REST API, TranslatePress, Elementor |
-| studiokook-knowledge | skills/wordpress/projects/studiokook/ | Project-specific knowledge, patterns, decisions |
+| studiokook-knowledge | skills/wordpress/projects/studiokook/KNOWLEDGE.md | Project-specific quirks, patterns, decisions |
+| studiokook-infra | skills/wordpress/projects/studiokook/INFRASTRUCTURE.md | Full technical reference (plugins, pages, API) |
 
 ## Project Routing
 
