@@ -10,7 +10,7 @@
 | CMS | WordPress 6.9.1 | Self-hosted on ZoneOS |
 | Page Builder | Elementor 3.25.11 | Content in widgets, not post_content |
 | Translation | TranslatePress 2.7.4 | Multi-table: et_en_gb, et_ru_ru, et_fi |
-| Theme | Astra + Xpro Themer | Child theme for customizations |
+| Theme | Astra + Xpro Themer | No child theme |
 | Caching | Seraph Accel | Aggressive caching, requires touch-page after changes |
 | Custom API | sk/v1 | WP Abilities plugin, 15+ endpoints |
 
@@ -81,6 +81,16 @@
 - **Decision:** Always use TranslatePress API over Code Snippets
 - **Reasoning:** TRP translations are editable via UI, survive updates
 - **Exception:** Dynamic PHP content (prices, calculations)
+
+### 2026-02-13: Infrastructure documentation approach
+- **Decision:** Single INFRASTRUCTURE.md (Russian, comprehensive) replaces auto-generated English version
+- **Reasoning:** CLI-generated file was incomplete (no Known Issues, no CLI rules, no dependency map)
+- **Impact:** CLI reads one file before edits, all context in one place
+
+### 2026-02-13: SEO fix approach
+- **Decision:** Sequential fixes by priority (hreflang -> 404 -> galleries -> translations -> meta)
+- **Reasoning:** Each task can cascade to the next (especially TranslatePress <-> NextGEN conflict)
+- **Impact:** Minimizes cascading breakage
 
 ### 2026-02-12: UTF-8 in Windows Bash
 - **Decision:** Use Node.js scripts for API calls with UTF-8 data

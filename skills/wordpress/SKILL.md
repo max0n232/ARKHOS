@@ -4,6 +4,14 @@
 > Languages: et (primary), ru, en, fi
 > Theme: Xpro Themer + Astra
 
+## Project Files
+
+Before ANY work on studiokook.ee, read these files:
+
+1. `skills/wordpress/projects/studiokook/INFRASTRUCTURE.md` -- full WP infrastructure map
+2. `skills/wordpress/projects/studiokook/KNOWLEDGE.md` -- project knowledge and decisions
+3. `skills/wordpress/projects/studiokook/SEO-FIXES.md` -- current SEO fix plan
+
 ## Architecture
 
 studiokook.ee — WordPress site with:
@@ -41,7 +49,16 @@ Base URL: `https://studiokook.ee/wp-json/sk/v1/`
 | trp-clean-emoji | **Yes** | POST |
 
 Auth method: WordPress application password or nonce cookie.
-For CLI: use `curl` with stored credentials from project's credentials/ directory.
+For CLI: `source ~/Desktop/Studiokook/credentials/wp-auth.env` then use `$WP_USER` and `$WP_APP_PASS`.
+
+### Loading Credentials
+
+```bash
+# Bash (Git Bash on Windows)
+source ~/Desktop/Studiokook/credentials/wp-auth.env
+export WP_AUTH=$(echo -n "$WP_USER:$WP_APP_PASS" | base64)
+curl -H "Authorization: Basic $WP_AUTH" "https://studiokook.ee/wp-json/sk/v1/..."
+```
 
 ### Translation Endpoints
 

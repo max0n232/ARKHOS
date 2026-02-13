@@ -1,337 +1,402 @@
-# Studiokook Infrastructure Reference
+# ИНФРАСТРУКТУРА WP: studiokook.ee
 
-> Technical reference for studiokook.ee infrastructure.
-> Last audit: 2026-02-12
+**Версия документа:** 1.0
+**Дата:** 13 февраля 2026
+**Назначение:** Карта инфраструктуры для безопасного внесения изменений. Читать перед ЛЮБЫМИ правками.
 
-## Server
+---
 
-| Property | Value |
-|----------|-------|
-| Domain | studiokook.ee |
-| Hosting | ZoneOS (zone.eu) |
-| Server | Apache |
-| Path | /data01/virt103578/domeenid/www.studiokook.ee/htdocs |
-| SSL | Yes (Let's Encrypt) |
-| CDN | None detected |
+## 1. СЕРВЕР И ХОСТИНГ
 
-## WordPress Core
+| Параметр | Значение |
+|----------|---------|
+| Хостинг | Zone.ee (shared hosting) |
+| Панель | https://my.zone.eu/hosting/103930 |
+| PHP | 8.2 |
+| DocumentRoot | `/data01/virt103578/domeenid/www.studiokook.ee/htdocs` |
+| FTP root | `/htdocs/` (chroot в корень домена) |
+| FTP host | `studiokook.ee` (НЕ ftp.zone.ee) |
+| FTP user | `d103930f913161` |
+| SSL | Let's Encrypt R13, до 03.04.2026 |
+| WAF | Отключен |
+| SSH | Раздел есть в панели, но не настроен |
+| WordPress | 6.9.1 |
+| URL сайта | https://studiokook.ee |
+| Permalink | `/%postname%/` |
+| Язык WP-admin | `ru_RU` |
 
-| Component | Version | Notes |
-|-----------|---------|-------|
-| WordPress | 6.9.1 | Latest stable |
-| PHP | 8.x | (exact version requires server access) |
-| Database | MySQL/MariaDB | wp_ prefix |
+### FTP-структура корня
 
-## Active Plugins (28)
-
-### Core Functionality
-| Plugin | File | Purpose |
-|--------|------|---------|
-| Elementor | elementor/elementor.php | Page builder |
-| TranslatePress Business | translatepress-business/index.php | Premium translation features |
-| TranslatePress Multilingual | translatepress-multilingual/index.php | Base translation |
-| Xpro Theme Builder | xpro-theme-builder/xpro-theme-builder.php | Header/Footer templates |
-| Xpro Elementor Addons | xpro-elementor-addons/xpro-elementor-addons.php | Extra widgets |
-
-### SEO & Analytics
-| Plugin | File | Purpose |
-|--------|------|---------|
-| Yoast SEO | wordpress-seo/wp-seo.php | SEO management |
-| Site Kit by Google | google-site-kit/google-site-kit.php | Analytics integration |
-
-### Forms & Communication
-| Plugin | File | Purpose |
-|--------|------|---------|
-| Contact Form 7 | contact-form-7/wp-contact-form-7.php | Forms |
-| CF7 Telegram | cf7-telegram/cf7-telegram.php | Form notifications to Telegram |
-| Flamingo | flamingo/flamingo.php | Form submission storage |
-| Drag and Drop Multiple File Upload CF7 | drag-n-drop-upload-cf7/drag-n-drop-upload-cf7.php | File uploads |
-
-### Media
-| Plugin | File | Purpose |
-|--------|------|---------|
-| NextGEN Gallery | nextgen-gallery/nggallery.php | Gallery management |
-| NextGEN Gallery Pro | nextgen-gallery-pro/nggallery-pro.php | Premium gallery features |
-| NGG Alt Updater | ngg-alt-updater/ngg-alt-updater.php | Alt text management |
-| NGG MCP Abilities | ngg-mcp-abilities/ngg-mcp-abilities.php | MCP integration for galleries |
-
-### Performance
-| Plugin | File | Purpose |
-|--------|------|---------|
-| Seraphinite Accelerator Ext | seraphinite-accelerator-ext/plugin_root.php | Page caching |
-
-### Development & Admin
-| Plugin | File | Purpose |
-|--------|------|---------|
-| Code Snippets | code-snippets/code-snippets.php | PHP customization |
-| WP Abilities API | abilities-api/abilities-api.php | sk/v1 REST API |
-| MCP Adapter | mcp-adapter/mcp-adapter.php | MCP protocol support |
-| Better Search Replace | better-search-replace/better-search-replace.php | DB search/replace |
-| WP File Manager | wp-file-manager/file_folder_manager.php | File management |
-| WordPress Importer | wordpress-importer/wordpress-importer.php | Content import |
-| Insert Headers and Footers | insert-headers-and-footers/ihaf.php | Code injection |
-| Disable Admin Notices | disable-admin-notices/disable-admin-notices.php | UI cleanup |
-
-### Blocks & Widgets
-| Plugin | File | Purpose |
-|--------|------|---------|
-| Kadence Blocks | kadence-blocks/kadence-blocks.php | Gutenberg blocks |
-| Unlimited Elements for Elementor | unlimited-elements-for-elementor/unlimited_elements.php | Extra Elementor widgets |
-| Sticky Header Effects for Elementor | sticky-header-effects-for-elementor/sticky-header-effects-for-elementor.php | Header effects |
-| AI Addons for Elementor | ai-addons-for-elementor/ai-addons.php | AI-powered widgets |
-
-## Theme
-
-| Property | Value |
-|----------|-------|
-| Parent Theme | Astra |
-| Builder | Xpro Theme Builder |
-| Header | Xpro Themer template (ID: 7) |
-| Footer | Xpro Themer template |
-
-## Languages & Translation
-
-### TranslatePress Configuration
-| Property | Value |
-|----------|-------|
-| Primary Language | Estonian (et) |
-| Secondary Languages | Russian (ru-RU), English (en-GB), Finnish (fi) |
-| URL Structure | Path prefix: `/{lang}/` |
-| Slug Translation | No (keeps original Estonian slugs) |
-
-### URL Examples
 ```
-Estonian: https://studiokook.ee/koogid/
-Russian:  https://studiokook.ee/ru/koogid/
-English:  https://studiokook.ee/en/koogid/
-Finnish:  https://studiokook.ee/fi/koogid/
+/htdocs/           ← DocumentRoot
+  ├── wp-admin/
+  ├── wp-content/
+  ├── wp-includes/
+  ├── robots.txt       ← Физический файл (заменён 13.02.2026)
+  ├── sitemap_index.xml ← Генерируется Yoast SEO
+  ├── wp-config.php
+  ├── .htaccess
+  ├── googlea8afd0d1a93c3611.html  ← верификация Google
+  ├── yandex_9e06327fd9111e0c.html ← верификация Yandex
+  ├── pinterest-2c34f.html         ← верификация Pinterest
+  ├── it-api.php                   ← кастомный API endpoint (назначение: уточнить)
+  ├── RUN_ONCE_check_hreflang.php  ← одноразовый скрипт проверки hreflang
+  └── old/                         ← старые файлы (уточнить содержимое)
 ```
 
-### Dictionary Tables
-| Table | Language Pair | Notes |
-|-------|---------------|-------|
-| wp_trp_dictionary_et_en_gb | ET → EN | Primary, used by trp-search |
-| wp_trp_dictionary_et_ru_ru | ET → RU | Separate IDs |
-| wp_trp_dictionary_et_fi | ET → FI | Separate IDs |
+---
 
-### Current Translation Status (2026-02-12)
-- Untranslated strings (EN table): 50
-- Most untranslated: SEO meta descriptions
+## 2. ТЕМА
 
-## Pages
+| Параметр | Значение |
+|----------|---------|
+| Активная тема | **Astra** (бесплатная) |
+| Child theme | Нет |
+| Запасная тема | Twenty Twenty-Five |
 
-### Page Map
-| ID | Slug | Builder | Parent | URL |
-|----|------|---------|--------|-----|
-| 8 | home | Elementor | - | / |
-| 21 | koogid | Elementor | - | /koogid/ |
-| 25 | hinnaparing | Elementor | - | /hinnaparing/ |
-| 536 | tostemehhanismid | Elementor | - | /tostemehhanismid/ |
-| 2465 | kontakt | Elementor | - | /kontakt/ |
-| 2530 | materjalid | Elementor | - | /materjalid/ |
-| 2619 | sahtlid | Elementor | - | /sahtlid/ |
-| 2651 | nurgamehhanismid | Elementor | - | /nurgamehhanismid/ |
-| 2674 | ladustamissusteemid | Elementor | - | /ladustamissusteemid/ |
-| 2706 | meie-furnituur | Elementor | - | /meie-furnituur/ |
-| 2776 | toopinnad | Native | - | /toopinnad/ |
-| 2943 | laminaadist-tootasapinnad | Elementor | - | /laminaadist-tootasapinnad/ |
-| 2951 | kividest-tootasapinnad | Elementor | - | /kividest-tootasapinnad/ |
-| 3010 | valmistamine | Elementor | - | /valmistamine/ |
-| 3133 | koogid-eritellimusel | Elementor | - | /koogid-eritellimusel/ |
-| 5161 | privacy | Native | - | /privacy/ |
-| 5800 | fassaadid | Native | - | /fassaadid/ |
-| 5802 | egger | Native | - | /egger/ |
-| 5804 | fenix | Native | 5800 | /fassaadid/fenix/ |
-| 6291 | kivi | Native | 5802 | /egger/kivi/ |
-| 6293 | puit | Native | 5802 | /egger/puit/ |
-| 6295 | monokroom | Native | 5802 | /egger/monokroom/ |
-| 6309 | egger-fassaadid | Native | 5800 | /fassaadid/egger-fassaadid/ |
-| 6335 | hpl-tootasapinnad | Native | 2776 | /toopinnad/hpl-tootasapinnad/ |
+**ВНИМАНИЕ:** Нет child theme. Обновление Astra может перезаписать кастомизации если они сделаны в файлах темы. Все кастомные CSS/JS должны идти через WPCode или Code Snippets.
 
-### Page Hierarchy
-```
-/ (home, ID:8)
-├── /koogid/ (ID:21) - Portfolio
-├── /hinnaparing/ (ID:25) - Price request form
-├── /kontakt/ (ID:2465) - Contact
-├── /materjalid/ (ID:2530) - Materials
-├── /meie-furnituur/ (ID:2706) - Furniture hardware
-│   ├── /sahtlid/ (ID:2619) - Drawers
-│   ├── /nurgamehhanismid/ (ID:2651) - Corner mechanisms
-│   ├── /ladustamissusteemid/ (ID:2674) - Storage systems
-│   └── /tostemehhanismid/ (ID:536) - Lift mechanisms
-├── /toopinnad/ (ID:2776) - Countertops
-│   ├── /laminaadist-tootasapinnad/ (ID:2943) - Laminate
-│   ├── /kividest-tootasapinnad/ (ID:2951) - Stone
-│   └── /hpl-tootasapinnad/ (ID:6335) - HPL
-├── /fassaadid/ (ID:5800) - Facades
-│   ├── /fenix/ (ID:5804) - Fenix
-│   └── /egger-fassaadid/ (ID:6309) - Egger facades
-├── /egger/ (ID:5802) - Egger catalog
-│   ├── /kivi/ (ID:6291) - Stone patterns
-│   ├── /puit/ (ID:6293) - Wood patterns
-│   └── /monokroom/ (ID:6295) - Monochrome
-├── /valmistamine/ (ID:3010) - Manufacturing
-├── /koogid-eritellimusel/ (ID:3133) - Custom kitchens
-└── /privacy/ (ID:5161) - Privacy policy
-```
+---
 
-## Blog
+## 3. ПЛАГИНЫ (29 установлено, 28 активных)
 
-| Property | Value |
-|----------|-------|
-| Posts | 31+ |
-| Category | Blogi (ID: 5) |
-| Most recent | 2025-11-15: koogimoobel-tellimisel-mida-peaks-teadma-2026-aastal |
+### Критические (влияют на контент и SEO)
 
-## Media & Galleries
+| Плагин | Версия | Роль | Зависимости |
+|--------|--------|------|-------------|
+| **TranslatePress - Multilingual** | 2.7.4 | Мультиязычность (ET/RU/EN/FI) | TranslatePress - Business |
+| **TranslatePress - Business** | 1.3.8 | Расширение TP: доп. языки, SEO Pack | Зависит от TranslatePress |
+| **Yoast SEO** | 26.3 | SEO: title, meta, sitemap, Schema, hreflang | - |
+| **Elementor** | 3.25.11 | Page builder: главная, материалы, фурнитура | Xpro Addons, AI Addons, Sticky Header, Unlimited Elements |
+| **NextGEN Gallery** | 3.59.3 | Галереи фасадов и столешниц | NextGEN Pro, NGG Alt Text Updater, NGG MCP Abilities |
+| **NextGEN Pro** | 3.31.2 | Pro-функции галереи | Зависит от NextGEN Gallery |
 
-### NextGEN Gallery
-- Storage: `/wp-content/gallery/`
-- Images on /koogid/ page: ~1575 (from NextGEN)
-- Display: Via Elementor Gallery widget (not NGG shortcodes)
-- Albums: Multiple, kitchen project portfolios
+### Контактные формы
 
-### Standard Media
-- Storage: `/wp-content/uploads/YYYY/MM/`
-- Format: Optimized JPG
+| Плагин | Версия | Роль |
+|--------|--------|------|
+| Contact Form 7 | 6.1.3 | Формы обратной связи |
+| CF7 + Telegram | 0.10.0 | Пересылка заявок в Telegram |
+| Drag & Drop File Upload for CF7 | 1.3.9.2 | Загрузка файлов через формы |
+| Flamingo | 2.6 | Хранение заявок из CF7 в БД |
 
-## Caching
+### Elementor экосистема
 
-### Seraph Accelerator
-| Property | Value |
-|----------|-------|
-| Cache directory | /wp-content/cache/ |
-| Cache files | 1 (at audit time) |
-| Status | Active |
+| Плагин | Версия | Роль |
+|--------|--------|------|
+| Elementor | 3.25.11 | Основной билдер |
+| AI Addons for Elementor | 2.2.1 | AI-виджеты |
+| Xpro Elementor Addons | 1.4.6.1 | Доп. виджеты |
+| Xpro Elementor Theme Builder | 1.2.8.2 | Header/Footer конструктор |
+| Unlimited Elements | 1.5.131 | Доп. виджеты HTML/CSS/JS |
+| Sticky Header Effects | 1.7.3 | Sticky header при скролле |
 
-### Cache Invalidation
-```bash
-# Clear specific page
-curl "https://studiokook.ee/wp-json/sk/v1/touch-page" -H "Authorization: Basic $WP_AUTH"
+### Утилиты
 
-# Clear all Seraph cache
-curl "https://studiokook.ee/wp-json/sk/v1/clear-seraph" -H "Authorization: Basic $WP_AUTH"
+| Плагин | Версия | Роль |
+|--------|--------|------|
+| Site Kit от Google | 1.171.0 | GA + GSC в WP-admin |
+| WPCode Lite | 2.3.1 | Сниппеты кода (header/footer) |
+| Code Snippets | 3.9.4 | PHP-сниппеты |
+| Better Search Replace | 1.4.10 | Поиск/замена в БД |
+| Серафинит Акселератор | 2.22.14 (Premium) | Кеширование, оптимизация скорости |
+| Диспетчер файлов WP | 8.0 | Файл-менеджер в WP-admin |
+| WordPress Importer | 0.8.3 | Импорт контента |
+| Kadence Blocks | 3.4.0 | Gutenberg-блоки |
 
-# Full clear (all layers)
-curl "https://studiokook.ee/wp-json/sk/v1/full-clear" -H "Authorization: Basic $WP_AUTH"
-```
+### Кастомные / CLI-созданные
 
-## Custom REST API
+| Плагин | Версия | Роль | Статус |
+|--------|--------|------|--------|
+| Abilities API | 0.4.0 | Framework для AI abilities | Активен |
+| MCP Adapter | 0.4.1 | MCP tools из Abilities API | Активен |
+| NGG Alt Text Updater | 1.0 | Обновление alt через REST API | Активен |
+| NGG Alt Text Updater v2 | 2.0 | То же, relaxed permissions | **НЕАКТИВЕН** |
+| NGG MCP Abilities | 2.1.0 | MCP управление NGG | Активен |
 
-### Namespaces
-| Namespace | Source | Endpoints |
-|-----------|--------|-----------|
-| sk/v1 | WP Abilities API | 19 endpoints |
-| wp-abilities/v1 | WP Abilities API | Generic abilities |
-| ngg-fix/v1 | Custom | Gallery repair |
-| xpro/v1/dynamic-content | Xpro Theme Builder | Dynamic content |
-| code-snippets/v1 | Code Snippets | Snippet management |
-| contact-form-7/v1 | CF7 | Form endpoints |
-| yoast/v1 | Yoast SEO | SEO data |
-| ngg/v1, nggpro/v1 | NextGEN | Gallery operations |
+### WPCode сниппеты (все НЕАКТИВНЫ)
 
-### sk/v1 Endpoints
-| Endpoint | Method | Auth | Purpose |
-|----------|--------|------|---------|
-| clear-seraph | GET | Yes | Clear Seraph cache |
-| seraph-info | GET | No | Cache status |
-| full-clear | GET | Yes | Clear all caches |
-| list-plugins | GET | No | List active plugins |
-| touch-page | GET | Yes | Invalidate page cache |
-| fix-trp-dicts | GET | Yes | Rebuild TRP dictionaries |
-| fix-trp-tasuta | GET | Yes | Fix "tasuta" translations |
-| trp-untranslated | GET | No | Get untranslated strings |
-| trp-search | GET | No | Search TRP dictionary |
-| trp-update | POST | Yes | Update translation |
-| trp-add | POST | Yes | Add translation |
-| trp-insert | POST | Yes | Insert dictionary entry |
-| trp-update-by-id | POST | Yes | Update by dictionary ID |
-| trp-update-id | POST | Yes | Update specific ID |
-| trp-clean-emoji | POST | Yes | Remove emoji from TRP |
-| update-seo | POST | Yes | Update Yoast SEO meta |
-| faq | POST | Yes | FAQ management |
-| elementor/{id} | GET | Yes | Get Elementor page data |
-| elementor/{id}/replace | POST | Yes | Replace content in page |
+| Название | Назначение |
+|----------|-----------|
+| 08-early-title-override.php | Перезапись title (отключен) |
+| 02-fix-canonical-urls.php | Фикс canonical URL (отключен) |
+| Focus_keywords | Фокусные ключевые слова (отключен) |
+| facebook | Facebook интеграция (отключен) |
 
-## Custom Post Types
+### Code Snippets (все НЕАКТИВНЫ)
 
-| CPT | Slug | Purpose |
-|-----|------|---------|
-| kadence_form | Forms | Kadence form builder |
-| kadence_navigation | Navigation | Kadence menus |
-| kadence_header | Header | Kadence headers |
-| kadence_lottie | Lottie | Lottie animations |
-| xpro_content | Templates | Xpro saved templates |
+| Название | Назначение |
+|----------|-----------|
+| SK hreflang x-default fix | Фикс x-default hreflang |
+| Read Debug Option | Отладка |
+| Write MU Plugin File | Запись MU plugin |
+| Flush Rewrite Rules | Сброс permalink rules |
 
-## Header/Footer
+**ЗАМЕЧАНИЕ:** Все сниппеты отключены. Возможно были эксперименты CLI, которые потом откатили. Проверять перед активацией.
 
-### Structure
-- **Header**: Xpro Theme Builder template (ID: 7)
-- **Type**: `data-elementor-type="xpro-themer"`
-- **Footer**: Xpro Theme Builder template
-- **Menu**: WordPress nav_menu taxonomy
+---
 
-### Header Elements
-- Site logo
-- Main navigation menu
-- Language switcher (TRP)
-- Contact button
+## 4. МУЛЬТИЯЗЫЧНОСТЬ (TranslatePress)
 
-## Forms
+### Настройки
 
-### Contact Form 7
-- Forms: Present (exact count requires auth)
-- Telegram integration: Active (cf7-telegram)
-- File uploads: Enabled
-- Submission storage: Flamingo
+| Параметр | Значение |
+|----------|---------|
+| Плагин | TranslatePress Business 1.3.8 + Multilingual 2.7.4 |
+| Основной язык | **Эстонский (et)** |
+| Доп. языки | Русский (ru-RU), Английский (en-GB), Финский (fi) |
+| URL-схема | `/` = ET, `/ru/` = RU, `/en/` = EN, `/fi/` = FI |
+| Переводы | Хранятся в БД (таблица `wp_trp_*`) |
+| Доступ к настройкам | Только администратор (текущий user `admin` не имеет доступа к настройкам TP!) |
 
-## SEO
+### Как работают переводы
 
-### Yoast SEO
-- Status: Active
-- Schema: WebPage, WebSite, BreadcrumbList
-- Language: et (Estonian primary)
+TranslatePress перехватывает HTML-вывод страницы и подставляет переводы из БД. Оригинальный контент — на эстонском (в WordPress posts/pages). Переводы хранятся отдельно в таблицах `wp_trp_*`.
 
-### Meta Structure
+**КРИТИЧЕСКИ ВАЖНО для CLI:**
+- НЕ менять контент в WP-редакторе для перевода — это изменит оригинал (ET)
+- Переводы редактируются ТОЛЬКО через TranslatePress visual editor или REST API
+- Если CLI меняет HTML-структуру страницы, переводы могут "отвалиться" (TP привязывается к конкретным строкам)
+- Галереи NextGEN генерируют HTML динамически — TP может не перехватить все элементы
+
+### hreflang (текущая реализация)
+
+Генерируется TranslatePress автоматически. На каждой странице:
+
 ```html
-<meta property="og:locale" content="et_EE" />
-<meta property="og:type" content="website" />
-<meta property="og:site_name" content="Studioköök" />
+<link rel="alternate" hreflang="x-default" href="https://studiokook.ee/..." />
+<link rel="alternate" hreflang="et" href="https://studiokook.ee/..." />
+<link rel="alternate" hreflang="ru-RU" href="https://studiokook.ee/ru/..." />
+<link rel="alternate" hreflang="fi" href="https://studiokook.ee/fi/..." />
+<link rel="alternate" hreflang="en-GB" href="https://studiokook.ee/en/..." />
+<link rel="alternate" hreflang="ru" href="https://studiokook.ee/ru/..." />
+<link rel="alternate" hreflang="en" href="https://studiokook.ee/en/..." />
 ```
 
-## Performance Notes
+**ПРОБЛЕМА:** Дублирование — `ru-RU` и `ru` указывают на один URL, `en-GB` и `en` — тоже. Google может путаться. Нужно оставить только один вариант для каждого языка.
 
-1. **Large image count**: ~1575 images on portfolio page
-2. **Seraph caching**: Aggressive, clear after content changes
-3. **No CDN**: Images served directly from server
-4. **Elementor**: Heavy, generates large HTML output
+---
 
-## Security
+## 5. SEO (Yoast SEO)
 
-### Exposed Information
-- WordPress version: Visible in HTML
-- Elementor version: Visible in HTML
-- Site Kit version: Visible in HTML
+| Параметр | Значение |
+|----------|---------|
+| Плагин | Yoast SEO 26.3 (бесплатный) |
+| Sitemap | https://studiokook.ee/sitemap_index.xml (авто) |
+| Schema | WebPage, BreadcrumbList, WebSite (авто), FurnitureStore (кастом) |
+| Title separator | `|` |
+| Search engine visibility | **НЕ заблокировано** (blog_public = 1) |
+| Site Kit | Подключен (Google Analytics + Search Console) |
 
-### Recommendations
-- Remove generator meta tags
-- Implement rate limiting on API
-- Consider CDN for image delivery
+### Schema.org FurnitureStore (кастом, на странице /kontakt/)
 
-## Maintenance Tasks
+```json
+{
+  "@type": "FurnitureStore",
+  "name": "Studiokook",
+  "description": "Kohandatud koogimööbel Tallinnas...",
+  "url": "https://studiokook.ee",
+  "telephone": "+372 55 525 143",
+  "email": "maksim@studiokook.ee",
+  "address": {
+    "streetAddress": "Paldiski mnt 21",
+    "addressLocality": "Tallinn",
+    "postalCode": "11317",
+    "addressCountry": "EE"
+  },
+  "geo": { "latitude": 59.4028, "longitude": 24.7066 },
+  "openingHours": "Mon-Fri 09:00-18:00",
+  "priceRange": "$$$"
+}
+```
 
-### Regular
-- Check trp-untranslated weekly
-- Monitor cache effectiveness
-- Review form submissions (Flamingo)
+**ЗАМЕЧАНИЕ:** Email `maksim@studiokook.ee`, но на сайте отображается `julia@studiokook.ee`. Уточнить актуальный.
 
-### After Content Changes
-1. Clear cache: `touch-page` or `clear-seraph`
-2. Verify translation matching
-3. Check page on all languages
+### FAQPage Schema
 
-### After Plugin Updates
-1. Test Elementor rendering
-2. Verify TRP functionality
-3. Check custom API endpoints
+Присутствует на странице `/kontakt/`. Генерируется автоматически (вероятно через Yoast или кастомный блок).
+
+---
+
+## 6. СТРАНИЦЫ (30 шт)
+
+### Опубликованные страницы
+
+| ID | Slug | Название | Builder | Примечание |
+|----|------|---------|---------|-----------|
+| 8 | `/` (avaleht) | Главная | Elementor | Главная страница сайта |
+| - | `/koogid/` | Галерея кухонь | Elementor | Портфолио |
+| - | `/koogid-eritellimusel/` | Кухни на заказ | Gutenberg | Основная коммерческая |
+| - | `/valmistamine/` | Производство | Elementor | О процессе |
+| 2530 | `/materjalid/` | Материалы | Elementor | Обзор материалов |
+| 2706 | `/meie-furnituur/` | Фурнитура | Elementor | BLUM фурнитура |
+| 2776 | `/meie-toopinnad/` (toopinnad) | Столешницы | Elementor | **404! Страница не найдена** |
+| - | `/kontakt/` | Контакты | Gutenberg | + Schema FurnitureStore + FAQ |
+| - | `/blogi/` | Блог | - | Архив записей |
+| - | `/hinnaparing/` | Ценовой запрос | - | Форма |
+| - | `/koogimoobli-valmistamine/` | Изготовление мебели | - | Доп. страница |
+
+### Фасады (новые страницы)
+
+| ID | Slug | Название | Builder | Примечание |
+|----|------|---------|---------|-----------|
+| 5800 | `/fassaadid/` | Фасады | Gutenberg | Родительская страница |
+| 6309 | `/fassaadid/egger-fassaadid/` | EGGER фасады | Gutenberg | Каталог декоров EGGER |
+| 5802 | `/fassaadid/egger/` | Egger (столешницы?) | Gutenberg | Уточнить отличие от 6309 |
+| - | `/fassaadid/fenix/` | Fenix | Gutenberg | Фасады Fenix NTM |
+
+### Столешницы (новые страницы)
+
+| ID | Slug | Название | Builder |
+|----|------|---------|---------|
+| 6291 | Дочерняя | Kivi (камень) | Gutenberg |
+| 6295 | Дочерняя | Monokroom | Gutenberg |
+| 6293 | Дочерняя | Puit (дерево) | Gutenberg |
+| 6335 | Дочерняя | HPL kompaktlaminaat | Gutenberg |
+
+### Elementor-страницы (доп. фурнитура)
+
+| ID | Slug | Название | Builder |
+|----|------|---------|---------|
+| 2651 | `/nurgamehhanismid/` | Угловые механизмы | Elementor |
+| 2619 | `/sahtlid/` | Ящики | Elementor |
+| 536 | `/tostemehhanismid/` | Подъёмные механизмы | Elementor |
+| - | `/ladustamissusteemid/` | Системы хранения | Elementor |
+| - | `/kividest-tootasapinnad/` | Каменные столешницы | Elementor |
+
+### Черновики
+
+| ID | Название | Примечание |
+|----|---------|-----------|
+| 5974 | Elementor #5974 | Без названия, Elementor |
+| 6351 | Elementor #6351 | Без названия, Elementor |
+| 6310 | F -- Kivi | Черновик подстраницы фасадов |
+| 6312 | H -- Puit | Черновик подстраницы фасадов |
+| 6314 | U -- Monokroom | Черновик подстраницы фасадов |
+
+---
+
+## 7. ГАЛЕРЕИ (NextGEN Gallery)
+
+### Список галерей
+
+| ID | Название | Контент | Используется на |
+|----|---------|---------|----------------|
+| 1 | Egger F-series (worktops) | Столешницы F-серия | Страница столешниц |
+| 2 | Egger H-series (worktops) | Столешницы H-серия | Страница столешниц |
+| 6 | Toopind Tehnostone | Столешницы Technistone | Каменные столешницы |
+| 7 | koogid gallery | Фото готовых кухонь | /koogid/ |
+| 8 | Fenix | Фасады Fenix NTM | /fassaadid/fenix/ |
+| 9 | Egger H-series | Фасады H-серия | /fassaadid/egger-fassaadid/ |
+| 10 | Egger F-series | Фасады F-серия | /fassaadid/egger-fassaadid/ |
+| 11 | Egger U-series | Фасады U-серия | /fassaadid/egger-fassaadid/ |
+| 14 | Egger | Общая EGGER галерея | Уточнить |
+| 16 | Fundermax HPL | HPL декоры Fundermax | /fassaadid/ или столешницы |
+
+### Alt-тексты в галереях
+
+Формат: `{КОД}_{ТЕКСТУРА}` (например `F186_ST9`, `H1113_ST10`)
+
+**ПРОБЛЕМА:** Alt-тексты содержат только технические коды, без описательных названий. Для SEO нужно: `F186 Бетон Чикаго светло-серый -- фасад EGGER для кухни`.
+
+### Известная проблема: дублирование маркировок в RU-версии
+
+**Причина:** CLI добавил CSS-хак для скрытия некорректного контента в RU-галерее. После этого маркировки стали дублироваться во ВСЕХ языковых версиях.
+
+**Корневая проблема:** TranslatePress перехватывает текст из галереи NGG. Если исходный текст (ET) изменён или HTML-структура поменялась, TP теряет привязку перевода и подставляет "мусор" (куски текста из других мест).
+
+**Правильное решение:**
+1. Убрать CSS-хак
+2. В TranslatePress visual editor найти и удалить некорректные переводы для галереи
+3. Заново перевести (или оставить коды без перевода -- они интернациональные)
+
+---
+
+## 8. КЕШИРОВАНИЕ
+
+| Параметр | Значение |
+|----------|---------|
+| Плагин | Серафинит Акселератор 2.22.14 (Premium) |
+| Тип | Page cache + оптимизация ресурсов |
+| Конфигурация | Файл `.htaccess` + `seraph-accel-img-compr-redir.conf` |
+
+**ВАЖНО при правках:** После изменений на сайте нужно очистить кеш Серафинита, иначе посетители будут видеть старую версию. Способы:
+- WP-admin -> Серафинит -> Настройки -> Очистить кеш
+- Добавить `?nocache=1` к URL для обхода кеша при проверке
+
+---
+
+## 9. КОНТАКТНЫЕ ДАННЫЕ (актуальные)
+
+| Параметр | На сайте | В Schema |
+|----------|---------|---------|
+| Телефон | +372 55 525 143 | +372 55 525 143 |
+| Email | julia@studiokook.ee | maksim@studiokook.ee |
+| Адрес | Paldiski mnt 21, Tallinn | Paldiski mnt 21, 11317 Tallinn |
+
+**РАСХОЖДЕНИЕ:** Email на сайте и в Schema не совпадают. Уточнить актуальный.
+
+---
+
+## 10. ПРАВИЛА ДЛЯ CLI / АВТОМАТИЗАЦИИ
+
+### Перед ЛЮБОЙ правкой:
+
+1. **Прочитай этот документ** -- определи какие системы затрагиваются
+2. **Проверь зависимости** -- изменение в одном месте может сломать другое
+3. **Не используй CSS-хаки** вместо исправления данных
+4. **Проверь все языковые версии** после изменения (ET, RU, EN, FI)
+5. **Очисти кеш** Серафинита после правок
+6. **Не трогай TranslatePress переводы** через прямое редактирование БД -- используй visual editor или REST API
+
+### Карта зависимостей
+
+```
+Elementor -> Astra theme -> Xpro Theme Builder (header/footer)
+         -> AI Addons, Xpro Addons, Unlimited Elements (виджеты)
+         -> Sticky Header Effects (поведение header)
+
+NextGEN Gallery -> NextGEN Pro (pro-функции)
+              -> NGG MCP Abilities (API управление)
+              -> NGG Alt Text Updater (alt тексты через API)
+              -> TranslatePress (перевод подписей!) <- ТОЧКА КОНФЛИКТА
+
+TranslatePress -> Yoast SEO (hreflang генерация)
+              -> Elementor (перевод виджетов)
+              -> NextGEN Gallery (перевод подписей) <- ТОЧКА КОНФЛИКТА
+              -> Contact Form 7 (перевод форм)
+
+Yoast SEO -> TranslatePress (sitemap + hreflang)
+          -> Site Kit (GSC данные)
+
+Contact Form 7 -> CF7 Telegram (уведомления)
+              -> Drag & Drop Upload (файлы)
+              -> Flamingo (хранение заявок)
+```
+
+### Опасные операции
+
+| Операция | Риск | Что делать |
+|----------|------|-----------|
+| Изменение HTML-структуры страницы | Переводы TP отвалятся | Заново привязать в TP visual editor |
+| Обновление Elementor | Несовместимость с Xpro/AI Addons | Сначала проверить совместимость |
+| Правка галереи NGG | Дублирование/мусор в переводах | Проверить все 4 языка после |
+| Правка robots.txt | Блокировка индексации | Валидация через fix_robots.py |
+| Обновление TranslatePress | Потеря переводов | Бэкап БД перед обновлением |
+
+---
+
+## 11. ИЗВЕСТНЫЕ ПРОБЛЕМЫ
+
+| # | Проблема | Приоритет | Статус |
+|---|---------|-----------|--------|
+| 1 | robots.txt блокировал краулеров | КРИТИЧНО | Исправлено 13.02.2026 |
+| 2 | Дублирование hreflang (ru-RU + ru, en-GB + en) | СРЕДНИЙ | Открыто |
+| 3 | `/meie-toopinnad/` возвращает 404 | ВЫСОКИЙ | Открыто |
+| 4 | Дублирование маркировок в RU-галерее фасадов | СРЕДНИЙ | Открыто (CSS-хак) |
+| 5 | Смешение языков на странице EGGER RU | СРЕДНИЙ | Открыто |
+| 6 | Email расхождение (julia vs maksim) | НИЗКИЙ | Уточнить |
+| 7 | 20 плагинов требуют обновления | СРЕДНИЙ | Открыто |
+| 8 | Elementor 3.25 -> 3.35 major update warning | ВЫСОКИЙ | Не обновлять без тестирования |
+| 9 | Alt-тексты галерей только коды, без названий | НИЗКИЙ | Открыто |
+| 10 | Title "Meie furnituur" не оптимизирован | НИЗКИЙ | Открыто |
