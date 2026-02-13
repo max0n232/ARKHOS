@@ -40,6 +40,16 @@ Shared skills available across all projects.
 | studiokook-knowledge | skills/wordpress/projects/studiokook/KNOWLEDGE.md | Project-specific quirks, patterns, decisions |
 | studiokook-infra | skills/wordpress/projects/studiokook/INFRASTRUCTURE.md | Full technical reference (plugins, pages, API) |
 
+## Community Skills
+
+| Skill | Source | Installed |
+|-------|--------|-----------|
+| supabase-postgres | supabase/agent-skills | 2026-02-13 |
+| context-compression | muratcankoylan/Agent-Skills-for-Context-Engineering | 2026-02-13 |
+| context-optimization | muratcankoylan/Agent-Skills-for-Context-Engineering | 2026-02-13 |
+| multi-agent-patterns | muratcankoylan/Agent-Skills-for-Context-Engineering | 2026-02-13 |
+| memory-systems | muratcankoylan/Agent-Skills-for-Context-Engineering | 2026-02-13 |
+
 ## Project Routing
 
 Skills are loaded based on:

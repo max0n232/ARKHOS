@@ -38,3 +38,10 @@ These skills auto-load by description. Listed here to improve routing:
 - post-mortem: Error analysis and documentation patching
 - pattern-tracker: Pattern detection across sessions
 - fal-ai: Image generation via fal.ai API
+
+## Community Skills (installed via git clone)
+- supabase-postgres: Supabase PostgreSQL best practices, RLS, migrations, indexes
+- context-compression: Session compression strategies for long-running tasks
+- context-optimization: Compaction, masking, caching for context management
+- multi-agent-patterns: Orchestrator, peer-to-peer, hierarchical architectures
+- memory-systems: Short-term, long-term, graph-based memory design
