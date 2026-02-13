@@ -31,7 +31,7 @@ SKILL.md должен содержать:
 - **Safety Rules** — что НЕЛЬЗЯ делать (ссылка на constitution.md)
 - **Common Workflows** — 2-3 реальных сценария с командами
 
-Эталон: `skills/n8n.md` или `skills/wordpress/SKILL.md`
+Эталон: `skills/wordpress/SKILL.md`
 
 ### 2. REGISTRY.md — зарегистрировать
 
@@ -63,7 +63,6 @@ Triggers = ключевые слова которые активируют skill
 
 Если skill требует agents:
   → Обнови agents/*.md — добавь domain/role/team_eligible
-  → Обнови skills/task-router/registry.json — если есть Task Router
 
 Если skill работает через MCP:
   → Проверь ~/.claude/mcp.json — сервер подключён?
@@ -143,7 +142,6 @@ CLAUDE.md должен быть <20 строк. Не забивай его.
 ```
 □ Создать agents/{name}.md с frontmatter (name, description, tools, model, permissionMode)
 □ Добавить domain, role, team_eligible в frontmatter
-□ Обновить skills/task-router/registry.json — если Task Router настроен
 □ Проверить что agent вызывается при релевантном запросе
 ```
 

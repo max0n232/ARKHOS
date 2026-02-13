@@ -358,7 +358,7 @@ function findSkillMd(finding) {
     // Map locations to skills
     const skillMappings = [
         { pattern: /studiokook|wordpress|wp|trp/i, skill: 'skills/wordpress/SKILL.md' },
-        { pattern: /n8n|workflow/i, skill: 'skills/n8n.md' },
+        { pattern: /n8n|workflow/i, skill: 'skills/n8n-expert/CLAUDE.md' },
         { pattern: /fal|image|audio/i, skill: 'skills/fal-ai/SKILL.md' }
     ];
 

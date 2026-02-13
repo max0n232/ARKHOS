@@ -1,3 +1,8 @@
+---
+name: legal
+description: "Estonian law reference. Use when working with OÜ formation, contracts, GDPR, Estonian tax, consumer protection."
+---
+
 # Legal Skill
 
 **Роль:** Estonian Law Consultant (IANAL - информационные цели)

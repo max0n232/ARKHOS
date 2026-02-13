@@ -1,4 +1,9 @@
-# External Integrations Skill
+---
+name: integrations
+description: "External integrations: Telegram Bot API, n8n webhooks, notifications. Use when sending Telegram messages, triggering n8n workflows, webhooks, notification pipelines."
+---
+
+# Integrations Skill
 
 **Роль:** External Communications & Webhooks Manager
 
@@ -167,7 +172,7 @@ if __name__ == '__main__':
 
 ### n8n MCP Tools (via skill)
 ```
-See /n8n skill for:
+See n8n-expert skill for:
 - search_nodes
 - get_node
 - search_templates
@@ -385,14 +390,6 @@ curl -X POST http://localhost:5000/webhook \
 **Assistant:**
 - Daily summary via Telegram
 - Task reminders
-
-**Trading:**
-- Price alerts via Telegram
-- Trade journal updates
-
-**SEO-SMM:**
-- Instagram post reminders
-- Analytics reports
 
 **Content Creator:**
 - Video publish notifications

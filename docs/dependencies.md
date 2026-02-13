@@ -45,22 +45,9 @@ npm install better-sqlite3
 - sk/v1 REST API (custom endpoints)
 
 **Required credentials:**
-- `credentials/wp_rest_api.json` - WordPress application password
-- Environment: `WP_AUTH` (base64 encoded)
+- `~/Desktop/Studiokook/credentials/wp_rest_api.json` - WordPress application password (JSON)
+- `~/Desktop/Studiokook/credentials/wp-auth.env` - WordPress application password (env, for `source`)
+- Load: `source ~/Desktop/Studiokook/credentials/wp-auth.env` then use `$WP_USER`, `$WP_APP_PASS`
 
 **API base:** `https://studiokook.ee/wp-json/sk/v1/`
 
-## Task Router Dependencies
-
-**settings.json flags:**
-- `AGENT_TEAMS=1` - enables team dispatch
-- `AUTOCOMPACT=80` - memory management
-
-**Files:**
-- `skills/task-router/SKILL.md` - routing logic
-- `skills/task-router/registry.json` - domains, roles, presets
-- `agents/*.md` - agent definitions with frontmatter
-
-**Pattern Tracker integration:**
-- `patterns/detector.js` - analyzes routing decisions
-- `patterns/tracker.db` - stores pattern data

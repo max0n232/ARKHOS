@@ -1,4 +1,9 @@
-# Knowledge Skill
+---
+name: knowledge-manager
+description: "Knowledge base management via DAL. Use for saving decisions, work logs, snippets, error solutions. Auto-save at session end."
+---
+
+# Knowledge Manager Skill
 
 **Роль:** Knowledge Base Manager (integration with DAL)
 
@@ -208,15 +213,10 @@ Type: [decisions/logs/snippets/errors]
 
 All skills should use knowledge base:
 
-**SEO-SMM:**
+**WordPress:**
 - Save successful post templates
 - Log campaign results
 - Store keyword research
-
-**Trading:**
-- Log trade analysis
-- Save successful patterns
-- Store strategy decisions
 
 **Legal:**
 - Save contract templates

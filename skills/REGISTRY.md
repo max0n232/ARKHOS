@@ -7,32 +7,31 @@ Shared skills available across all projects.
 ### Core
 | Skill | Path | Description |
 |-------|------|-------------|
-| assistant | skills/assistant/ | General task management |
-| knowledge | skills/knowledge/ | Knowledge DB operations |
-| task-router | skills/task-router/ | Task mode routing (solo/subagent/team) |
+| assistant | skills/assistant/ | Personal task management and productivity planning |
+| knowledge-manager | skills/knowledge-manager/ | Knowledge DB via DAL |
+| pattern-tracker | skills/pattern-tracker/ | Pattern tracking and correction system |
 | post-mortem | skills/post-mortem/ | Session error analysis, auto-patching SKILL.md |
 
 ### Automation
 | Skill | Path | Description |
 |-------|------|-------------|
-| n8n | skills/n8n.md | n8n MCP tools |
-| n8n-expert | skills/n8n-expert/ | Advanced workflow patterns |
+| n8n-expert | skills/n8n-expert/ | Advanced n8n workflow patterns (7 sub-skills) |
 
 ### Content
 | Skill | Path | Description |
 |-------|------|-------------|
-| content-creator | skills/content-creator.md | YouTube, Telegram content |
+| content-creator | skills/content-creator/ | YouTube, Telegram content strategy |
 
-### External
+### Integrations
 | Skill | Path | Description |
 |-------|------|-------------|
-| external | skills/external.md | Telegram Bot, webhooks |
-| fal-ai | skills/fal-ai/ | AI image generation |
+| integrations | skills/integrations/ | Telegram Bot API, n8n webhooks, notifications |
+| fal-ai | skills/fal-ai/ | AI image/audio generation |
 
 ### Compliance
 | Skill | Path | Description |
 |-------|------|-------------|
-| legal | skills/legal.md | Estonian law, GDPR |
+| legal | skills/legal/ | Estonian law, OÜ, GDPR, contracts |
 
 ### WordPress
 | Skill | Path | Description |
@@ -44,8 +43,8 @@ Shared skills available across all projects.
 ## Project Routing
 
 Skills are loaded based on:
-1. Project-specific `_triggers.json`
-2. Global fallback patterns
+1. YAML frontmatter `description` field (auto-discovery)
+2. Project-specific `_triggers.json`
 3. Explicit user request
 
 ## Memory Integration

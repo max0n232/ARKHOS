@@ -1,3 +1,8 @@
+---
+name: content-creator
+description: "YouTube and Telegram content strategy. Use when creating video scripts, optimizing YouTube SEO, planning Telegram posts, content calendars."
+---
+
 # Content Creator Skill
 
 **Роль:** YouTube & Telegram Content Strategist

@@ -40,15 +40,13 @@
 | Category | Location | Triggers |
 |----------|----------|----------|
 | n8n Expert (MCP tools) | `~/.claude/skills/n8n-expert/` | Advanced n8n patterns, MCP tools |
-| n8n Workflows | `~/.claude/skills/n8n.md` | n8n workflow automation (16+ operations) |
 | FAL-AI | `~/.claude/skills/fal-ai/` | Image generation, audio synthesis, AI models |
-| External | `~/.claude/skills/external.md` | Telegram bot, webhooks, n8n integration |
-| Legal | `~/.claude/skills/legal.md` | Estonian law, OÜ, GDPR, contracts, tax |
-| Content Creator | `~/.claude/skills/content-creator.md` | YouTube, Telegram strategy, SEO |
-| Assistant | `~/.claude/skills/assistant.md` | Task management, Eisenhower, Pomodoro |
-| Knowledge | `~/.claude/skills/knowledge.md` | Knowledge DB, decisions, logs, snippets |
+| Integrations | `~/.claude/skills/integrations/` | Telegram bot, webhooks, n8n integration |
+| Legal | `~/.claude/skills/legal/` | Estonian law, OÜ, GDPR, contracts, tax |
+| Content Creator | `~/.claude/skills/content-creator/` | YouTube, Telegram strategy, SEO |
+| Assistant | `~/.claude/skills/assistant/` | Task management, Eisenhower, Pomodoro |
+| Knowledge Manager | `~/.claude/skills/knowledge-manager/` | Knowledge DB, decisions, logs, snippets |
 | WordPress | `~/.claude/skills/wordpress/` | WordPress, WP, сайт, studiokook, перевод, translation, TRP, Elementor, SEO, snippets |
-| Task Router | `~/.claude/skills/task-router/` | (implicit) Automatic routing to Solo/Subagent/Team mode |
 
 ## Marketing Skills (`skills/marketing/`)
 

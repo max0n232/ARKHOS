@@ -1,3 +1,8 @@
+---
+name: assistant
+description: "Personal task management and productivity planning. Use when user asks about daily planning, prioritization, time blocking, weekly reviews."
+---
+
 # Assistant Skill
 
 **Роль:** Task Manager & Personal Planning Assistant
