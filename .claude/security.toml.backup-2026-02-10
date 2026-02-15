@@ -1,0 +1,126 @@
+# Studiokook Project Security Rules
+# Extends global rules with WordPress-specific protections
+
+[project]
+name = "studiokook"
+inherits = "global"
+
+# =============================================================================
+# DENY RULES - Project-specific blocks
+# =============================================================================
+[deny]
+
+# WordPress dangerous functions (in PHP code)
+php_functions = [
+    "wp_update_post",      # Crashes site in Code Snippets - use $wpdb->update()
+    "update_option",       # Dangerous without validation
+    "wp_delete_post",      # Requires confirmation
+    "delete_option",       # Can break site config
+]
+
+# Protected directories
+file_patterns = [
+    "credentials/**",           # Never access credentials directly
+    "**/wp-config.php",        # WordPress config
+    "**/wp-includes/**",       # Core WordPress files
+    "**/.env",                 # Environment files
+]
+
+# Dangerous API calls
+api_patterns = [
+    "DELETE /wp-json/wp/v2/posts/*",   # Bulk delete
+    "DELETE /wp-json/wp/v2/pages/*",   # Page delete
+]
+
+# =============================================================================
+# ALLOW RULES - Project-specific permissions
+# =============================================================================
+[allow]
+
+# Safe WordPress operations
+commands_regex = [
+    "^curl.*studiokook\\.ee/wp-json",  # REST API calls
+    "^wp\\s+(post|page|term)\\s+list", # WP-CLI read operations
+    "^wp\\s+option\\s+get",            # Read options
+]
+
+# Development file patterns
+file_patterns = [
+    "n8n/**/*.json",           # n8n workflows
+    "skills/**/*.md",          # Skills documentation
+    "code-snippets/**/*.php",  # Code snippets (with caution)
+    "agents/**/*.py",          # Python agents
+]
+
+# =============================================================================
+# CREDENTIALS ACCESS
+# =============================================================================
+[credentials_access]
+# Credentials that can be referenced (read values for API calls)
+allowed = [
+    "wp_rest_api",
+    "google_analytics",
+]
+
+# Credentials requiring explicit confirmation
+require_confirmation = [
+    "zone_ee",              # Hosting access
+    "supabase",             # Database access
+    "google_credentials",   # OAuth credentials
+]
+
+# =============================================================================
+# WORDPRESS-SPECIFIC RULES
+# =============================================================================
+[wordpress]
+
+# Code Snippets plugin safety
+snippets_forbidden_patterns = [
+    "wp_update_post",
+    "wp_insert_post.*'post_status'.*'publish'",  # Auto-publish
+    "\\$_GET\\[",                                 # Direct superglobal access
+    "\\$_POST\\[",
+    "eval\\(",
+    "exec\\(",
+    "shell_exec\\(",
+]
+
+# Safe database operations
+db_allowed_operations = [
+    "$wpdb->get_results",
+    "$wpdb->get_row",
+    "$wpdb->get_var",
+    "$wpdb->update",        # Safe update (not wp_update_post)
+    "$wpdb->insert",
+]
+
+# REST API safety
+rest_require_validation = true
+rest_require_nonce = true
+rest_require_capability_check = true
+
+# =============================================================================
+# N8N WORKFLOW RULES
+# =============================================================================
+[n8n]
+
+# Before deploy checks
+pre_deploy_checks = [
+    "no_hardcoded_secrets",
+    "error_handling_present",
+    "tested_locally",
+]
+
+# Forbidden in workflows
+forbidden_in_workflows = [
+    "password",
+    "api_key",
+    "secret",
+    "token",
+]
+
+# Required nodes for production
+required_for_prod = [
+    "error_trigger",        # Error handling
+    "respond_to_webhook",   # Controlled responses
+]

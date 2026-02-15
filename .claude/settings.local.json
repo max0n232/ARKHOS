@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(test:*)",
+      "WebFetch(domain:github.com)",
+      "Bash(dir:*)",
+      "Bash(powershell -Command:*)",
+      "Bash(findstr:*)",
+      "Bash(powershell:*)",
+      "Bash(node:*)",
+      "Bash(npm init:*)",
+      "Bash(npm install:*)",
+      "Bash(New-Item -ItemType Directory -Force -Path \"C:\\\\Users\\\\sorte\\\\.claude\\\\plans\\\\archive\")",
+      "Bash(Move-Item \"C:\\\\Users\\\\sorte\\\\.claude\\\\plans\\\\hazy-sauteeing-honey.md\" \"C:\\\\Users\\\\sorte\\\\.claude\\\\plans\\\\archive\\\\2026-02-09_architecture-complete.md\")"
+    ]
+  }
+}

@@ -1,0 +1,184 @@
+<?php
+/**
+ * FIX HPL + RENAME Series + UPDATE pages
+ *
+ * 1. Delete broken HPL gallery (GID 15, meta_data=NULL → DivisionByZero)
+ * 2. Rename galleries: Kivi→F-series, Puit→H-series, Monokroom→U-series
+ * 3. Update Egger facade page (6309): headings + descriptions
+ * 4. Update HPL page: [ngg src="images" ids="..."] with real PIDs
+ * 5. Clear caches
+ *
+ * RUN ONCE.
+ */
+
+global $wpdb;
+$prefix = $wpdb->prefix;
+$log = [];
+
+// ============================================================
+// STEP 1: Delete broken HPL gallery (GID 15)
+// ============================================================
+$log[] = "=== STEP 1: FIX HPL GALLERY ===";
+
+$hpl_gid = $wpdb->get_var("SELECT gid FROM {$prefix}ngg_gallery WHERE title = 'HPL Egger' LIMIT 1");
+if ($hpl_gid) {
+    $del_pics = $wpdb->query("DELETE FROM {$prefix}ngg_pictures WHERE galleryid = $hpl_gid");
+    $del_gal = $wpdb->query("DELETE FROM {$prefix}ngg_gallery WHERE gid = $hpl_gid");
+    $log[] = "Deleted broken gallery GID $hpl_gid ($del_pics images removed)";
+} else {
+    $log[] = "HPL Egger gallery not found (already deleted or never created)";
+}
+
+// ============================================================
+// STEP 2: Rename galleries → Series
+// ============================================================
+$log[] = "\n=== STEP 2: RENAME GALLERIES ===";
+
+$renames = [
+    10 => 'Egger F-series',
+    9  => 'Egger H-series',
+    11 => 'Egger U-series',
+    1  => 'Egger F-series (worktops)',
+    2  => 'Egger H-series (worktops)',
+];
+
+foreach ($renames as $gid => $new_title) {
+    $old = $wpdb->get_var("SELECT title FROM {$prefix}ngg_gallery WHERE gid = $gid");
+    $wpdb->update("{$prefix}ngg_gallery", ['title' => $new_title], ['gid' => $gid]);
+    $log[] = "GID $gid: '$old' → '$new_title'";
+}
+
+// ============================================================
+// STEP 3: Update Egger facade page (6309)
+// ============================================================
+$log[] = "\n=== STEP 3: UPDATE EGGER PAGE ===";
+
+$egger_content = '<h1>Egger fassaadimaterjalid</h1>
+<p>Egger pakub laia valiku kvaliteetseid dekoore köögifassaadide jaoks. Valige sobiv dekoor kolmest kategooriast.</p>
+
+<h2>F-series</h2>
+<p>Kivi- ja mineraaltekstuuridega dekoratiivsed fassaadimaterjalid.</p>
+[ngg src="galleries" ids="10" display="basic_thumbnail" images_per_page="100" number_of_columns="7" maximum_entity_count="500"]
+
+<h2>H-series</h2>
+<p>Naturaalsete puidu tekstuuridega fassaadimaterjalid.</p>
+[ngg src="galleries" ids="9" display="basic_thumbnail" images_per_page="150" number_of_columns="7" maximum_entity_count="500"]
+
+<h2>U-series</h2>
+<p>Ühevärvilised minimalistlikud fassaadimaterjalid.</p>
+[ngg src="galleries" ids="11" display="basic_thumbnail" images_per_page="150" number_of_columns="7" maximum_entity_count="500"]';
+
+$wpdb->update($wpdb->posts, ['post_content' => $egger_content], ['ID' => 6309]);
+clean_post_cache(6309);
+$log[] = "Page 6309 updated: F-series / H-series / U-series";
+
+// ============================================================
+// STEP 4: Find HPL decor PIDs from existing galleries
+// ============================================================
+$log[] = "\n=== STEP 4: FIND HPL PIDS ===";
+
+$hpl_codes = ['F206','F221','F244','F311','H1318','H1330','U7081','U999'];
+$hpl_pids = [];
+
+foreach ($hpl_codes as $code) {
+    $found = $wpdb->get_var($wpdb->prepare(
+        "SELECT pid FROM {$prefix}ngg_pictures WHERE filename LIKE %s AND galleryid NOT IN (15) ORDER BY exclude ASC, pid ASC LIMIT 1",
+        $code . '_%'
+    ));
+    if ($found) {
+        $hpl_pids[] = (int)$found;
+        $fname = $wpdb->get_var("SELECT CONCAT(filename,' (GID:',galleryid,', excl:',exclude,')') FROM {$prefix}ngg_pictures WHERE pid = $found");
+        $log[] = "  $code → pid $found — $fname";
+    } else {
+        $log[] = "  $code → NOT FOUND";
+    }
+}
+
+$pids_str = implode(',', $hpl_pids);
+$log[] = "HPL shortcode PIDs: $pids_str";
+
+// ============================================================
+// STEP 5: Update HPL page
+// ============================================================
+$log[] = "\n=== STEP 5: UPDATE HPL PAGE ===";
+
+$hpl_page_id = $wpdb->get_var("SELECT ID FROM {$wpdb->posts} WHERE post_name = 'hpl-tootasapinnad' AND post_status IN ('publish','draft') LIMIT 1");
+
+if ($hpl_page_id && !empty($pids_str)) {
+
+    $hpl_content = '<h2>HPL kompaktlaminaat töötasapinnad</h2>
+
+<p>HPL (High Pressure Laminate) kompaktlaminaat töötasapinnad on köögimööbli tipptasemel lahendus. Erinevalt tavalistest laminaattöötasapindadest on HPL plaadid valmistatud kõrgsurvemeetodil — kihtide kokkupressimine kõrgel temperatuuril ja rõhul tagab erakordse vastupidavuse.</p>
+
+<p>HPL töötasapinnad on vaid 12 mm paksused, mis annab köögile elegantse ja minimalistliku ilme. Vaatamata õhukesele profiilile on need äärmiselt vastupidavad kriimustustele, kuumusele, niiskusele ja keemilistele ainetele.</p>
+
+<hr/>
+
+<h3>Egger Compact Laminate</h3>
+
+<p>Egger kompaktlaminaat töötasapinnad (formaat 4100 × 920 mm, paksus 12 mm) on saadaval musta või värvilise südamikuga. Egger pakub 10-aastast garantiid ja realistlikke puit- ning kivitektuure. Pinnad on hügieenilised, antibakteriaalsed ning ei vaja erikohtlemist — piisab tavalisest puhastamisest.</p>
+
+[ngg src="images" ids="' . $pids_str . '" display="basic_thumbnail" thumbnail_crop="0" images_per_page="20"]
+
+<p><em>Egger kasutab jätkusuutlikult majandatud metsadest pärit puitu ning taaskasutatavaid materjale.</em></p>
+
+<hr/>
+
+<h3>Fundermax Max Compact Interior</h3>
+
+<p>Fundermax on ülemaailmne HPL-paneelide liider. Nende Max Compact Interior töötasapinnad (formaat 4100 × 1300 mm, paksus 12 mm) paistavad silma maksimaalse vastupidavuse, lihtsa hoolduse ja ülipika kasutusea poolest.</p>
+
+<p>Saadaval dekoorkoodid: 0026, 0027, 0075, 0077, 0080, 0344, 0386, 0394, 0426, 0427, 0428, 0497, 0581, 0585, 0670, 0693</p>
+
+<p><em>Fundermax HPL-plaadid on UV-kindlad ja sobivad nii sise- kui väliskasutuseks.</em></p>
+
+<hr/>
+
+<p><strong>Küsi pakkumist:</strong> Kõik HPL töötasapinnad on saadaval tellimuse alusel. Võtke meiega ühendust parima lahenduse leidmiseks.</p>';
+
+    $wpdb->update($wpdb->posts, ['post_content' => $hpl_content], ['ID' => $hpl_page_id]);
+    clean_post_cache($hpl_page_id);
+    $log[] = "HPL page $hpl_page_id updated with [ngg src=images ids=$pids_str]";
+} else {
+    $log[] = "ERROR: HPL page not found or no PIDs";
+}
+
+// ============================================================
+// STEP 6: Clear caches
+// ============================================================
+$log[] = "\n=== STEP 6: CLEAR CACHES ===";
+$wpdb->query("DELETE FROM {$wpdb->options} WHERE option_name LIKE '%ngg%transient%'");
+$wpdb->query("DELETE FROM {$wpdb->options} WHERE option_name LIKE '%displayed_gallery%'");
+if (function_exists('wp_cache_flush')) wp_cache_flush();
+$log[] = "NGG transients + WP cache cleared";
+
+// ============================================================
+// STEP 7: Verify
+// ============================================================
+$log[] = "\n=== STEP 7: VERIFICATION ===";
+
+$check_hpl = $wpdb->get_var("SELECT COUNT(*) FROM {$prefix}ngg_gallery WHERE title = 'HPL Egger'");
+$log[] = "Broken HPL gallery exists: " . ($check_hpl ? "YES — problem!" : "NO — good");
+
+foreach ($renames as $gid => $expected) {
+    $actual = $wpdb->get_var("SELECT title FROM {$prefix}ngg_gallery WHERE gid = $gid");
+    $status = ($actual === $expected) ? 'OK' : "MISMATCH: got '$actual'";
+    $log[] = "GID $gid: $status ($actual)";
+}
+
+$egger_h2s = [];
+preg_match_all('/<h2>(.*?)<\/h2>/', $wpdb->get_var("SELECT post_content FROM {$wpdb->posts} WHERE ID = 6309"), $egger_h2s);
+$log[] = "Egger page headings: " . implode(', ', $egger_h2s[1] ?? ['none found']);
+
+$hpl_has_ngg = strpos($wpdb->get_var("SELECT post_content FROM {$wpdb->posts} WHERE ID = $hpl_page_id"), '[ngg src="images"') !== false;
+$log[] = "HPL page has [ngg images]: " . ($hpl_has_ngg ? "YES" : "NO");
+
+foreach ([1,2,9,10,11] as $gid) {
+    $vis = $wpdb->get_var("SELECT COUNT(*) FROM {$prefix}ngg_pictures WHERE galleryid=$gid AND exclude=0");
+    $title = $wpdb->get_var("SELECT title FROM {$prefix}ngg_gallery WHERE gid=$gid");
+    $log[] = "GID $gid ($title): $vis visible";
+}
+
+echo "<h2>FIX RESULTS</h2><pre>" . implode("\n", $log) . "</pre>";
+echo "<p><strong>После:</strong> Seraphinite → Удалить кэш</p>";
+echo "<p><strong>Переводы:</strong> TranslatePress → перевести новые тексты на RU</p>";

@@ -1,0 +1,241 @@
+<?php
+/**
+ * DEDUP + RENAME + HPL GALLERIES
+ *
+ * 1. Remove texture duplicates (keep one per decor code, prefer _ST9)
+ * 2. Rename alttext: remove _STxx/_PMxx/_TMxx suffixes → clean code only
+ * 3. Create HPL gallery for Egger HPL decors and embed in HPL page
+ *
+ * RUN ONCE. Safe: uses exclude=1 (not DELETE).
+ */
+
+global $wpdb;
+$log = [];
+$prefix = $wpdb->prefix;
+
+// ============================================================
+// STEP 1: BACKUP current state
+// ============================================================
+$log[] = "=== STEP 1: BACKUP ===";
+$all_visible = $wpdb->get_results("SELECT pid, filename, galleryid, alttext, exclude FROM {$prefix}ngg_pictures WHERE galleryid IN (1,2,9,10,11) AND exclude = 0");
+update_option('studiokook_dedup_backup_' . date('Ymd_His'), json_encode($all_visible, JSON_UNESCAPED_UNICODE), false);
+$log[] = "Backup saved: " . count($all_visible) . " visible images";
+
+// ============================================================
+// STEP 2: DEDUPLICATE — one image per decor code per gallery
+// ============================================================
+$log[] = "\n=== STEP 2: DEDUPLICATE ===";
+
+$dedup_galleries = [9, 11]; // only these have duplicates
+$total_excluded = 0;
+
+foreach ($dedup_galleries as $gid) {
+    $images = $wpdb->get_results("SELECT pid, filename FROM {$prefix}ngg_pictures WHERE galleryid = $gid AND exclude = 0 ORDER BY filename");
+
+    // Group by base code
+    $groups = [];
+    foreach ($images as $img) {
+        // Extract base code: F206 from F206_ST9.jpg, U999 from U999_PM.jpg
+        $base = preg_replace('/^([A-Z]\d+).*$/', '$1', pathinfo($img->filename, PATHINFO_FILENAME));
+        $groups[$base][] = $img;
+    }
+
+    $exclude_pids = [];
+    foreach ($groups as $code => $imgs) {
+        if (count($imgs) <= 1) continue;
+
+        // Pick best: prefer _ST9, then first alphabetically
+        $keep = null;
+        foreach ($imgs as $img) {
+            if (strpos($img->filename, '_ST9') !== false) {
+                $keep = $img->pid;
+                break;
+            }
+        }
+        if (!$keep) {
+            $keep = $imgs[0]->pid; // fallback: first one
+        }
+
+        foreach ($imgs as $img) {
+            if ($img->pid != $keep) {
+                $exclude_pids[] = $img->pid;
+            }
+        }
+    }
+
+    if (!empty($exclude_pids)) {
+        $result = $wpdb->query("UPDATE {$prefix}ngg_pictures SET exclude = 1 WHERE pid IN (" . implode(',', $exclude_pids) . ")");
+        $log[] = "GID $gid: excluded $result texture duplicates";
+        $total_excluded += $result;
+    } else {
+        $log[] = "GID $gid: no duplicates found";
+    }
+}
+$log[] = "Total duplicates excluded: $total_excluded";
+
+// ============================================================
+// STEP 3: RENAME ALTTEXT — clean codes only
+// ============================================================
+$log[] = "\n=== STEP 3: RENAME ALTTEXT ===";
+
+// Get all visible images across all Egger galleries
+$all_images = $wpdb->get_results("SELECT pid, filename, alttext, galleryid FROM {$prefix}ngg_pictures WHERE galleryid IN (1,2,9,10,11) AND exclude = 0");
+
+$renamed = 0;
+foreach ($all_images as $img) {
+    $fname = pathinfo($img->filename, PATHINFO_FILENAME);
+    // Extract clean code: F206 from F206_ST9, U767 from U767_ST9, H1318 from H1318_ST10
+    $clean = preg_replace('/^([A-Z]\d+).*$/', '$1', $fname);
+
+    if ($clean !== $img->alttext) {
+        $wpdb->update(
+            "{$prefix}ngg_pictures",
+            ['alttext' => $clean],
+            ['pid' => $img->pid]
+        );
+        $renamed++;
+    }
+}
+$log[] = "Renamed alttext: $renamed images";
+
+// ============================================================
+// STEP 4: CREATE HPL GALLERY + POPULATE
+// ============================================================
+$log[] = "\n=== STEP 4: HPL GALLERY ===";
+
+// Egger HPL decor codes from eamf.ee
+$hpl_egger_codes = ['F206', 'F221', 'F244', 'F311', 'H1318', 'H1330', 'U7081', 'U999'];
+
+// Check if HPL gallery already exists
+$hpl_gid = $wpdb->get_var("SELECT gid FROM {$prefix}ngg_gallery WHERE title = 'HPL Egger' LIMIT 1");
+
+if (!$hpl_gid) {
+    // Create new gallery — use path from existing Egger gallery (GID 14)
+    $wpdb->insert("{$prefix}ngg_gallery", [
+        'title'    => 'HPL Egger',
+        'path'     => '/wp-content/gallery/egger/',
+        'galdesc'  => 'Egger HPL Compact Laminate decors',
+        'author'   => 1,
+    ]);
+    $hpl_gid = $wpdb->insert_id;
+    $log[] = "Created HPL Egger gallery GID: $hpl_gid";
+} else {
+    $log[] = "HPL Egger gallery already exists: GID $hpl_gid";
+}
+
+// Find source images for HPL decors (from any gallery)
+$hpl_added = 0;
+foreach ($hpl_egger_codes as $code) {
+    // Check if already in HPL gallery
+    $exists = $wpdb->get_var($wpdb->prepare(
+        "SELECT pid FROM {$prefix}ngg_pictures WHERE galleryid = %d AND filename LIKE %s LIMIT 1",
+        $hpl_gid, $code . '%'
+    ));
+
+    if ($exists) {
+        $log[] = "  $code: already in HPL gallery (pid $exists)";
+        continue;
+    }
+
+    // Find source image from any gallery
+    $source = $wpdb->get_row($wpdb->prepare(
+        "SELECT filename, image_slug, description FROM {$prefix}ngg_pictures WHERE filename LIKE %s ORDER BY FIELD(galleryid,10,9,11,1,2) LIMIT 1",
+        $code . '%'
+    ));
+
+    if ($source) {
+        $wpdb->insert("{$prefix}ngg_pictures", [
+            'image_slug'  => 'hpl-' . strtolower($code),
+            'galleryid'   => $hpl_gid,
+            'filename'    => $source->filename,
+            'description' => $source->description ?: '',
+            'alttext'     => $code,
+            'exclude'     => 0,
+            'sortorder'   => $hpl_added,
+        ]);
+        $hpl_added++;
+        $log[] = "  $code: added to HPL gallery (file: {$source->filename})";
+    } else {
+        $log[] = "  $code: NOT FOUND in any gallery";
+    }
+}
+$log[] = "HPL gallery populated: $hpl_added new images";
+
+// ============================================================
+// STEP 5: UPDATE HPL PAGE with gallery shortcode
+// ============================================================
+$log[] = "\n=== STEP 5: UPDATE HPL PAGE ===";
+
+$hpl_page_id = $wpdb->get_var("SELECT ID FROM {$wpdb->posts} WHERE post_name = 'hpl-tootasapinnad' AND post_status = 'publish' LIMIT 1");
+
+if ($hpl_page_id) {
+    $hpl_content = '
+<h2>HPL kompaktlaminaat töötasapinnad</h2>
+
+<p>HPL (High Pressure Laminate) kompaktlaminaat töötasapinnad on köögimööbli tipptasemel lahendus. Erinevalt tavalistest laminaattöötasapindadest on HPL plaadid valmistatud kõrgsurvemeetodil — kihtide kokkupressimine kõrgel temperatuuril ja rõhul tagab erakordse vastupidavuse.</p>
+
+<p>HPL töötasapinnad on vaid 12 mm paksused, mis annab köögile elegantse ja minimalistliku ilme. Vaatamata õhukesele profiilile on need äärmiselt vastupidavad kriimustustele, kuumusele, niiskusele ja keemilistele ainetele.</p>
+
+<hr/>
+
+<h3>Egger Compact Laminate</h3>
+
+<p>Egger kompaktlaminaat töötasapinnad (formaat 4100 × 920 mm, paksus 12 mm) on saadaval musta või värvilise südamikuga. Egger pakub 10-aastast garantiid ja realistlikke puit- ning kivitektuure. Pinnad on hügieenilised, antibakteriaalsed ning ei vaja erikohtlemist — piisab tavalisest puhastamisest.</p>
+
+[ngg src="galleries" ids="' . $hpl_gid . '" display="basic_thumbnail" thumbnail_crop="0" images_per_page="20"]
+
+<p><em>Egger kasutab jätkusuutlikult majandatud metsadest pärit puitu ning taaskasutatavaid materjale.</em></p>
+
+<hr/>
+
+<h3>Fundermax Max Compact Interior</h3>
+
+<p>Fundermax on ülemaailmne HPL-paneelide liider. Nende Max Compact Interior töötasapinnad (formaat 4100 × 1300 mm, paksus 12 mm) paistavad silma maksimaalse vastupidavuse, lihtsa hoolduse ja ülipika kasutusea poolest.</p>
+
+<p>Saadaval dekoorkoodid: 0026, 0027, 0075, 0077, 0080, 0344, 0386, 0394, 0426, 0427, 0428, 0497, 0581, 0585, 0670, 0693</p>
+
+<p><em>Fundermax HPL-plaadid on UV-kindlad ja sobivad nii sise- kui väliskasutuseks.</em></p>
+
+<hr/>
+
+<p><strong>Küsi pakkumist:</strong> Kõik HPL töötasapinnad on saadaval tellimuse alusel. Võtke meiega ühendust parima lahenduse leidmiseks.</p>';
+
+    $wpdb->update($wpdb->posts, ['post_content' => $hpl_content], ['ID' => $hpl_page_id]);
+    $log[] = "Updated HPL page (ID: $hpl_page_id) with gallery shortcode [ngg ids=$hpl_gid]";
+} else {
+    $log[] = "ERROR: HPL page not found!";
+}
+
+// ============================================================
+// STEP 6: CLEAR CACHES
+// ============================================================
+$log[] = "\n=== STEP 6: CLEAR CACHES ===";
+$wpdb->query("DELETE FROM {$wpdb->options} WHERE option_name LIKE '%ngg%transient%'");
+$wpdb->query("DELETE FROM {$wpdb->options} WHERE option_name LIKE '%displayed_gallery%'");
+if (function_exists('wp_cache_flush')) wp_cache_flush();
+$log[] = "Caches cleared";
+
+// ============================================================
+// STEP 7: FINAL VERIFICATION
+// ============================================================
+$log[] = "\n=== STEP 7: VERIFICATION ===";
+
+$all_galleries = [
+    1  => 'Worktop F',
+    2  => 'Worktop H',
+    6  => 'Tehnostone',
+    8  => 'Fenix',
+    9  => 'Facade H',
+    10 => 'Facade F',
+    11 => 'Facade U',
+];
+if ($hpl_gid) $all_galleries[$hpl_gid] = 'HPL Egger';
+
+foreach ($all_galleries as $gid => $name) {
+    $visible = $wpdb->get_var("SELECT COUNT(*) FROM {$prefix}ngg_pictures WHERE galleryid = $gid AND exclude = 0");
+    $unique = $wpdb->get_var("SELECT COUNT(DISTINCT SUBSTRING_INDEX(SUBSTRING_INDEX(filename, '_', 1), '.', 1)) FROM {$prefix}ngg_pictures WHERE galleryid = $gid AND exclude = 0");
+    $log[] = "GID $gid ($name): $visible visible, $unique unique codes";
+}
+
+echo "<h2>DEDUP + RENAME + HPL RESULTS</h2><pre>" . implode("\n", $log) . "</pre>";
+echo "<p><strong>После:</strong> Seraphinite → Удалить кэш</p>";

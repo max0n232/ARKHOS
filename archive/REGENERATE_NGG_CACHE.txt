@@ -1,0 +1,25 @@
+// Force NGG to regenerate gallery cache
+global $wpdb;
+
+// Clear all NGG-related transients
+$deleted = $wpdb->query("DELETE FROM {$wpdb->options} WHERE option_name LIKE '%ngg%' AND option_name LIKE '%transient%'");
+error_log("[NGG Cache] Deleted {$deleted} NGG transients");
+
+// Clear NGG Pro displayed gallery cache
+$deleted_pro = $wpdb->query("DELETE FROM {$wpdb->options} WHERE option_name LIKE 'displayed_gallery_%'");
+error_log("[NGG Cache] Deleted {$deleted_pro} displayed gallery cache entries");
+
+// Flush object cache
+wp_cache_flush();
+error_log("[NGG Cache] Object cache flushed");
+
+// Clear Seraphinite cache
+if (function_exists('seraph_accel_cache_clear')) {
+    seraph_accel_cache_clear();
+    error_log("[NGG Cache] Seraphinite cache cleared");
+}
+
+error_log("[NGG Cache] ========== SUCCESS ==========");
+error_log("[NGG Cache] NGG will regenerate HTML on next page load");
+error_log("[NGG Cache] DEACTIVATE THIS SNIPPET");
+error_log("[NGG Cache] Wait 10 seconds, then refresh page");

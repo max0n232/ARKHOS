@@ -77,11 +77,10 @@ node scripts/add-translation.js " Kõrgklassi materjalid ja foorium" "Матер
 node scripts/add-translation.js " Täielik teenindus – algusest lõpuni" "Полный сервис — от начала до конца"
 
 # Rebuild + clear cache
-WP_USER=admin && WP_APP_PASS=2joA1jBbBkiqOrCRgFpjapoA && \
-curl -s "https://studiokook.ee/wp-json/sk/v1/fix-trp-dicts" -H "Authorization: Basic $(echo -n $WP_USER:$WP_APP_PASS | base64)"
+source credentials/wp-auth.env
+curl -s "https://studiokook.ee/wp-json/sk/v1/fix-trp-dicts" -u "$WP_USER:$WP_APP_PASS"
 
-WP_USER=admin && WP_APP_PASS=2joA1jBbBkiqOrCRgFpjapoA && \
-curl -s "https://studiokook.ee/wp-json/sk/v1/touch-page" -H "Authorization: Basic $(echo -n $WP_USER:$WP_APP_PASS | base64)"
+curl -s "https://studiokook.ee/wp-json/sk/v1/touch-page" -u "$WP_USER:$WP_APP_PASS"
 
 # Verify
 curl -s "https://studiokook.ee/ru/" | grep -o "Изготавливаем\|Лучшее соотношение\|Материалы и фурнитура\|Полный сервис"
@@ -131,9 +130,7 @@ From `arkhos-audit-fixes.md` — cleanup duplicates, structure.
 - `C:\Users\sorte\Desktop\Studiokook\scripts\add-translation.js`
 
 **Credentials:**
-- `C:\Users\sorte\Desktop\Studiokook\credentials\wp-auth.env`
-  - WP_USER=admin
-  - WP_APP_PASS=2joA1jBbBkiqOrCRgFpjapoA
+- `credentials/wp-auth.env` (WP_USER + WP_APP_PASS)
 
 **Logs:**
 - `C:\Users\sorte\Desktop\Studiokook\translation-progress.txt`

@@ -1,0 +1,244 @@
+<?php
+/**
+ * TRANSLATIONS: HPL page + Egger Facades page
+ *
+ * Fills TranslatePress translations for RU, EN, FI
+ * Uses original_id to match strings correctly.
+ * Status: 2 = human-reviewed translation
+ *
+ * RUN ONCE.
+ */
+
+global $wpdb;
+$log = [];
+
+// ============================================================
+// TRANSLATIONS MAP: original_id => [RU, EN, FI]
+// ============================================================
+
+$translations = [
+    // === EGGER FACADES PAGE (6309) ===
+    5569 => [
+        'ru' => 'Фасадные материалы Egger',
+        'en' => 'Egger facade materials',
+        'fi' => 'Egger julkisivumateriaalit',
+    ],
+    5572 => [
+        'ru' => 'Декоративные фасадные материалы с текстурой камня и минералов.',
+        'en' => 'Decorative facade materials with stone and mineral textures.',
+        'fi' => 'Koristeelliset julkisivumateriaalit kivi- ja mineraalipinnoilla.',
+    ],
+    5574 => [
+        'ru' => 'Фасадные материалы с натуральной текстурой дерева.',
+        'en' => 'Facade materials with natural wood textures.',
+        'fi' => 'Luonnollisilla puupinnoilla varustetut julkisivumateriaalit.',
+    ],
+    5576 => [
+        'ru' => 'Однотонные минималистичные фасадные материалы.',
+        'en' => 'Solid colour minimalist facade materials.',
+        'fi' => 'Yksivärisiä minimalistisia julkisivumateriaaleja.',
+    ],
+    5757 => [
+        'ru' => 'F-серия',
+        'en' => 'F-series',
+        'fi' => 'F-sarja',
+    ],
+    5758 => [
+        'ru' => 'Декоративные фасадные материалы с текстурой камня и минералов.',
+        'en' => 'Decorative facade materials with stone and mineral textures.',
+        'fi' => 'Koristeelliset julkisivumateriaalit kivi- ja mineraalipinnoilla.',
+    ],
+    5759 => [
+        'ru' => 'H-серия',
+        'en' => 'H-series',
+        'fi' => 'H-sarja',
+    ],
+    5760 => [
+        'ru' => 'U-серия',
+        'en' => 'U-series',
+        'fi' => 'U-sarja',
+    ],
+    5761 => [
+        'ru' => 'Однотонные минималистичные фасадные материалы.',
+        'en' => 'Solid colour minimalist facade materials.',
+        'fi' => 'Yksivärisiä minimalistisia julkisivumateriaaleja.',
+    ],
+
+    // === HPL PAGE (6335) ===
+    5578 => [
+        'ru' => 'Компактный ламинат HPL',
+        'en' => 'HPL Compact Laminate',
+        'fi' => 'HPL-kompaktilaminaatti',
+    ],
+    5580 => [
+        'ru' => 'Столешницы из компактного ламината HPL',
+        'en' => 'HPL compact laminate countertops',
+        'fi' => 'HPL-kompaktilaminaattityötasot',
+    ],
+    5581 => [
+        'ru' => 'Столешницы из компактного ламината HPL (High Pressure Laminate) — это решение премиум-класса для кухонной мебели. В отличие от обычных ламинированных столешниц, HPL-плиты изготовлены методом высокого давления — прессование слоёв при высокой температуре и давлении обеспечивает исключительную прочность.',
+        'en' => 'HPL (High Pressure Laminate) compact laminate countertops are a premium solution for kitchen furniture. Unlike standard laminate countertops, HPL panels are manufactured using high-pressure technology — compression of layers at high temperature and pressure provides exceptional durability.',
+        'fi' => 'HPL (High Pressure Laminate) -kompaktilaminaattityötasot ovat keittiökalusteiden huippuluokan ratkaisu. Toisin kuin tavalliset laminaattityötasot, HPL-levyt valmistetaan korkeapaineisella teknologialla — kerrosten puristaminen korkeassa lämpötilassa ja paineessa takaa erinomaisen kestävyyden.',
+    ],
+    5582 => [
+        'ru' => 'Толщина HPL-столешниц составляет всего 12 мм, что придаёт кухне элегантный и минималистичный вид. Несмотря на тонкий профиль, они чрезвычайно устойчивы к царапинам, нагреву, влаге и химическим веществам.',
+        'en' => 'HPL countertops are only 12 mm thick, giving the kitchen an elegant and minimalist look. Despite the thin profile, they are extremely resistant to scratches, heat, moisture and chemicals.',
+        'fi' => 'HPL-työtasot ovat vain 12 mm paksuja, mikä antaa keittiölle tyylikkään ja minimalistisen ilmeen. Ohuesta profiilista huolimatta ne ovat erittäin kestäviä naarmuja, kuumuutta, kosteutta ja kemikaaleja vastaan.',
+    ],
+    5583 => [
+        'ru' => 'Egger Compact Laminate',
+        'en' => 'Egger Compact Laminate',
+        'fi' => 'Egger Compact Laminate',
+    ],
+    5584 => [
+        'ru' => 'Столешницы из компактного ламината Egger (формат 4100 × 920 мм, толщина 12 мм) доступны с чёрной или цветной сердцевиной. Egger предоставляет 10-летнюю гарантию и реалистичные текстуры дерева и камня. Поверхности гигиеничны, антибактериальны и не требуют специального ухода — достаточно обычной очистки.',
+        'en' => 'Egger compact laminate countertops (format 4100 × 920 mm, thickness 12 mm) are available with black or coloured core. Egger provides a 10-year warranty and realistic wood and stone textures. Surfaces are hygienic, antibacterial and require no special treatment — standard cleaning is sufficient.',
+        'fi' => 'Eggerin kompaktilaminaattityötasot (koko 4100 × 920 mm, paksuus 12 mm) ovat saatavana mustalla tai värisydämellä. Egger tarjoaa 10 vuoden takuun ja realistiset puu- ja kivipinnat. Pinnat ovat hygieenisiä, antibakteerisia eivätkä vaadi erikoiskäsittelyä — tavallinen puhdistus riittää.',
+    ],
+    5588 => [
+        'ru' => 'Fundermax Max Compact Interior',
+        'en' => 'Fundermax Max Compact Interior',
+        'fi' => 'Fundermax Max Compact Interior',
+    ],
+    5589 => [
+        'ru' => 'Fundermax — мировой лидер в производстве HPL-панелей. Их столешницы Max Compact Interior (формат 4100 × 1300 мм, толщина 12 мм) отличаются максимальной прочностью, простотой ухода и исключительно долгим сроком службы.',
+        'en' => 'Fundermax is a global leader in HPL panel production. Their Max Compact Interior countertops (format 4100 × 1300 mm, thickness 12 mm) stand out for maximum durability, easy maintenance and exceptionally long service life.',
+        'fi' => 'Fundermax on maailmanjohtaja HPL-paneelien valmistuksessa. Heidän Max Compact Interior -työtasonsa (koko 4100 × 1300 mm, paksuus 12 mm) erottuvat maksimikestävyydellään, helppoudellaan ja poikkeuksellisen pitkällä käyttöiällään.',
+    ],
+    5591 => [
+        'ru' => 'HPL-плиты Fundermax устойчивы к УФ-излучению и подходят как для внутреннего, так и для наружного использования.',
+        'en' => 'Fundermax HPL panels are UV-resistant and suitable for both indoor and outdoor use.',
+        'fi' => 'Fundermaxin HPL-paneelit ovat UV-kestäviä ja soveltuvat sekä sisä- että ulkokäyttöön.',
+    ],
+    5592 => [
+        'ru' => 'Запросить предложение:',
+        'en' => 'Request a quote:',
+        'fi' => 'Pyydä tarjous:',
+    ],
+    5593 => [
+        'ru' => 'Все HPL-столешницы доступны на заказ. Свяжитесь с нами для подбора лучшего решения.',
+        'en' => 'All HPL countertops are available to order. Contact us to find the best solution.',
+        'fi' => 'Kaikki HPL-työtasot ovat saatavilla tilauksesta. Ota yhteyttä löytääksesi parhaan ratkaisun.',
+    ],
+
+    // === TITLE TAGS ===
+    5579 => [
+        'ru' => 'Столешницы из компактного ламината HPL - Компания Studioköök',
+        'en' => 'HPL Compact Laminate Countertops - Studioköök',
+        'fi' => 'HPL-kompaktilaminaattityötasot - Studioköök',
+    ],
+    5594 => [
+        'ru' => 'Столешницы из компактного ламината HPL - Компания Studioköök',
+        'en' => 'HPL Compact Laminate Countertops - Studioköök',
+        'fi' => 'HPL-kompaktilaminaattityötasot - Studioköök',
+    ],
+
+    // === FACADES PAGE GENERAL ===
+    5606 => [
+        'ru' => 'Выбор фасадных материалов для кухни. Мы предлагаем двух качественных производителей:',
+        'en' => 'Kitchen facade materials selection. We offer two quality manufacturers:',
+        'fi' => 'Keittiön julkisivumateriaalien valikoima. Tarjoamme kahta laadukasta valmistajaa:',
+    ],
+];
+
+// ============================================================
+// STEP 1: UPDATE RU translations
+// ============================================================
+$log[] = "=== RU TRANSLATIONS ===";
+$ru_updated = 0;
+foreach ($translations as $orig_id => $langs) {
+    if (!isset($langs['ru'])) continue;
+    $result = $wpdb->update(
+        'wp_trp_dictionary_et_ru_ru',
+        ['translated' => $langs['ru'], 'status' => 2],
+        ['original_id' => $orig_id]
+    );
+    if ($result !== false) {
+        $ru_updated++;
+        $log[] = "  RU #{$orig_id}: OK";
+    } else {
+        $log[] = "  RU #{$orig_id}: FAILED";
+    }
+}
+$log[] = "RU updated: $ru_updated";
+
+// ============================================================
+// STEP 2: UPDATE EN translations
+// ============================================================
+$log[] = "\n=== EN TRANSLATIONS ===";
+$en_updated = 0;
+foreach ($translations as $orig_id => $langs) {
+    if (!isset($langs['en'])) continue;
+    $result = $wpdb->update(
+        'wp_trp_dictionary_et_en_gb',
+        ['translated' => $langs['en'], 'status' => 2],
+        ['original_id' => $orig_id]
+    );
+    if ($result !== false) {
+        $en_updated++;
+        $log[] = "  EN #{$orig_id}: OK";
+    } else {
+        $log[] = "  EN #{$orig_id}: FAILED";
+    }
+}
+$log[] = "EN updated: $en_updated";
+
+// ============================================================
+// STEP 3: UPDATE FI translations
+// ============================================================
+$log[] = "\n=== FI TRANSLATIONS ===";
+$fi_updated = 0;
+foreach ($translations as $orig_id => $langs) {
+    if (!isset($langs['fi'])) continue;
+    $result = $wpdb->update(
+        'wp_trp_dictionary_et_fi',
+        ['translated' => $langs['fi'], 'status' => 2],
+        ['original_id' => $orig_id]
+    );
+    if ($result !== false) {
+        $fi_updated++;
+        $log[] = "  FI #{$orig_id}: OK";
+    } else {
+        $log[] = "  FI #{$orig_id}: FAILED";
+    }
+}
+$log[] = "FI updated: $fi_updated";
+
+// ============================================================
+// STEP 4: CLEAR TranslatePress cache
+// ============================================================
+$log[] = "\n=== CLEAR TRP CACHE ===";
+$deleted = $wpdb->query("DELETE FROM {$wpdb->options} WHERE option_name LIKE '%trp_cache%' OR option_name LIKE '%transient_trp%'");
+$log[] = "TRP cache entries cleared: $deleted";
+
+if (function_exists('wp_cache_flush')) {
+    wp_cache_flush();
+    $log[] = "WP object cache flushed";
+}
+
+// ============================================================
+// STEP 5: VERIFY
+// ============================================================
+$log[] = "\n=== VERIFICATION ===";
+
+// Check RU
+$ru_check = $wpdb->get_var("SELECT COUNT(*) FROM wp_trp_dictionary_et_ru_ru WHERE original_id IN (" . implode(',', array_keys($translations)) . ") AND status = 2 AND translated != ''");
+$log[] = "RU verified: $ru_check / " . count($translations) . " translated";
+
+// Check EN
+$en_check = $wpdb->get_var("SELECT COUNT(*) FROM wp_trp_dictionary_et_en_gb WHERE original_id IN (" . implode(',', array_keys($translations)) . ") AND status = 2 AND translated != ''");
+$log[] = "EN verified: $en_check / " . count($translations) . " translated";
+
+// Check FI
+$fi_check = $wpdb->get_var("SELECT COUNT(*) FROM wp_trp_dictionary_et_fi WHERE original_id IN (" . implode(',', array_keys($translations)) . ") AND status = 2 AND translated != ''");
+$log[] = "FI verified: $fi_check / " . count($translations) . " translated";
+
+// Sample RU translations
+$samples = $wpdb->get_results("SELECT os.original, d.translated FROM wp_trp_original_strings os JOIN wp_trp_dictionary_et_ru_ru d ON os.id = d.original_id WHERE os.id IN (5757,5759,5760,5578,5592)");
+foreach ($samples as $s) {
+    $log[] = "  '{$s->original}' → '{$s->translated}'";
+}
+
+echo "<h2>TRANSLATION RESULTS</h2><pre>" . implode("\n", $log) . "</pre>";
+echo "<p><strong>Дальше:</strong> Зайдите на /ru/hpl-tootasapinnad и /en/hpl-tootasapinnad чтобы проверить</p>";
+echo "<p><strong>Кэш:</strong> Seraphinite → Удалить кэш</p>";

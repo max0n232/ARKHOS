@@ -1,0 +1,17 @@
+global $wpdb;
+
+// Count before
+$before = $wpdb->get_var("SELECT COUNT(*) FROM {$wpdb->prefix}ngg_pictures WHERE galleryid = 1 AND (alttext LIKE '% toopind' OR description LIKE '%toopind%')");
+error_log("[F-Clean] Found {$before} records with toopind");
+
+// Clean alttext
+$wpdb->query("UPDATE {$wpdb->prefix}ngg_pictures SET alttext = REPLACE(alttext, ' toopind', '') WHERE galleryid = 1 AND alttext LIKE '% toopind'");
+
+// Clean description
+$wpdb->query("UPDATE {$wpdb->prefix}ngg_pictures SET description = REPLACE(REPLACE(description, ' - laminaat toopind', ''), ' toopind', '') WHERE galleryid = 1 AND description LIKE '%toopind%'");
+
+// Count after
+$after = $wpdb->get_var("SELECT COUNT(*) FROM {$wpdb->prefix}ngg_pictures WHERE galleryid = 1 AND (alttext LIKE '%toopind%' OR description LIKE '%toopind%')");
+error_log("[F-Clean] Remaining: {$after}");
+error_log("[F-Clean] SUCCESS - Cleaned " . ($before - $after) . " records");
+error_log("[F-Clean] DEACTIVATE THIS SNIPPET NOW");
