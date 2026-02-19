@@ -1,0 +1,164 @@
+{
+  "version": "1.0",
+  "description": "Skill activation triggers for Studiokook project",
+
+  "skills": {
+    "seo-audit": {
+      "triggers": [
+        "SEO audit", "SEO аудит", "аудит сайта",
+        "ranking", "позиции", "ранжирование",
+        "индексация", "indexing", "Google Search Console",
+        "GSC", "Core Web Vitals", "метрики"
+      ],
+      "priority": 1,
+      "path": "skills/seo-aeo/SKILL.md",
+      "description": "SEO и AEO оптимизация, EEAT, metadata"
+    },
+
+    "seo-smm": {
+      "triggers": [
+        "Instagram", "соцсети", "social media",
+        "контент-план", "content plan", "посты",
+        "SMM", "social", "хэштеги"
+      ],
+      "priority": 1,
+      "path": "skills/seo-smm.md",
+      "description": "SEO + SMM стратегия"
+    },
+
+    "wordpress-router": {
+      "triggers": [
+        "WordPress", "WP", "вордпресс",
+        "plugin", "плагин", "theme", "тема",
+        "REST API", "WP-CLI"
+      ],
+      "priority": 2,
+      "path": "skills/wordpress-router/SKILL.md",
+      "routes_to": ["wp-rest-api", "wp-performance", "wp-abilities-api", "wp-wpcli-and-ops"],
+      "description": "Роутер для WordPress задач"
+    },
+
+    "wp-rest-api": {
+      "triggers": [
+        "REST API", "wp-json", "endpoint",
+        "API запрос", "CRUD", "fetch"
+      ],
+      "priority": 3,
+      "path": "skills/wp-rest-api/SKILL.md",
+      "description": "WordPress REST API"
+    },
+
+    "wp-performance": {
+      "triggers": [
+        "performance", "производительность", "скорость",
+        "lazy loading", "оптимизация", "Core Web Vitals",
+        "LCP", "FID", "CLS"
+      ],
+      "priority": 3,
+      "path": "skills/wp-performance/SKILL.md",
+      "description": "WordPress оптимизация"
+    },
+
+    "wp-abilities-api": {
+      "triggers": [
+        "gallery", "галерея", "NGG", "NextGen",
+        "images", "изображения", "медиа"
+      ],
+      "priority": 3,
+      "path": "skills/wp-abilities-api/SKILL.md",
+      "description": "WordPress Abilities (NGG gallery)"
+    },
+
+    "wp-problem-solver": {
+      "triggers": [
+        "PHP snippet", "add_action", "add_filter",
+        "function fix", "Code Snippets", "workaround",
+        "костыль", "исправить PHP", "fix WordPress",
+        "WP code", "hooks", "snippet"
+      ],
+      "priority": 1,
+      "path": "skills/wp-problem-solver/SKILL.md",
+      "description": "MANDATORY before any WordPress PHP changes. 5 Whys analysis.",
+      "mandatory_before": ["wp-rest-api", "wp-performance", "wp-abilities-api"]
+    },
+
+    "wp-translatepress": {
+      "triggers": [
+        "TranslatePress", "перевод", "translation",
+        "мультиязычность", "multilingual", "hreflang",
+        "языки", "languages", "ET", "RU", "EN", "FI"
+      ],
+      "priority": 2,
+      "path": "skills/wp-translatepress/SKILL.md",
+      "description": "TranslatePress multilingual management"
+    },
+
+    "marketing": {
+      "triggers": [
+        "marketing", "маркетинг", "CRO",
+        "conversion", "конверсия", "landing",
+        "лендинг", "A/B тест", "воронка"
+      ],
+      "priority": 2,
+      "path": "skills/marketing/CLAUDE.md",
+      "description": "25+ marketing skills"
+    },
+
+    "copywriting": {
+      "triggers": [
+        "copy", "копирайтинг", "текст",
+        "заголовок", "headline", "описание",
+        "description", "CTA"
+      ],
+      "priority": 2,
+      "path": "skills/marketing/skills/copywriting/SKILL.md",
+      "description": "Copywriting и copy editing"
+    },
+
+    "schema-markup": {
+      "triggers": [
+        "schema", "JSON-LD", "structured data",
+        "микроразметка", "rich snippets", "FAQ schema"
+      ],
+      "priority": 2,
+      "path": "skills/marketing/skills/schema-markup/SKILL.md",
+      "description": "Schema.org разметка"
+    },
+
+    "n8n-workflow": {
+      "triggers": [
+        "n8n", "workflow", "автоматизация",
+        "automation", "webhook", "trigger"
+      ],
+      "priority": 2,
+      "path": null,
+      "global_skill": "n8n-expert",
+      "description": "n8n workflow automation"
+    },
+
+    "analytics": {
+      "triggers": [
+        "analytics", "аналитика", "GA4",
+        "Google Analytics", "метрики", "отчет",
+        "dashboard", "KPI"
+      ],
+      "priority": 2,
+      "path": "skills/marketing/skills/analytics-tracking/SKILL.md",
+      "description": "Analytics и tracking"
+    }
+  },
+
+  "routing_rules": {
+    "description": "How skills chain together",
+    "chains": {
+      "seo-full": ["seo-audit", "schema-markup", "analytics"],
+      "content-creation": ["copywriting", "seo-smm"],
+      "wordpress-full": ["wordpress-router", "wp-rest-api", "wp-performance"]
+    }
+  },
+
+  "fallback": {
+    "no_match": "Ask user for clarification",
+    "multiple_matches": "Use highest priority (lowest number)"
+  }
+}

@@ -1,0 +1,47 @@
+{
+  "SessionStart": [
+    {
+      "matcher": "*",
+      "hooks": [
+        {
+          "type": "command",
+          "command": "node .claude/context-loader.js",
+          "timeout": 5000,
+          "statusMessage": "Loading Studiokook context..."
+        }
+      ]
+    }
+  ],
+  "UserPromptSubmit": [
+    {
+      "matcher": "*",
+      "hooks": [
+        {
+          "type": "command",
+          "command": "node .claude/route-skill.js",
+          "timeout": 3000,
+          "statusMessage": "Routing to skill..."
+        }
+      ]
+    }
+  ],
+  "PreToolUse": [
+    {
+      "matcher": "Write|Edit",
+      "hooks": [
+        {
+          "type": "command",
+          "command": "node .claude/validate-wordpress.js",
+          "timeout": 3000,
+          "statusMessage": "Checking WordPress safety..."
+        },
+        {
+          "type": "command",
+          "command": "node .claude/validate-wp-changes.js",
+          "timeout": 5000,
+          "statusMessage": "Checking Problem-Solving Protocol..."
+        }
+      ]
+    }
+  ]
+}

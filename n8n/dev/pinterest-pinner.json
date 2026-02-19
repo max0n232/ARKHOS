@@ -1,0 +1,507 @@
+{
+  "name": "Pinterest Pinner - Studiokook",
+  "description": "Automated Pinterest pin creator with 3 daily waves, board rotation, and multi-language support",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 6,
+              "triggerAtMinute": 0
+            },
+            {
+              "triggerAtHour": 12,
+              "triggerAtMinute": 0
+            },
+            {
+              "triggerAtHour": 18,
+              "triggerAtMinute": 0
+            }
+          ]
+        },
+        "timezone": "Europe/Tallinn"
+      },
+      "id": "cron_trigger",
+      "name": "Cron Trigger (06:00, 12:00, 18:00)",
+      "type": "n8n-nodes-base.cron",
+      "typeVersion": 1,
+      "position": [
+        100,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "code": "// Board rotation - 12 boards as specified\nconst boards = [\n  { id: 'board_kitchen_design', name: 'Kitchen Design Ideas' },\n  { id: 'board_scandinavian', name: 'Scandinavian Kitchens' },\n  { id: 'board_modern_minimalist', name: 'Modern Minimalist Kitchen' },\n  { id: 'board_materials', name: 'Kitchen Materials Guide' },\n  { id: 'board_blum', name: 'BLUM Hardware' },\n  { id: 'board_lighting', name: 'Kitchen Lighting' },\n  { id: 'board_before_after', name: 'Before & After Kitchens' },\n  { id: 'board_organization', name: 'Kitchen Organization' },\n  { id: 'board_custom_tallinn', name: 'Custom Kitchen Tallinn' },\n  { id: 'board_faq', name: 'Kitchen FAQ Tips' },\n  { id: 'board_neoclassic', name: 'Neoclassic Kitchens' },\n  { id: 'board_loft', name: 'Loft Style Kitchens' }\n];\n\n// Use execution index to rotate boards sequentially\nconst executionCount = $execution.id.length; // Pseudo-random increment\nconst boardIndex = Math.floor(Date.now() / (24 * 60 * 60 * 1000)) % boards.length; // Rotate daily\nconst selectedBoard = boards[boardIndex];\n\n// Determine wave (hour-based)\nconst now = new Date();\nconst hour = now.getHours();\nlet wave = 1;\nif (hour === 12) wave = 2;\nif (hour === 18) wave = 3;\n\nreturn {\n  selectedBoard: selectedBoard,\n  boardIndex: boardIndex,\n  wave: wave,\n  timestamp: now.toISOString(),\n  totalBoards: boards.length\n};"
+      },
+      "id": "board_rotation",
+      "name": "Board Rotation & Wave Detection",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        300,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://studiokook.ee/wp-json/wp/v2/posts",
+        "method": "GET",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "per_page",
+              "value": "1"
+            },
+            {
+              "name": "orderby",
+              "value": "date"
+            },
+            {
+              "name": "order",
+              "value": "desc"
+            }
+          ]
+        },
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "httpBasicAuth",
+        "timeout": 30
+      },
+      "id": "fetch_latest_post",
+      "name": "Wave 1: Get Latest Blog Post",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        500,
+        100
+      ],
+      "onError": "continueRegularFlow"
+    },
+    {
+      "parameters": {
+        "code": "// Extract and prepare blog post data for Rich Pin\nconst posts = $input.first().json;\n\nif (!Array.isArray(posts) || posts.length === 0) {\n  throw new Error('No blog posts found');\n}\n\nconst post = posts[0];\nconst titleEn = post.title?.rendered?.replace(/<[^>]+>/g, '') || 'Studiokook Kitchen Design';\nconst excerptEn = post.excerpt?.rendered?.replace(/<[^>]+>/g, '').substring(0, 300) || 'Discover beautiful kitchen designs from Studiokook';\n\nreturn {\n  pinType: 'rich_pin',\n  title: titleEn,\n  description: `${titleEn}\\n\\n${excerptEn}\\n\\nRead more on Studiokook blog`,\n  url: post.link,\n  imageUrl: post._links?.['wp:featuredmedia']?.[0]?.href || 'https://studiokook.ee/wp-content/uploads/default-post.jpg',\n  postId: post.id\n};"
+      },
+      "id": "extract_blog_data",
+      "name": "Extract Blog Post Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        700,
+        100
+      ],
+      "onError": "continueRegularFlow"
+    },
+    {
+      "parameters": {
+        "code": "// Wave 2: Select Design Pin from 16 Project Folders\nconst projects = [\n  { id: 'proj_001', name: 'Modern Kitchen 1', desc: 'Contemporary kitchen design' },\n  { id: 'proj_002', name: 'Scandinavian Kitchen', desc: 'Light & minimal design' },\n  { id: 'proj_003', name: 'Classic Design', desc: 'Traditional kitchen style' },\n  { id: 'proj_004', name: 'Minimalist Space', desc: 'Clean lines & open concept' },\n  { id: 'proj_005', name: 'Luxury Kitchen', desc: 'High-end materials & finishes' },\n  { id: 'proj_006', name: 'Family Kitchen', desc: 'Functional & practical design' },\n  { id: 'proj_007', name: 'Island Kitchen', desc: 'Central island focus' },\n  { id: 'proj_008', name: 'Storage Solutions', desc: 'Maximum organization' },\n  { id: 'proj_009', name: 'Open Plan Kitchen', desc: 'Seamless living space' },\n  { id: 'proj_010', name: 'Compact Kitchen', desc: 'Smart space utilization' },\n  { id: 'proj_011', name: 'Wood & Warm Tones', desc: 'Natural materials focus' },\n  { id: 'proj_012', name: 'Modern Black Kitchen', desc: 'Bold contemporary design' },\n  { id: 'proj_013', name: 'Bright & Airy', desc: 'Maximum light & space' },\n  { id: 'proj_014', name: 'Industrial Style', desc: 'Edgy modern kitchen' },\n  { id: 'proj_015', name: 'Coastal Kitchen', desc: 'Beach-inspired design' },\n  { id: 'proj_016', name: 'Urban Loft Kitchen', desc: 'City living kitchen' }\n];\n\nconst projectIndex = Math.floor(Date.now() / (6 * 60 * 60 * 1000)) % projects.length; // Rotate every 6 hours\nconst selectedProject = projects[projectIndex];\n\nreturn {\n  pinType: 'design_pin',\n  projectFolder: selectedProject,\n  projectIndex: projectIndex,\n  title: `${selectedProject.name} | Custom Kitchen by Studiokook`,\n  description: `${selectedProject.desc}\\n\\nExplore custom kitchen designs by Studiokook Tallinn. Professional design & installation services.`,\n  url: 'https://studiokook.ee/portfolio',\n  imageUrl: `https://studiokook.ee/projects/${selectedProject.id}/featured.jpg`\n};"
+      },
+      "id": "wave2_design_pin",
+      "name": "Wave 2: Select Design Pin from Library",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        500,
+        300
+      ],
+      "onError": "continueRegularFlow"
+    },
+    {
+      "parameters": {
+        "code": "// Wave 3: Alternate between Design Pin and Infographic\nconst dayOfMonth = new Date().getDate();\nconst isInfographic = dayOfMonth % 2 === 0;\n\nif (isInfographic) {\n  return {\n    pinType: 'infographic',\n    title: 'Kitchen Design Tips & Trends 2026',\n    description: 'Learn the latest kitchen design trends, materials, and expert tips from Studiokook. Transform your kitchen space with proven design strategies.',\n    url: 'https://studiokook.ee/kitchen-tips',\n    imageUrl: 'https://studiokook.ee/infographics/kitchen-design-tips-2026.jpg'\n  };\n} else {\n  return {\n    pinType: 'design_showcase',\n    title: 'Featured Kitchen Projects - Studiokook Portfolio',\n    description: 'Discover our latest kitchen renovation projects featuring modern design, sustainable materials, innovative storage, and stunning finishes.',\n    url: 'https://studiokook.ee/portfolio',\n    imageUrl: 'https://studiokook.ee/portfolio/featured-selection.jpg'\n  };\n}"
+      },
+      "id": "wave3_design_infographic",
+      "name": "Wave 3: Select Design or Infographic",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        500,
+        500
+      ],
+      "onError": "continueRegularFlow"
+    },
+    {
+      "parameters": {
+        "code": "// Rate limiting: Max 3 pins per day\nconst today = new Date().toISOString().split('T')[0];\nconst pinsCreatedToday = parseInt(process.env.PINS_TODAY || '0');\nconst maxPinsPerDay = 3;\nconst allowed = pinsCreatedToday < maxPinsPerDay;\n\nreturn {\n  allowed: allowed,\n  pinsCreatedToday: pinsCreatedToday,\n  pinsRemaining: Math.max(0, maxPinsPerDay - pinsCreatedToday),\n  date: today,\n  reason: allowed ? 'Approved' : `Daily limit reached (${pinsCreatedToday}/${maxPinsPerDay})`\n};"
+      },
+      "id": "rate_limiting",
+      "name": "Rate Limiting Check",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        700,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": [
+            {
+              "key": "allowed",
+              "condition": "true",
+              "value": "true",
+              "type": "boolean"
+            }
+          ]
+        }
+      },
+      "id": "check_rate_limit",
+      "name": "Check Rate Limit Passed",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        900,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "code": "// Merge content data based on wave\nconst wave = $input.all()[0].json.wave;\nlet contentData = {};\n\nif (wave === 1) {\n  // Use blog post from Wave 1\n  const blogData = $input.all()[3].json;\n  contentData = {\n    ...blogData,\n    wave: wave\n  };\n} else if (wave === 2) {\n  // Use project from Wave 2\n  const projectData = $input.all()[4].json;\n  contentData = {\n    ...projectData,\n    wave: wave\n  };\n} else {\n  // Use design/infographic from Wave 3\n  const waveData = $input.all()[5].json;\n  contentData = {\n    ...waveData,\n    wave: wave\n  };\n}\n\nreturn contentData;"
+      },
+      "id": "merge_content",
+      "name": "Merge Content Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1100,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://api.pinterest.com/v5/pins",
+        "method": "POST",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "bearerToken",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParametersUi": "json",
+        "body": "{\n  \"board_id\": \"{{ $input.all()[0].json.selectedBoard.id }}\",\n  \"title\": \"{{ $input.first().json.title }}\",\n  \"description\": \"{{ $input.first().json.description }}\\n\\n🌐 Studiokook | Tallinn, Estonia\",\n  \"link\": \"{{ $input.first().json.url }}\",\n  \"media_source\": {\n    \"source_type\": \"image_url\",\n    \"url\": \"{{ $input.first().json.imageUrl }}\"\n  }\n}",
+        "timeout": 30
+      },
+      "id": "create_pin",
+      "name": "Create Pinterest Pin",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        1300,
+        200
+      ],
+      "onError": "continueRegularFlow"
+    },
+    {
+      "parameters": {
+        "code": "// Parse and log successful pin creation\nconst response = $input.first().json;\n\nif (!response.id) {\n  throw new Error(`Pinterest API Error: ${JSON.stringify(response)}`);\n}\n\nreturn {\n  status: 'success',\n  pinId: response.id,\n  boardId: $input.all()[0].json.selectedBoard.id,\n  boardName: $input.all()[0].json.selectedBoard.name,\n  pinType: $input.all()[7].json.pinType,\n  title: response.title,\n  url: response.link,\n  wave: $input.all()[7].json.wave,\n  timestamp: new Date().toISOString(),\n  executionId: $execution.id\n};"
+      },
+      "id": "log_success",
+      "name": "Log Pin Creation",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1500,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://api.telegram.org/bot{{ $credentials.telegram_bot_token }}/sendMessage",
+        "method": "POST",
+        "sendBody": true,
+        "bodyParametersUi": "json",
+        "body": "{\n  \"chat_id\": \"{{ $credentials.telegram_chat_id }}\",\n  \"text\": \"✅ <b>Pinterest Pin Created</b>\\n\\n📌 <b>{{ $input.first().json.title }}</b>\\n🎯 Board: {{ $input.first().json.boardName }}\\n🌊 Wave {{ $input.first().json.wave }}\\n⏰ {{ $input.first().json.timestamp }}\",\n  \"parse_mode\": \"HTML\"\n}",
+        "timeout": 10,
+        "authentication": "none",
+        "useStreaming": false
+      },
+      "id": "notify_telegram",
+      "name": "Success Notification (Telegram)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        1700,
+        200
+      ],
+      "onError": "continueRegularFlow"
+    },
+    {
+      "parameters": {
+        "code": "// Store complete log entry with all metadata\nconst logEntry = {\n  timestamp: new Date().toISOString(),\n  executionId: $execution.id,\n  workflowName: 'Pinterest Pinner',\n  status: 'success',\n  wave: $input.first().json.wave,\n  board: {\n    id: $input.first().json.boardId,\n    name: $input.first().json.boardName\n  },\n  pin: {\n    id: $input.first().json.pinId,\n    type: $input.first().json.pinType,\n    title: $input.first().json.title,\n    url: $input.first().json.url\n  }\n};\n\n// In production: Write to database, file, or logging service\nconsole.log('PIN_LOG:', JSON.stringify(logEntry));\n\nreturn logEntry;"
+      },
+      "id": "store_log",
+      "name": "Store Success Log",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1900,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://api.telegram.org/bot{{ $credentials.telegram_bot_token }}/sendMessage",
+        "method": "POST",
+        "sendBody": true,
+        "bodyParametersUi": "json",
+        "body": "{\n  \"chat_id\": \"{{ $credentials.telegram_chat_id }}\",\n  \"text\": \"⏸️ <b>Pinterest Pinner - Rate Limit</b>\\n\\n🚫 {{ $input.first().json.reason }}\\n📊 Pins today: {{ $input.first().json.pinsCreatedToday }}/{{ 3 }}\\n⏰ {{ $input.first().json.date }}\",\n  \"parse_mode\": \"HTML\"\n}",
+        "timeout": 10,
+        "authentication": "none"
+      },
+      "id": "notify_limit",
+      "name": "Rate Limit Notification",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        1100,
+        450
+      ],
+      "onError": "continueRegularFlow"
+    },
+    {
+      "parameters": {
+        "url": "https://api.telegram.org/bot{{ $credentials.telegram_bot_token }}/sendMessage",
+        "method": "POST",
+        "sendBody": true,
+        "bodyParametersUi": "json",
+        "body": "{\n  \"chat_id\": \"{{ $credentials.telegram_chat_id }}\",\n  \"text\": \"❌ <b>Pinterest Pinner - Error</b>\\n\\n🔴 <b>{{ $node.latest().json.error || 'Unknown Error' }}</b>\\n⏰ {{ $execution.startedAt }}\\n🔗 Execution: {{ $execution.id }}\",\n  \"parse_mode\": \"HTML\"\n}",
+        "timeout": 10,
+        "authentication": "none"
+      },
+      "id": "notify_error",
+      "name": "Error Notification (Telegram)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        500,
+        700
+      ],
+      "onError": "continueRegularFlow"
+    }
+  ],
+  "connections": {
+    "cron_trigger": {
+      "main": [
+        [
+          {
+            "node": "board_rotation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "board_rotation": {
+      "main": [
+        [
+          {
+            "node": "fetch_latest_post",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "wave2_design_pin",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "wave3_design_infographic",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "rate_limiting",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "fetch_latest_post": {
+      "main": [
+        [
+          {
+            "node": "extract_blog_data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "extract_blog_data": {
+      "main": [
+        [
+          {
+            "node": "merge_content",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "wave2_design_pin": {
+      "main": [
+        [
+          {
+            "node": "merge_content",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "wave3_design_infographic": {
+      "main": [
+        [
+          {
+            "node": "merge_content",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "rate_limiting": {
+      "main": [
+        [
+          {
+            "node": "check_rate_limit",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "check_rate_limit": {
+      "main": [
+        [
+          {
+            "node": "merge_content",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "notify_limit",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "merge_content": {
+      "main": [
+        [
+          {
+            "node": "create_pin",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "create_pin": {
+      "main": [
+        [
+          {
+            "node": "log_success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "log_success": {
+      "main": [
+        [
+          {
+            "node": "notify_telegram",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "notify_telegram": {
+      "main": [
+        [
+          {
+            "node": "store_log",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "store_log": {
+      "main": [
+        []
+      ]
+    },
+    "notify_limit": {
+      "main": [
+        []
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner",
+    "errorHandler": {
+      "enabled": true,
+      "node": "notify_error"
+    }
+  },
+  "versionId": "v1-pinterest-pinner-2026-02",
+  "meta": {
+    "instanceId": "studiokook-n8n",
+    "created": "2026-02-14T14:00:00.000Z",
+    "updated": "2026-02-14T14:00:00.000Z"
+  },
+  "id": "pinterest-pinner-complete",
+  "tags": [
+    "studiokook",
+    "pinterest",
+    "smm",
+    "automation",
+    "content-marketing"
+  ],
+  "pinData": {},
+  "requiredCredentials": [
+    {
+      "id": "pinterest_token",
+      "name": "Pinterest API Bearer Token",
+      "type": "bearerToken",
+      "displayName": "Pinterest API Token"
+    },
+    {
+      "id": "wp_rest_api",
+      "name": "WordPress REST API",
+      "type": "httpBasicAuth",
+      "displayName": "WordPress REST API Credentials"
+    },
+    {
+      "id": "telegram_bot_token",
+      "name": "Telegram Bot Token",
+      "type": "string",
+      "displayName": "Telegram Bot Token"
+    },
+    {
+      "id": "telegram_chat_id",
+      "name": "Telegram Chat ID",
+      "type": "string",
+      "displayName": "Telegram Chat ID"
+    }
+  ]
+}

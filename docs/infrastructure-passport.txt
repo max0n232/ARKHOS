@@ -1,0 +1,191 @@
+Паспорт инфраструктуры n8n + Supabase + Caddy + PostgreSQL (финальная версия)
+1. Общая архитектура
+Сервисы:
+n8n — основная система автоматизации (Node.js).
+Supabase (self-hosted) — PostgreSQL + Auth + Storage + REST + Realtime + Edge Functions (через Kong).
+Caddy — единый HTTPS reverse-proxy (Let’s Encrypt).
+Redis — кеш/очереди для n8n.
+Supabase-компоненты: supabase-db, supabase-kong, supabase-rest, supabase-auth, supabase-storage, supabase-realtime, supabase-pooler, supabase-studio, supabase-analytics, supabase-imgproxy, supabase-vector.
+postgres — отдельный PostgreSQL для n8n.
+watchtower — автообновление контейнеров.
+2. Домены и точки входа
+https://n8n.studiokook.ee — n8n (через Caddy).
+https://files.studiokook.ee — файловый браузер (SFTP-директория n8n через Caddy file_server).
+https://app.studiokook.ee — Supabase Studio + публичный REST/API (через Caddy → Kong).
+Всё внешнее общение идёт только через Caddy по 80/443.
+3. Docker-сети
+Сеть n8n_n8n-network:
+n8n
+redis
+postgres (локальный для n8n)
+caddy
+Сеть supabase_default:
+supabase-db
+supabase-kong
+supabase-rest
+supabase-auth
+supabase-storage
+supabase-realtime
+supabase-pooler
+supabase-studio
+supabase-analytics
+supabase-imgproxy
+supabase-vector
+supabase-edge-functions
+caddy (подключён к двум сетям: n8n_n8n-network + supabase_default)
+Это гарантирует:
+доступ Caddy к Supabase по внутренним именам supabase-kong и supabase-studio;
+отсутствие необходимости открывать порты Supabase наружу.
+4. Порты и UFW
+Фактически открыто наружу (UFW):
+80/tcp — HTTP (редирект в HTTPS, Caddy).
+443/tcp — HTTPS (Caddy).
+22/tcp — SSH.
+Остальные:
+3000/tcp — Supabase Studio: закрыт, доступ только через Caddy.
+8000/tcp — Kong HTTP: только внутри Docker сети.
+5432/tcp — Supabase PostgreSQL: только внутри supabase_default.
+5678/tcp — n8n: закрыт в UFW, доступ только через https://n8n.studiokook.ee.
+В UFW ещё остаются старые правила для 8001/8443 и Nginx Full, но они не используются текущей схемой (можно удалить при необходимости, на работу текущей конфигурации не влияют).
+5. Caddy (HTTPS reverse-proxy)
+Файл: /root/n8n/Caddyfile
+Смонтирован в контейнер caddy как /etc/caddy/Caddyfile (read-only).
+Актуальный Caddyfile:
+{
+  email maksim@studiokook.ee
+}
+
+n8n.studiokook.ee {
+  reverse_proxy n8n:5678
+}
+
+files.studiokook.ee {
+  root * /data/n8n_ftp
+  file_server browse
+}
+
+app.studiokook.ee {
+  @supabase_api path /rest* /auth* /storage* /realtime* /functions* /graphql* /pg* /meta* /img* /analytics*
+
+  handle @supabase_api {
+    reverse_proxy supabase-kong:8000
+  }
+
+  handle {
+    reverse_proxy supabase-studio:3000
+  }
+}
+Кратко:
+Supabase API (/rest, /auth, /storage, /realtime, /functions, /graphql, /pg, /meta, /img, /analytics) → supabase-kong:8000.
+Supabase Studio и UI (/project/default и прочее) → supabase-studio:3000.
+n8n → n8n:5678.
+файловый браузер → /data/n8n_ftp через file_server.
+6. Supabase
+6.1. Переменные окружения (.env)
+Основной .env Supabase:
+/root/supabase/docker/.env
+Критичные переменные:
+# JWT / ключи
+JWT_SECRET=...
+ANON_KEY=...
+SERVICE_ROLE_KEY=...
+
+# Dashboard (Studio BasicAuth)
+DASHBOARD_USERNAME=...      # Логин Studio
+DASHBOARD_PASSWORD=...      # Случайный безопасный пароль (обновлён)
+
+# URLs (Production)
+SITE_URL=https://app.studiokook.ee
+API_EXTERNAL_URL=https://app.studiokook.ee
+SUPABASE_PUBLIC_URL=https://app.studiokook.ee
+Принцип: значения ключей хранятся только в .env, в документации не раскрываются.
+6.2. API-вход
+Публичный URL: https://app.studiokook.ee
+REST: https://app.studiokook.ee/rest/v1
+Auth/Storage/Realtime/Functions — по соответствующим путям под app.studiokook.ee.
+Цепочка:
+Клиент → Caddy (app.studiokook.ee) → supabase-kong:8000 → конкретный Supabase сервис
+7. n8n
+7.1. Запуск и конфиги
+Каталог: /root/n8n
+Основные файлы:
+docker-compose.yml — основной compose n8n + caddy + postgres + redis.
+Caddyfile — конфиг Caddy.
+postgres-data — данные PostgreSQL n8n.
+redis-data — данные Redis.
+n8n_n8n_data (volume) — конфиги и данные n8n (/home/node/.n8n).
+Ключевые переменные в docker-compose.yml для n8n:
+N8N_PROTOCOL=https
+N8N_HOST=n8n.studiokook.ee
+N8N_PORT=5678
+N8N_TRUST_PROXY=true
+N8N_TRUSTED_PROXIES=0.0.0.0/0
+N8N_ENCRYPTION_KEY=...
+DB_POSTGRESDB_USER=n8n_admin
+POSTGRES_USER=n8n_admin
+7.2. Пользователи n8n
+Используется новый User Management (не basic auth).
+Логин/пароль админа задаются через веб-мастер при первом запуске или через user-management:reset.
+При необходимости сброса пользователей:
+# Бэкап БД n8n (уже есть, но пример)
+docker exec postgres pg_dump -U n8n_admin -d n8n | gzip > /root/backups/n8n/n8n-$(date +%F_%H-%M-%S).sql.gz
+
+# Сброс пользователей
+docker exec -u node -it n8n n8n user-management:reset
+docker restart n8n
+После этого при заходе на https://n8n.studiokook.ee UI предложит создать нового админа.
+8. Базы данных и бэкапы
+8.1. Supabase PostgreSQL (supabase-db)
+Образ: supabase/postgres:15.8.1.060.
+Доступ: только внутри сети supabase_default (supabase-db:5432).
+Ручной бэкап:
+mkdir -p /root/backups/supabase
+docker exec supabase-db pg_dump -U postgres -d postgres \
+  | gzip > /root/backups/supabase/supabase-$(date +%F_%H-%M-%S).sql.gz
+(Фактический каталог /root/backups/supabase уже существует.)
+8.2. n8n PostgreSQL (postgres)
+Образ: postgres:15.
+Доступ: внутри сети n8n_n8n-network (postgres:5432).
+Ручной бэкап:
+mkdir -p /root/backups/n8n
+docker exec postgres pg_dump -U n8n_admin -d n8n \
+  | gzip > /root/backups/n8n/n8n-$(date +%F_%H-%M-%S).sql.gz
+В /root/backups/n8n уже лежит длинная история бэкапов + свежий файл n8n-YYYY-MM-DD_...sql.gz.
+9. Логи и мониторинг
+Caddy
+docker logs caddy --tail 200
+n8n
+docker logs n8n --tail 100
+Supabase / Kong
+docker logs supabase-kong --tail 100
+docker exec supabase-kong curl -i http://localhost:8000
+Контейнеры в целом
+docker ps
+docker compose ps   # в соответствующем каталоге (n8n или supabase/docker)
+10. Обновления
+n8n
+Обновление образа (по тегу n8nio/n8n:...).
+Перед обновлением:
+бэкап /root/n8n;
+бэкап БД n8n (см. выше).
+После обновления проверить:
+логин в UI;
+работу основных воркфлоу.
+Supabase
+Обновляется вручную (обновление образов в docker-compose.yml Supabase).
+Перед любым обновлением Supabase обязательно:
+полный бэкап supabase-db (pg_dump);
+бэкап /root/supabase/docker/.env и compose-файлов.
+Caddy
+Образ caddy:2.7.
+При смене версии:
+бэкап /root/n8n/Caddyfile;
+проверка синтаксиса;
+рестарт контейнера.
+11. Восстановление (кратко)
+Восстановление Supabase БД
+gunzip -c /root/backups/supabase/supabase-YYYY-MM-DD_HH-MM-SS.sql.gz \
+  | docker exec -i supabase-db psql -U postgres -d postgres
+Восстановление n8n БД
+gunzip -c /root/backups/n8n/n8n-YYYY-MM-DD_HH-MM-SS.sql.gz \
+  | docker exec -i postgres psql -U n8n_admin -d n8n

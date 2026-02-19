@@ -1,0 +1,36 @@
+// FORCE clear Seraphinite page cache
+// This clears disk cache, not just database
+
+if (function_exists('seraph_accel_cache_clear')) {
+    $result = seraph_accel_cache_clear();
+    error_log('[Force Clear] Seraphinite result: ' . var_export($result, true));
+}
+
+// Also clear filesystem cache if Seraphinite stores files
+$cache_dir = WP_CONTENT_DIR . '/cache/seraph-accel';
+if (is_dir($cache_dir)) {
+    $files = glob($cache_dir . '/*');
+    foreach ($files as $file) {
+        if (is_file($file)) {
+            unlink($file);
+        }
+    }
+    error_log('[Force Clear] Deleted ' . count($files) . ' cache files');
+}
+
+// Clear all WordPress caches
+wp_cache_flush();
+
+// Clear NGG cache specifically
+if (function_exists('nggdb')) {
+    $nggdb = nggdb::get_instance();
+    if (method_exists($nggdb, 'clear_cache')) {
+        $nggdb->clear_cache();
+        error_log('[Force Clear] NGG cache cleared');
+    }
+}
+
+error_log('[Force Clear] ========== COMPLETE ==========');
+error_log('[Force Clear] All caches cleared');
+error_log('[Force Clear] DEACTIVATE THIS SNIPPET');
+error_log('[Force Clear] Refresh page with Ctrl+Shift+R');

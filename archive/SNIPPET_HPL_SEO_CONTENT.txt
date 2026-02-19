@@ -1,0 +1,155 @@
+<?php
+/**
+ * HPL PAGE — ENHANCED SEO CONTENT
+ *
+ * Updates HPL page (6335) with comprehensive SEO content including:
+ * - Technical specifications from eamf.ee
+ * - Structured H-tags for SEO
+ * - Egger + Fundermax detailed descriptions
+ * - Schema-ready content
+ *
+ * RUN ONCE (after SNIPPET_FUNDERMAX_GALLERY.txt).
+ */
+
+global $wpdb;
+$log = [];
+
+// Get Fundermax gallery ID
+$fm_gid = $wpdb->get_var("SELECT gid FROM {$wpdb->prefix}ngg_gallery WHERE title = 'Fundermax HPL' LIMIT 1");
+if (!$fm_gid) {
+    $fm_gid = 'XX'; // placeholder if gallery not yet created
+    $log[] = "WARNING: Fundermax gallery not found. Run SNIPPET_FUNDERMAX_GALLERY first!";
+}
+
+// HPL page content with comprehensive SEO
+$hpl_content = '<h2>HPL kompaktlaminaat t&ouml;&ouml;tasapinnad</h2>
+
+<p>HPL (High Pressure Laminate) kompaktlaminaat t&ouml;&ouml;tasapinnad on k&ouml;&ouml;gim&ouml;&ouml;bli tipptasemel lahendus. Erinevalt tavalistest laminaatt&ouml;&ouml;tasapindadest on HPL plaadid valmistatud k&otilde;rgsurvemeetodil &mdash; kihtide kokkupressimine k&otilde;rgel temperatuuril ja r&otilde;hul tagab erakordse vastupidavuse.</p>
+
+<p>HPL t&ouml;&ouml;tasapinnad on vaid 12 mm paksused, mis annab k&ouml;&ouml;gile elegantse ja minimalistliku ilme. Vaatamata &otilde;hukesele profiilile on need &auml;&auml;rmiselt vastupidavad kriimustustele, kuumusele, niiskusele ja keemilistele ainetele.</p>
+
+<h3>HPL eelised</h3>
+<ul>
+<li>Paksus vaid 12 mm &mdash; elegantne ja minimalistlik disain</li>
+<li>Kriimustuskindel ja kuumakindel (kuni 180&deg;C)</li>
+<li>T&auml;ielikult niiskuskindel &mdash; sobib k&ouml;&ouml;ki ja vannitoa kasutuseks</li>
+<li>H&uuml;gieeniline ja antibakteriaalne pind</li>
+<li>Keemiliselt vastupidav &mdash; talub puhastusvahendeid</li>
+<li>Lihtne hooldus &mdash; piisab tavalisest puhastamisest</li>
+<li>UV-kindel &mdash; v&auml;rv ei pleegi</li>
+</ul>
+
+<hr/>
+
+<h3>Egger Compact Laminate</h3>
+
+<p>Egger kompaktlaminaat t&ouml;&ouml;tasapinnad on saadaval kahes formaadis: <strong>4100 &times; 920 mm</strong> ja <strong>4100 &times; 650 mm</strong>, paksusega <strong>12 mm</strong>. K&otilde;ik plaadid on varustatud 1&times;1 mm faasiga &uuml;mber&uuml;mbermise, mis v&otilde;imaldab kohest paigaldust ilma ABS-servata.</p>
+
+<p>Egger pakub 10-aastast garantiid ja realistlikke puit- ning kivitektuure. S&uuml;damik on must. Pinnad on h&uuml;gieenilised, antibakteriaalsed ning ei vaja erikohtlemist.</p>
+
+[ngg src="images" ids="509,511,523,528,587,588,1294,1349" display="basic_thumbnail" thumbnail_crop="0" images_per_page="20"]
+
+<h4>Egger HPL tehnilised andmed</h4>
+<table>
+<thead><tr><th>Parameeter</th><th>V&auml;&auml;rtus</th></tr></thead>
+<tbody>
+<tr><td>Formaat</td><td>4100 &times; 920 mm / 4100 &times; 650 mm</td></tr>
+<tr><td>Paksus</td><td>12 mm</td></tr>
+<tr><td>S&uuml;damiku v&auml;rv</td><td>Must</td></tr>
+<tr><td>Serv</td><td>Faas 1&times;1 mm (eelpaigaldatud)</td></tr>
+<tr><td>Garantii</td><td>10 aastat</td></tr>
+<tr><td>Saadaval dekoorid</td><td>F206, F221, F244, F311, H1318, H1330, U7081, U999</td></tr>
+</tbody>
+</table>
+
+<p><em>Egger kasutab j&auml;tkusuutlikult majandatud metsadest p&auml;rit puitu ning taaskasutatavaid materjale.</em></p>
+
+<hr/>
+
+<h3>Fundermax Max Compact Interior</h3>
+
+<p>Fundermax on &uuml;lemaailmne HPL-paneelide liider. Nende Max Compact Interior t&ouml;&ouml;tasapinnad (formaat <strong>4100 &times; 1300 mm</strong>, paksus <strong>12 mm</strong>) paistavad silma maksimaalse vastupidavuse, lihtsa hoolduse ja &uuml;lipika kasutusea poolest.</p>
+
+<p>Fundermax pakub erinevaid pinnaviimistluse t&uuml;&uuml;pe:</p>
+<ul>
+<li><strong>NN</strong> &mdash; naturaalne tekstuur (Prado, Riverside, Blues, Moonwalk, Loft, Horizon)</li>
+<li><strong>SX</strong> &mdash; kivitekstuuri imitatsioon (Graphite, Black)</li>
+<li><strong>AP</strong> &mdash; s&otilde;rmej&auml;ljekindel matt pind (MATT-seeria)</li>
+<li><strong>FH/FH</strong> &mdash; kahepoolne dekoratiivne viimistlus</li>
+</ul>
+
+[ngg src="galleries" ids="' . $fm_gid . '" display="basic_thumbnail" thumbnail_crop="0" images_per_page="20"]
+
+<h4>Fundermax HPL tehnilised andmed</h4>
+<table>
+<thead><tr><th>Parameeter</th><th>V&auml;&auml;rtus</th></tr></thead>
+<tbody>
+<tr><td>Formaat</td><td>4100 &times; 1300 mm</td></tr>
+<tr><td>Paksus</td><td>12 mm</td></tr>
+<tr><td>T&uuml;&uuml;bid</td><td>&Uuml;hepoolne (NN/FH, SX/FH, AP/FH) ja kahepoolne (FH/FH)</td></tr>
+<tr><td>UV-kindlus</td><td>Jah &mdash; sobib ka v&auml;liskasutuseks</td></tr>
+<tr><td>Saadaval dekoorid</td><td>0026, 0027, 0075, 0077, 0080, 0344, 0386, 0394, 0426, 0427, 0428, 0497, 0581, 0585, 0670, 0693</td></tr>
+</tbody>
+</table>
+
+<p><em>Fundermax HPL-plaadid on UV-kindlad ja sobivad nii sise- kui v&auml;liskasutuseks.</em></p>
+
+<hr/>
+
+<h3>Egger vs Fundermax &mdash; v&otilde;rdlus</h3>
+<table>
+<thead><tr><th></th><th>Egger Compact</th><th>Fundermax Max Compact</th></tr></thead>
+<tbody>
+<tr><td>Formaat</td><td>4100 &times; 920 mm</td><td>4100 &times; 1300 mm</td></tr>
+<tr><td>Paksus</td><td>12 mm</td><td>12 mm</td></tr>
+<tr><td>S&uuml;gavus</td><td>650 / 920 mm</td><td>1300 mm</td></tr>
+<tr><td>Serv</td><td>Faas 1&times;1 mm</td><td>Otse l&otilde;igatud</td></tr>
+<tr><td>UV-kindlus</td><td>Standardne</td><td>K&otilde;rge (v&auml;lis&ouml;&ouml;biv)</td></tr>
+<tr><td>Dekooride arv</td><td>8 HPL dekoori</td><td>16 HPL dekoori</td></tr>
+</tbody>
+</table>
+
+<hr/>
+
+<p><strong>K&uuml;si pakkumist:</strong> K&otilde;ik HPL t&ouml;&ouml;tasapinnad on saadaval tellimuse alusel. V&otilde;tke meiega &uuml;hendust parima lahenduse leidmiseks.</p>';
+
+// Update page
+$wpdb->update($wpdb->posts, ['post_content' => $hpl_content], ['ID' => 6335]);
+clean_post_cache(6335);
+$log[] = "HPL page (6335) updated with enhanced SEO content";
+
+// ============================================================
+// Add translations for NEW content
+// ============================================================
+$log[] = "\n=== ADD NEW TRANSLATIONS ===";
+
+// Wait for TranslatePress to detect new strings on next page load
+// Then the translations will need to be filled
+$log[] = "New strings will be detected by TranslatePress on next page visit";
+$log[] = "After visiting the page, run DeepL auto-translate or add manually";
+
+// Clear caches
+$wpdb->query("DELETE FROM {$wpdb->options} WHERE option_name LIKE '%ngg%transient%'");
+$wpdb->query("DELETE FROM {$wpdb->options} WHERE option_name LIKE '%displayed_gallery%'");
+if (function_exists('wp_cache_flush')) wp_cache_flush();
+$log[] = "\nCaches cleared";
+
+// Verify
+$content = $wpdb->get_var("SELECT post_content FROM {$wpdb->posts} WHERE ID = 6335");
+$h3_count = preg_match_all('/<h3>/', $content);
+$table_count = preg_match_all('/<table>/', $content);
+$ngg_count = preg_match_all('/\[ngg/', $content);
+$log[] = "\nVerification:";
+$log[] = "  H3 headings: $h3_count";
+$log[] = "  Tables: $table_count";
+$log[] = "  NGG shortcodes: $ngg_count";
+$log[] = "  Content length: " . strlen($content) . " chars";
+
+echo "<h2>HPL SEO CONTENT RESULTS</h2><pre>" . implode("\n", $log) . "</pre>";
+echo "<p><strong>Дальше:</strong></p>";
+echo "<ol>";
+echo "<li>Seraphinite → Удалить кэш</li>";
+echo "<li>Зайти на /hpl-tootasapinnad чтобы TranslatePress подхватил новые строки</li>";
+echo "<li>Зайти на /ru/hpl-tootasapinnad и /en/hpl-tootasapinnad</li>";
+echo "<li>TranslatePress → автоперевод или ручная правка</li>";
+echo "</ol>";

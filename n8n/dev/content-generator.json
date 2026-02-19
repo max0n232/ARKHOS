@@ -1,0 +1,500 @@
+{
+  "name": "Studiokook Content Generator",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": "0 8 * * *",
+        "timezone": "Europe/Tallinn"
+      },
+      "id": "cron-trigger",
+      "name": "Daily 08:00 Cron",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1,
+      "position": [100, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const now = new Date();\nconst dayOfWeek = now.getDay();\nconst dayName = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][dayOfWeek];\nconst dayET = ['Pühapäev', 'Esmaspäev', 'Teisipäev', 'Kolmapäev', 'Neljapäev', 'Reede', 'Laupäev'][dayOfWeek];\n\n// Check if it's Mon(1), Wed(3), or Fri(5)\nconst isFullPost = [1, 3, 5].includes(dayOfWeek);\n\nreturn {\n  dayOfWeek,\n  dayName,\n  dayET,\n  isFullPost,\n  timestamp: new Date().toISOString()\n};"
+      },
+      "id": "check-day-logic",
+      "name": "Check Day of Week",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 1,
+      "position": [300, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "{{ $node[\"check-day-logic\"].json.isFullPost }}",
+              "operation": "equals",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "id": "if-full-post",
+      "name": "IF: Full Post Path?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [500, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const pillars = [\n  { name: 'Materials', weight: 0.25, prompt: 'Materiaalid ja tekstuurid köögis. Räägime puit-, metall- ja klaasmaterjalitest. Mis teeb need köögis parimaks valikuks?' },\n  { name: 'Kitchen Styles', weight: 0.20, prompt: 'Köögidesainid ja stiilid. Skandinaavne minimalismist retro-vintage-ni. Milline stiil sobib sinu kodule?' },\n  { name: 'Order Process', weight: 0.15, prompt: 'Kuidas tellida Studiokook-iga kohandatud köögimööblit. Protsessist algusest lõpuni. Millised on meie sammud?' },\n  { name: 'Pricing', weight: 0.15, prompt: 'Hinnad ja maksuplaanid Studiokook-is. Kulutõhusad lahendused erinevate eelarvetega. Kuidas saame teha sinu budget tööle?' },\n  { name: 'Lighting', weight: 0.10, prompt: 'Valgustus köögis. Funktsionaalne ja mood-setting valgus. Kuidas valgus muudab köögi?' },\n  { name: 'FAQ', weight: 0.10, prompt: 'Sageli esitatud küsimused köögiremondi kohta. Praktiline nõu ja vastused. Mis sind vaevab köögiremondi planeerimisel?' },\n  { name: 'Technical', weight: 0.05, prompt: 'Tehnilised aspektid: ergonoomia, mõõdud, paigutus. Köök, mis töötab. Kuidas tehakse head köögi?' }\n];\n\n// Select pillar based on weighted random\nconst random = Math.random();\nlet cumulative = 0;\nlet selected = pillars[0];\n\nfor (let pillar of pillars) {\n  cumulative += pillar.weight;\n  if (random <= cumulative) {\n    selected = pillar;\n    break;\n  }\n}\n\nreturn {\n  contentPillar: selected.name,\n  prompt: selected.prompt,\n  funnelStage: selected.name === 'Technical' ? 'awareness' : (selected.name === 'Order Process' ? 'decision' : 'consideration'),\n  timestamp: new Date().toISOString()\n};"
+      },
+      "id": "select-content-pillar",
+      "name": "Select Content Pillar",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 1,
+      "position": [700, 150]
+    },
+    {
+      "parameters": {
+        "url": "https://api.anthropic.com/v1/messages",
+        "method": "POST",
+        "authentication": "genericCredentialType",
+        "genericCredentialType": "{{ $credentials.claude_api_key }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-api-key",
+              "value": "={{ $credentials.claude_api_key }}"
+            },
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            }
+          ]
+        },
+        "contentType": "application/json",
+        "body": "{\n  \"model\": \"claude-sonnet-4-5-20250929\",\n  \"max_tokens\": 1024,\n  \"system\": \"Sa oled Studiokook'i SMM-juht. Kirjuta nagu Julia, ettevõtte omanik 15+ aasta kogemusega. Esimene isik: \\\"meie\\\"/\\\"meie oma\\\". Konkreetsed materjalide ja brändide nimed. Lühike lause + pikk lause + küsimus. Mitte kunagi: \\\"oluline märkida\\\", \\\"kokkuvõtteks\\\", \\\"lai valik\\\", \\\"ideaalne lahendus\\\", \\\"tänapäeva maailmas\\\". Kasuta ettevõtte teadmistebaasi. Vasta JSON-formaadis.\",\n  \"messages\": [\n    {\n      \"role\": \"user\",\n      \"content\": \"{{ $node[\\\"select-content-pillar\\\"].json.prompt }}\\n\\nVasta JSON-formaadis:\\n{\\\"caption_et\\\": \\\"Instagram post Estonia keeles\\\", \\\"caption_en\\\": \\\"Pinterest board description English\\\", \\\"hashtags_et\\\": \\\"#tag1 #tag2 #tag3\\\", \\\"hashtags_en\\\": \\\"#tag1 #tag2\\\", \\\"image_prompt\\\": \\\"English image description for generation\\\", \\\"content_pillar\\\": \\\"{{ $node[\\\"select-content-pillar\\\"].json.contentPillar }}\\\", \\\"funnel_stage\\\": \\\"{{ $node[\\\"select-content-pillar\\\"].json.funnelStage }}\\\"}\"\n    }\n  ]\n}",
+        "options": {}
+      },
+      "id": "claude-content-generation",
+      "name": "Claude: Generate Content",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [900, 150]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parse Claude's response\nconst response = $input.item.json.content[0].text;\nlet contentData;\n\ntry {\n  // Try to extract JSON from the response\n  const jsonMatch = response.match(/\\{[\\s\\S]*\\}/);\n  if (jsonMatch) {\n    contentData = JSON.parse(jsonMatch[0]);\n  } else {\n    throw new Error('No JSON found in response');\n  }\n} catch (e) {\n  contentData = {\n    caption_et: response,\n    caption_en: response,\n    hashtags_et: '#studiokook #kook #disain',\n    hashtags_en: '#studiokook #kitchen #design',\n    image_prompt: 'Modern kitchen design professional photography',\n    content_pillar: 'Kitchen Styles',\n    funnel_stage: 'consideration'\n  };\n}\n\nreturn contentData;"
+      },
+      "id": "parse-claude-response",
+      "name": "Parse Claude Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 1,
+      "position": [1100, 150]
+    },
+    {
+      "parameters": {
+        "url": "https://api.kie.ai/v1/images/generations",
+        "method": "POST",
+        "authentication": "genericCredentialType",
+        "genericCredentialType": "{{ $credentials.kieai_api_key }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer {{ $credentials.kieai_api_key }}"
+            }
+          ]
+        },
+        "contentType": "application/json",
+        "body": "{\n  \"model\": \"gpt-image-1\",\n  \"prompt\": \"{{ $node[\\\"parse-claude-response\\\"].json.image_prompt }}. Professional photography. High quality. Kitchen design. Estonia interior.\",\n  \"n\": 1,\n  \"size\": \"1024x1024\",\n  \"quality\": \"hd\"\n}",
+        "options": {}
+      },
+      "id": "kieai-image-generation",
+      "name": "Kie.ai: Generate Image",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1300, 150],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Handle image generation - use placeholder if fails\nlet imageUrl;\n\ntry {\n  const response = $input.item.json;\n  if (response.data && response.data[0] && response.data[0].url) {\n    imageUrl = response.data[0].url;\n  } else if (response.status === 'error') {\n    throw new Error(response.error?.message || 'Image generation failed');\n  }\n} catch (e) {\n  // Use default/library image if generation fails\n  imageUrl = 'https://studiokook.ee/library/default-kitchen.jpg';\n}\n\nreturn {\n  imageUrl,\n  generatedAt: new Date().toISOString()\n};"
+      },
+      "id": "handle-image-fallback",
+      "name": "Handle Image Fallback",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 1,
+      "position": [1500, 150]
+    },
+    {
+      "parameters": {
+        "url": "https://graph.facebook.com/v19.0/17841461511497185/media",
+        "method": "POST",
+        "authentication": "genericCredentialType",
+        "genericCredentialType": "{{ $credentials.meta_page_token }}",
+        "contentType": "application/json",
+        "body": "{\n  \"image_url\": \"{{ $node[\\\"handle-image-fallback\\\"].json.imageUrl }}\",\n  \"caption\": \"{{ $node[\\\"parse-claude-response\\\"].json.caption_et }}\\n\\n{{ $node[\\\"parse-claude-response\\\"].json.hashtags_et }}\",\n  \"access_token\": \"{{ $credentials.meta_page_token }}\"\n}",
+        "options": {}
+      },
+      "id": "meta-create-ig-media",
+      "name": "Meta: Create IG Media",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1700, 50]
+    },
+    {
+      "parameters": {
+        "url": "https://graph.facebook.com/v19.0/{{ $node[\\\"meta-create-ig-media\\\"].json.id }}/publish",
+        "method": "POST",
+        "authentication": "genericCredentialType",
+        "genericCredentialType": "{{ $credentials.meta_page_token }}",
+        "contentType": "application/json",
+        "body": "{\n  \"access_token\": \"{{ $credentials.meta_page_token }}\"\n}",
+        "options": {}
+      },
+      "id": "meta-publish-ig-media",
+      "name": "Meta: Publish IG Post",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1900, 50]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "{{ ['Monday', 'Friday'].includes($node[\\\"check-day-logic\\\"].json.dayName) }}",
+              "operation": "equals",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "id": "if-facebook-crosspost",
+      "name": "IF: Facebook Cross-Post (Mon/Fri)?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [1900, 150]
+    },
+    {
+      "parameters": {
+        "url": "https://graph.facebook.com/v19.0/108709097229809/feed",
+        "method": "POST",
+        "authentication": "genericCredentialType",
+        "genericCredentialType": "{{ $credentials.meta_page_token }}",
+        "contentType": "application/json",
+        "body": "{\n  \"message\": \"{{ $node[\\\"parse-claude-response\\\"].json.caption_et }}\\n\\n{{ $node[\\\"parse-claude-response\\\"].json.hashtags_et }}\",\n  \"link\": \"https://studiokook.ee\",\n  \"picture\": \"{{ $node[\\\"handle-image-fallback\\\"].json.imageUrl }}\",\n  \"access_token\": \"{{ $credentials.meta_page_token }}\"\n}",
+        "options": {}
+      },
+      "id": "meta-post-facebook",
+      "name": "Meta: Post to Facebook",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2100, 100]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Stories content generator (simplified)\nreturn {\n  caption_short: \"Jälgi meid 📸\",\n  sticker_text: \"Küsi hinnapakkumist\",\n  sticker_url: \"https://studiokook.ee\",\n  libraries: [\n    'stories-materials',\n    'stories-designs',\n    'stories-process',\n    'stories-tips'\n  ],\n  selectedLibrary: Math.random() > 0.5 ? 'stories-materials' : 'stories-designs'\n};"
+      },
+      "id": "stories-content-setup",
+      "name": "Stories: Content Setup",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 1,
+      "position": [700, 400]
+    },
+    {
+      "parameters": {
+        "url": "https://graph.facebook.com/v19.0/17841461511497185/media",
+        "method": "POST",
+        "authentication": "genericCredentialType",
+        "genericCredentialType": "{{ $credentials.meta_page_token }}",
+        "contentType": "application/json",
+        "body": "{\n  \"image_url\": \"https://studiokook.ee/library/{{ $node[\\\"stories-content-setup\\\"].json.selectedLibrary }}/story-{{ Math.floor(Math.random() * 10) }}.jpg\",\n  \"story\": true,\n  \"caption\": \"{{ $node[\\\"stories-content-setup\\\"].json.caption_short }}\",\n  \"access_token\": \"{{ $credentials.meta_page_token }}\"\n}",
+        "options": {}
+      },
+      "id": "meta-create-ig-story",
+      "name": "Meta: Create IG Story",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [900, 400]
+    },
+    {
+      "parameters": {
+        "url": "https://graph.facebook.com/v19.0/{{ $node[\\\"meta-create-ig-story\\\"].json.id }}/publish",
+        "method": "POST",
+        "authentication": "genericCredentialType",
+        "genericCredentialType": "{{ $credentials.meta_page_token }}",
+        "contentType": "application/json",
+        "body": "{\n  \"access_token\": \"{{ $credentials.meta_page_token }}\"\n}",
+        "options": {}
+      },
+      "id": "meta-publish-ig-story",
+      "name": "Meta: Publish IG Story",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1100, 400]
+    },
+    {
+      "parameters": {
+        "jsCode": "return {\n  status: 'success',\n  workflow: 'Content Generator',\n  executedAt: new Date().toISOString(),\n  dayOfWeek: $node['check-day-logic'].json.dayET,\n  contentType: $node['check-day-logic'].json.isFullPost ? 'Full Post' : 'Stories',\n  contentPillar: $node['check-day-logic'].json.isFullPost ? $node['select-content-pillar']?.json?.contentPillar : 'Stories',\n  captionET: $node['check-day-logic'].json.isFullPost ? $node['parse-claude-response']?.json?.caption_et : $node['stories-content-setup']?.json?.caption_short,\n  imageUrl: $node['handle-image-fallback']?.json?.imageUrl || 'fallback-library',\n  meta_post_id: $node['meta-publish-ig-media']?.json?.id || $node['meta-publish-ig-story']?.json?.id\n};"
+      },
+      "id": "success-summary",
+      "name": "Success Summary",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 1,
+      "position": [2300, 200]
+    },
+    {
+      "parameters": {
+        "url": "{{ $credentials.telegram_webhook_url }}",
+        "method": "POST",
+        "contentType": "application/json",
+        "body": "{\n  \"text\": \"❌ *Studiokook Content Generator Error*\\n\\nWorkflow: {{ $node[\\\"check-day-logic\\\"].json.dayET }}\\nError: {{ $error.message }}\\nNode: {{ $error.node }}\\n\\nTimestamp: {{ new Date().toISOString() }}\",\n  \"parse_mode\": \"Markdown\"\n}",
+        "options": {}
+      },
+      "id": "error-telegram-notification",
+      "name": "Error: Telegram Alert",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2300, 400],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {},
+      "id": "end-workflow",
+      "name": "End",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [2500, 200]
+    }
+  ],
+  "connections": {
+    "cron-trigger": {
+      "main": [
+        [
+          {
+            "node": "check-day-logic",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "check-day-logic": {
+      "main": [
+        [
+          {
+            "node": "if-full-post",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "if-full-post": {
+      "main": [
+        [
+          {
+            "node": "select-content-pillar",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "stories-content-setup",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "select-content-pillar": {
+      "main": [
+        [
+          {
+            "node": "claude-content-generation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "claude-content-generation": {
+      "main": [
+        [
+          {
+            "node": "parse-claude-response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "parse-claude-response": {
+      "main": [
+        [
+          {
+            "node": "kieai-image-generation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "kieai-image-generation": {
+      "main": [
+        [
+          {
+            "node": "handle-image-fallback",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "handle-image-fallback": {
+      "main": [
+        [
+          {
+            "node": "meta-create-ig-media",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "meta-create-ig-media": {
+      "main": [
+        [
+          {
+            "node": "meta-publish-ig-media",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "meta-publish-ig-media": {
+      "main": [
+        [
+          {
+            "node": "if-facebook-crosspost",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "if-facebook-crosspost": {
+      "main": [
+        [
+          {
+            "node": "meta-post-facebook",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "success-summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "meta-post-facebook": {
+      "main": [
+        [
+          {
+            "node": "success-summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "stories-content-setup": {
+      "main": [
+        [
+          {
+            "node": "meta-create-ig-story",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "meta-create-ig-story": {
+      "main": [
+        [
+          {
+            "node": "meta-publish-ig-story",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "meta-publish-ig-story": {
+      "main": [
+        [
+          {
+            "node": "success-summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "success-summary": {
+      "main": [
+        [
+          {
+            "node": "end-workflow",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "error-telegram-notification": {
+      "main": [
+        [
+          {
+            "node": "end-workflow",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "d41e8cd98f00b204e9800998ecf8427e",
+  "meta": {
+    "instanceId": "studiokook-content-gen-v1"
+  },
+  "pinData": {},
+  "tags": [
+    {
+      "name": "Studiokook",
+      "id": "studiokook"
+    },
+    {
+      "name": "SMM",
+      "id": "smm"
+    },
+    {
+      "name": "Content",
+      "id": "content"
+    },
+    {
+      "name": "Social Media",
+      "id": "social"
+    }
+  ]
+}

@@ -1,0 +1,234 @@
+{
+  "name": "SEO Content Translator - Studiokook",
+  "meta": {
+    "description": "Автоматический перевод контента страниц через Claude API",
+    "version": "1.0.0",
+    "trigger": "manual or webhook"
+  },
+  "nodes": [
+    {
+      "id": "webhook",
+      "name": "Webhook Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [250, 300],
+      "parameters": {
+        "path": "translate-content",
+        "httpMethod": "POST",
+        "responseMode": "lastNode"
+      }
+    },
+    {
+      "id": "get_page",
+      "name": "Get WP Page",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [450, 300],
+      "parameters": {
+        "method": "GET",
+        "url": "=https://studiokook.ee/wp-json/wp/v2/pages/{{ $json.page_id }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBasicAuth",
+        "options": {}
+      },
+      "credentials": {
+        "httpBasicAuth": {
+          "id": "{{WP_CREDENTIAL_ID}}",
+          "name": "WordPress REST API"
+        }
+      }
+    },
+    {
+      "id": "extract_content",
+      "name": "Extract Content",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [650, 300],
+      "parameters": {
+        "mode": "manual",
+        "duplicateItem": false,
+        "assignments": {
+          "assignments": [
+            {
+              "name": "page_id",
+              "value": "={{ $json.id }}",
+              "type": "number"
+            },
+            {
+              "name": "title",
+              "value": "={{ $json.title.rendered }}",
+              "type": "string"
+            },
+            {
+              "name": "content",
+              "value": "={{ $json.content.rendered.replace(/<[^>]*>/g, ' ').substring(0, 5000) }}",
+              "type": "string"
+            },
+            {
+              "name": "slug",
+              "value": "={{ $json.slug }}",
+              "type": "string"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "translate_ru",
+      "name": "Translate to RU",
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 1.4,
+      "position": [850, 200],
+      "parameters": {
+        "model": "gpt-4o-mini",
+        "messages": {
+          "values": [
+            {
+              "role": "system",
+              "content": "Ты профессиональный переводчик. Переведи текст на русский язык. Сохрани форматирование, не добавляй комментарии. Контекст: сайт компании по производству кухонной мебели в Таллинне."
+            },
+            {
+              "role": "user",
+              "content": "=Переведи на русский:\n\nTitle: {{ $json.title }}\n\nContent: {{ $json.content }}"
+            }
+          ]
+        },
+        "options": {
+          "temperature": 0.3
+        }
+      }
+    },
+    {
+      "id": "translate_en",
+      "name": "Translate to EN",
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 1.4,
+      "position": [850, 300],
+      "parameters": {
+        "model": "gpt-4o-mini",
+        "messages": {
+          "values": [
+            {
+              "role": "system",
+              "content": "You are a professional translator. Translate the text to English. Keep formatting, don't add comments. Context: website of a custom kitchen furniture company in Tallinn, Estonia."
+            },
+            {
+              "role": "user",
+              "content": "=Translate to English:\n\nTitle: {{ $json.title }}\n\nContent: {{ $json.content }}"
+            }
+          ]
+        },
+        "options": {
+          "temperature": 0.3
+        }
+      }
+    },
+    {
+      "id": "translate_fi",
+      "name": "Translate to FI",
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 1.4,
+      "position": [850, 400],
+      "parameters": {
+        "model": "gpt-4o-mini",
+        "messages": {
+          "values": [
+            {
+              "role": "system",
+              "content": "Olet ammattikääntäjä. Käännä teksti suomeksi. Säilytä muotoilu, älä lisää kommentteja. Konteksti: mittatilauskeittöitä valmistavan yrityksen verkkosivusto Tallinnassa."
+            },
+            {
+              "role": "user",
+              "content": "=Käännä suomeksi:\n\nTitle: {{ $json.title }}\n\nContent: {{ $json.content }}"
+            }
+          ]
+        },
+        "options": {
+          "temperature": 0.3
+        }
+      }
+    },
+    {
+      "id": "merge_translations",
+      "name": "Merge Translations",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [1050, 300],
+      "parameters": {
+        "mode": "combine",
+        "combinationMode": "mergeByPosition"
+      }
+    },
+    {
+      "id": "save_to_supabase",
+      "name": "Save to Supabase",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [1250, 300],
+      "parameters": {
+        "operation": "upsert",
+        "tableId": "page_translations",
+        "fieldsUi": {
+          "fieldValues": [
+            { "fieldName": "page_id", "fieldValue": "={{ $json.page_id }}" },
+            { "fieldName": "slug", "fieldValue": "={{ $json.slug }}" },
+            { "fieldName": "title_et", "fieldValue": "={{ $json.title }}" },
+            { "fieldName": "title_ru", "fieldValue": "={{ $json.translation_ru.title }}" },
+            { "fieldName": "title_en", "fieldValue": "={{ $json.translation_en.title }}" },
+            { "fieldName": "title_fi", "fieldValue": "={{ $json.translation_fi.title }}" },
+            { "fieldName": "content_ru", "fieldValue": "={{ $json.translation_ru.content }}" },
+            { "fieldName": "content_en", "fieldValue": "={{ $json.translation_en.content }}" },
+            { "fieldName": "content_fi", "fieldValue": "={{ $json.translation_fi.content }}" },
+            { "fieldName": "updated_at", "fieldValue": "={{ new Date().toISOString() }}" }
+          ]
+        }
+      }
+    },
+    {
+      "id": "response",
+      "name": "Response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1450, 300],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ success: true, page_id: $json.page_id, translations: ['ru', 'en', 'fi'] }) }}"
+      }
+    }
+  ],
+  "connections": {
+    "Webhook Trigger": {
+      "main": [[{ "node": "Get WP Page", "type": "main", "index": 0 }]]
+    },
+    "Get WP Page": {
+      "main": [[{ "node": "Extract Content", "type": "main", "index": 0 }]]
+    },
+    "Extract Content": {
+      "main": [
+        [
+          { "node": "Translate to RU", "type": "main", "index": 0 },
+          { "node": "Translate to EN", "type": "main", "index": 0 },
+          { "node": "Translate to FI", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Translate to RU": {
+      "main": [[{ "node": "Merge Translations", "type": "main", "index": 0 }]]
+    },
+    "Translate to EN": {
+      "main": [[{ "node": "Merge Translations", "type": "main", "index": 1 }]]
+    },
+    "Translate to FI": {
+      "main": [[{ "node": "Merge Translations", "type": "main", "index": 2 }]]
+    },
+    "Merge Translations": {
+      "main": [[{ "node": "Save to Supabase", "type": "main", "index": 0 }]]
+    },
+    "Save to Supabase": {
+      "main": [[{ "node": "Response", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

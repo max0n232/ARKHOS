@@ -1,0 +1,419 @@
+<?php
+/**
+ * FUNDERMAX HPL GALLERY — ALL 16 DECORS
+ *
+ * 1. Create /wp-content/gallery/fundermax-hpl/ directory
+ * 2. Download 16 Fundermax decor images from eamf.ee CDN
+ * 3. Create NGG gallery "Fundermax HPL"
+ * 4. Register images in NGG with proper meta_data
+ * 5. Update HPL page (6335) with Fundermax gallery shortcode
+ *
+ * RUN ONCE.
+ */
+
+global $wpdb;
+$log = [];
+$prefix = $wpdb->prefix;
+
+// ============================================================
+// STEP 1: Create gallery directory
+// ============================================================
+$log[] = "=== STEP 1: CREATE DIRECTORY ===";
+
+$gallery_path = ABSPATH . 'wp-content/gallery/fundermax-hpl';
+if (!file_exists($gallery_path)) {
+    wp_mkdir_p($gallery_path);
+    $log[] = "Created: $gallery_path";
+} else {
+    $log[] = "Directory exists: $gallery_path";
+}
+
+// ============================================================
+// STEP 2: Download ALL 16 Fundermax images from eamf.ee
+// ============================================================
+$log[] = "\n=== STEP 2: DOWNLOAD IMAGES ===";
+
+$fundermax_decors = [
+    '0026' => [
+        'url' => 'https://www.eamf.ee/media/catalog/product/7/6/76.0026.12.png',
+        'name' => 'Prado Grey',
+        'name_ru' => 'Прадо серый',
+        'name_en' => 'Prado Grey',
+        'surface' => 'NN/FH',
+        'type' => 'one-sided',
+    ],
+    '0027' => [
+        'url' => 'https://www.eamf.ee/media/catalog/product/7/6/76.0027.12.png',
+        'name' => 'Prado Brown',
+        'name_ru' => 'Прадо коричневый',
+        'name_en' => 'Prado Brown',
+        'surface' => 'NN/FH',
+        'type' => 'one-sided',
+    ],
+    '0075' => [
+        'url' => 'https://www.eamf.ee/media/catalog/product/7/6/76.0075.12.png',
+        'name' => 'Dark Brown MATT',
+        'name_ru' => 'Тёмно-коричневый МАТТ',
+        'name_en' => 'Dark Brown MATT',
+        'surface' => 'AP/FH',
+        'type' => 'one-sided',
+    ],
+    '0077' => [
+        'url' => 'https://www.eamf.ee/media/catalog/product/7/6/76.0077.12_1.png',
+        'name' => 'Graphite',
+        'name_ru' => 'Графит',
+        'name_en' => 'Graphite',
+        'surface' => 'SX/FH',
+        'type' => 'one-sided',
+    ],
+    '0080' => [
+        'url' => 'https://www.eamf.ee/media/catalog/product/7/6/76.0080.12.png',
+        'name' => 'Black',
+        'name_ru' => 'Чёрный',
+        'name_en' => 'Black',
+        'surface' => 'SX/FH',
+        'type' => 'one-sided',
+    ],
+    '0344' => [
+        'url' => 'https://www.eamf.ee/media/catalog/product/7/6/76.0344.12.png',
+        'name' => 'Riverside',
+        'name_ru' => 'Риверсайд',
+        'name_en' => 'Riverside',
+        'surface' => 'NN/FH',
+        'type' => 'one-sided',
+    ],
+    '0386' => [
+        'url' => 'https://www.eamf.ee/media/catalog/product/7/6/76.0386.12.png',
+        'name' => 'Blues',
+        'name_ru' => 'Блюз',
+        'name_en' => 'Blues',
+        'surface' => 'NN/FH',
+        'type' => 'one-sided',
+    ],
+    '0394' => [
+        'url' => 'https://www.eamf.ee/media/catalog/product/7/6/76.0394.12.png',
+        'name' => 'Moonwalk',
+        'name_ru' => 'Мунволк',
+        'name_en' => 'Moonwalk',
+        'surface' => 'NN/FH',
+        'type' => 'one-sided',
+    ],
+    '0426' => [
+        'url' => 'https://www.eamf.ee/media/catalog/product/7/6/76.0426.12.png',
+        'name' => 'Loft',
+        'name_ru' => 'Лофт',
+        'name_en' => 'Loft',
+        'surface' => 'NN/FH',
+        'type' => 'one-sided',
+    ],
+    '0427' => [
+        'url' => 'https://www.eamf.ee/media/catalog/product/7/6/76.0427.12.png',
+        'name' => 'Horizon',
+        'name_ru' => 'Горизонт',
+        'name_en' => 'Horizon',
+        'surface' => 'NN/FH',
+        'type' => 'one-sided',
+    ],
+    '0428' => [
+        'url' => 'https://www.eamf.ee/media/catalog/product/7/6/76.0428.12.png',
+        'name' => 'Cave',
+        'name_ru' => 'Кейв',
+        'name_en' => 'Cave',
+        'surface' => 'NN/FH',
+        'type' => 'one-sided',
+    ],
+    '0497' => [
+        'url' => 'https://www.eamf.ee/media/catalog/product/7/6/76.0497.12.png',
+        'name' => 'Stonehenge',
+        'name_ru' => 'Стоунхендж',
+        'name_en' => 'Stonehenge',
+        'surface' => 'NN/FH',
+        'type' => 'one-sided',
+    ],
+    '0581' => [
+        'url' => 'https://www.eamf.ee/media/catalog/product/7/6/76.0581.12.png',
+        'name' => 'Lentos',
+        'name_ru' => 'Лентос',
+        'name_en' => 'Lentos',
+        'surface' => 'FH/FH',
+        'type' => 'two-sided',
+    ],
+    '0585' => [
+        'url' => 'https://www.eamf.ee/media/catalog/product/7/6/76.0585.12.png',
+        'name' => 'Castello',
+        'name_ru' => 'Кастелло',
+        'name_en' => 'Castello',
+        'surface' => 'FH/FH',
+        'type' => 'two-sided',
+    ],
+    '0670' => [
+        'url' => 'https://www.eamf.ee/media/catalog/product/7/6/76.0670.12.jpg',
+        'name' => 'Olivin',
+        'name_ru' => 'Оливин',
+        'name_en' => 'Olivin',
+        'surface' => 'FH/FH',
+        'type' => 'two-sided',
+    ],
+    '0693' => [
+        'url' => 'https://www.eamf.ee/media/catalog/product/7/6/76.0693.12.png',
+        'name' => 'Orchid MATT',
+        'name_ru' => 'Орхидея МАТТ',
+        'name_en' => 'Orchid MATT',
+        'surface' => 'AP/FH',
+        'type' => 'one-sided',
+    ],
+];
+
+$downloaded = 0;
+foreach ($fundermax_decors as $code => $decor) {
+    $ext = pathinfo(parse_url($decor['url'], PHP_URL_PATH), PATHINFO_EXTENSION);
+    $filename = "FM_{$code}.{$ext}";
+    $filepath = $gallery_path . '/' . $filename;
+
+    if (file_exists($filepath) && filesize($filepath) > 1000) {
+        $log[] = "  {$code}: already exists (" . filesize($filepath) . " bytes)";
+        $downloaded++;
+        continue;
+    }
+
+    $response = wp_remote_get($decor['url'], [
+        'timeout' => 30,
+        'user-agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+    ]);
+    if (!is_wp_error($response) && wp_remote_retrieve_response_code($response) === 200) {
+        $body = wp_remote_retrieve_body($response);
+        if (strlen($body) > 1000) {
+            file_put_contents($filepath, $body);
+            $downloaded++;
+            $log[] = "  {$code} ({$decor['name']}): downloaded (" . strlen($body) . " bytes)";
+        } else {
+            $log[] = "  {$code}: too small (" . strlen($body) . " bytes) — placeholder";
+        }
+    } else {
+        $error = is_wp_error($response) ? $response->get_error_message() : wp_remote_retrieve_response_code($response);
+        $log[] = "  {$code}: FAILED ($error)";
+    }
+}
+$log[] = "Downloaded: $downloaded / " . count($fundermax_decors);
+
+// ============================================================
+// STEP 3: Create NGG Gallery
+// ============================================================
+$log[] = "\n=== STEP 3: CREATE NGG GALLERY ===";
+
+$fm_gid = $wpdb->get_var("SELECT gid FROM {$prefix}ngg_gallery WHERE title = 'Fundermax HPL' LIMIT 1");
+
+if (!$fm_gid) {
+    $wpdb->insert("{$prefix}ngg_gallery", [
+        'title'   => 'Fundermax HPL',
+        'slug'    => 'fundermax-hpl',
+        'path'    => '/wp-content/gallery/fundermax-hpl/',
+        'galdesc' => 'Fundermax Max Compact Interior HPL decors',
+        'author'  => 1,
+    ]);
+    $fm_gid = $wpdb->insert_id;
+    $log[] = "Created gallery 'Fundermax HPL' GID: $fm_gid";
+} else {
+    $log[] = "Gallery exists: GID $fm_gid";
+}
+
+// ============================================================
+// STEP 4: Register images in NGG with meta_data
+// ============================================================
+$log[] = "\n=== STEP 4: REGISTER IMAGES ===";
+
+$registered = 0;
+$sortorder = 0;
+foreach ($fundermax_decors as $code => $decor) {
+    $ext = pathinfo(parse_url($decor['url'], PHP_URL_PATH), PATHINFO_EXTENSION);
+    $filename = "FM_{$code}.{$ext}";
+    $filepath = $gallery_path . '/' . $filename;
+
+    if (!file_exists($filepath) || filesize($filepath) < 1000) {
+        $log[] = "  {$code}: no file, skip";
+        $sortorder++;
+        continue;
+    }
+
+    // Check if already registered
+    $exists = $wpdb->get_var($wpdb->prepare(
+        "SELECT pid FROM {$prefix}ngg_pictures WHERE galleryid = %d AND filename = %s",
+        $fm_gid, $filename
+    ));
+
+    if ($exists) {
+        $log[] = "  {$code}: already in NGG (pid $exists)";
+        $registered++;
+        $sortorder++;
+        continue;
+    }
+
+    // Get image dimensions
+    $image_info = @getimagesize($filepath);
+    $width  = $image_info ? $image_info[0] : 232;
+    $height = $image_info ? $image_info[1] : 232;
+
+    // Build meta_data (NGG serialized format)
+    $meta_data = [
+        'width'     => $width,
+        'height'    => $height,
+        'file'      => $filename,
+        'aperture'  => 0,
+        'credit'    => 'eamf.ee / Fundermax',
+        'camera'    => '',
+        'created_timestamp' => time(),
+        'copyright' => 'Fundermax',
+        'focal_length' => 0,
+        'iso'       => 0,
+        'shutter_speed' => 0,
+        'flash'     => 0,
+        'title'     => $code . ' ' . $decor['name'],
+        'keywords'  => "HPL, Fundermax, compact laminate, {$code}, {$decor['name']}",
+        'thumbnail' => [
+            'width'  => min($width, 240),
+            'height' => min($height, 160),
+        ],
+    ];
+
+    $wpdb->insert("{$prefix}ngg_pictures", [
+        'image_slug'  => 'fundermax-' . strtolower($code),
+        'galleryid'   => $fm_gid,
+        'filename'    => $filename,
+        'description' => "Fundermax {$code} {$decor['name']} ({$decor['surface']})",
+        'alttext'     => $code,
+        'exclude'     => 0,
+        'sortorder'   => $sortorder,
+        'meta_data'   => serialize($meta_data),
+    ]);
+
+    $pid = $wpdb->insert_id;
+    $registered++;
+    $sortorder++;
+    $log[] = "  {$code} {$decor['name']} ({$decor['surface']}): pid={$pid} ({$width}x{$height})";
+}
+$log[] = "Registered: $registered / " . count($fundermax_decors);
+
+// ============================================================
+// STEP 5: Generate thumbnails
+// ============================================================
+$log[] = "\n=== STEP 5: THUMBNAILS ===";
+
+$thumb_dir = $gallery_path . '/thumbs';
+if (!file_exists($thumb_dir)) {
+    wp_mkdir_p($thumb_dir);
+    $log[] = "Created thumbs dir";
+}
+
+$thumbs_created = 0;
+foreach ($fundermax_decors as $code => $decor) {
+    $ext = pathinfo(parse_url($decor['url'], PHP_URL_PATH), PATHINFO_EXTENSION);
+    $filename = "FM_{$code}.{$ext}";
+    $filepath = $gallery_path . '/' . $filename;
+    $thumbpath = $thumb_dir . '/thumbs_' . $filename;
+
+    if (!file_exists($filepath) || filesize($filepath) < 1000) continue;
+    if (file_exists($thumbpath)) continue;
+
+    $image_info = @getimagesize($filepath);
+    if (!$image_info) continue;
+
+    $src_w = $image_info[0];
+    $src_h = $image_info[1];
+    $thumb_w = 240;
+    $thumb_h = intval($src_h * ($thumb_w / max($src_w, 1)));
+
+    if ($image_info[2] === IMAGETYPE_PNG) {
+        $src = @imagecreatefrompng($filepath);
+    } elseif ($image_info[2] === IMAGETYPE_JPEG) {
+        $src = @imagecreatefromjpeg($filepath);
+    } else {
+        continue;
+    }
+    if (!$src) continue;
+
+    $thumb = imagecreatetruecolor($thumb_w, $thumb_h);
+    // Preserve transparency for PNG
+    if ($image_info[2] === IMAGETYPE_PNG) {
+        imagealphablending($thumb, false);
+        imagesavealpha($thumb, true);
+    }
+    imagecopyresampled($thumb, $src, 0, 0, 0, 0, $thumb_w, $thumb_h, $src_w, $src_h);
+
+    if ($image_info[2] === IMAGETYPE_PNG) {
+        imagepng($thumb, $thumbpath);
+    } else {
+        imagejpeg($thumb, $thumbpath, 90);
+    }
+
+    imagedestroy($src);
+    imagedestroy($thumb);
+    $thumbs_created++;
+}
+$log[] = "Thumbnails created: $thumbs_created";
+
+// ============================================================
+// STEP 6: Update HPL page — replace text list with gallery
+// ============================================================
+$log[] = "\n=== STEP 6: UPDATE HPL PAGE ===";
+
+$hpl_page_id = 6335;
+$current_content = $wpdb->get_var("SELECT post_content FROM {$wpdb->posts} WHERE ID = $hpl_page_id");
+
+if (strpos($current_content, 'ids="' . $fm_gid . '"') !== false) {
+    $log[] = "HPL page already has Fundermax gallery shortcode";
+} else {
+    $old_text = '<p>Saadaval dekoorkoodid: 0026, 0027, 0075, 0077, 0080, 0344, 0386, 0394, 0426, 0427, 0428, 0497, 0581, 0585, 0670, 0693</p>';
+
+    $new_text = '[ngg src="galleries" ids="' . $fm_gid . '" display="basic_thumbnail" thumbnail_crop="0" images_per_page="20"]';
+
+    if (strpos($current_content, $old_text) !== false) {
+        $new_content = str_replace($old_text, $new_text, $current_content);
+        $wpdb->update($wpdb->posts, ['post_content' => $new_content], ['ID' => $hpl_page_id]);
+        clean_post_cache($hpl_page_id);
+        $log[] = "HPL page updated: replaced decor codes list with [ngg galleries ids=$fm_gid]";
+    } else {
+        $log[] = "WARNING: Old text not found in HPL page. Add shortcode manually:";
+        $log[] = $new_text;
+    }
+}
+
+// ============================================================
+// STEP 7: Clear caches
+// ============================================================
+$log[] = "\n=== STEP 7: CLEAR CACHES ===";
+$wpdb->query("DELETE FROM {$wpdb->options} WHERE option_name LIKE '%ngg%transient%'");
+$wpdb->query("DELETE FROM {$wpdb->options} WHERE option_name LIKE '%displayed_gallery%'");
+$wpdb->query("DELETE FROM {$wpdb->options} WHERE option_name LIKE '%trp_cache%'");
+if (function_exists('wp_cache_flush')) wp_cache_flush();
+$log[] = "All caches cleared";
+
+// ============================================================
+// VERIFY
+// ============================================================
+$log[] = "\n=== VERIFICATION ===";
+
+$fm_count = $wpdb->get_var("SELECT COUNT(*) FROM {$prefix}ngg_pictures WHERE galleryid = $fm_gid AND exclude = 0");
+$fm_meta = $wpdb->get_var("SELECT COUNT(*) FROM {$prefix}ngg_pictures WHERE galleryid = $fm_gid AND meta_data IS NOT NULL AND meta_data != ''");
+$log[] = "Fundermax gallery GID $fm_gid: $fm_count visible, $fm_meta with meta_data";
+
+// Check files on disk
+$files_on_disk = glob($gallery_path . '/FM_*.{png,jpg}', GLOB_BRACE);
+$log[] = "Files on disk: " . count($files_on_disk);
+
+$thumbs_on_disk = glob($thumb_dir . '/thumbs_FM_*.{png,jpg}', GLOB_BRACE);
+$log[] = "Thumbs on disk: " . count($thumbs_on_disk);
+
+$hpl_content = $wpdb->get_var("SELECT post_content FROM {$wpdb->posts} WHERE ID = 6335");
+$has_fm = strpos($hpl_content, 'ids="' . $fm_gid . '"') !== false;
+$log[] = "HPL page has Fundermax gallery: " . ($has_fm ? 'YES' : 'NO');
+
+// All galleries summary
+$all_galleries = $wpdb->get_results("SELECT gid, title, (SELECT COUNT(*) FROM {$prefix}ngg_pictures WHERE galleryid = g.gid AND exclude = 0) as cnt FROM {$prefix}ngg_gallery g ORDER BY gid");
+$log[] = "\nAll galleries:";
+foreach ($all_galleries as $g) {
+    $log[] = "  GID {$g->gid}: {$g->title} ({$g->cnt} visible)";
+}
+
+echo "<h2>FUNDERMAX GALLERY — ALL 16 DECORS</h2>";
+echo "<pre>" . implode("\n", $log) . "</pre>";
+echo "<p><strong>Next:</strong> Seraphinite &rarr; Delete cache, then check /hpl-tootasapinnad</p>";
