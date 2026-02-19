@@ -1,0 +1,56 @@
+# Troubleshooting Guide
+
+Common issues and solutions across projects.
+
+## Claude Code Issues
+
+### Hook Not Running
+- Check settings.json syntax (valid JSON)
+- Verify file path is absolute
+- Check file has execute permissions
+- Test manually: `node path/to/hook.js`
+
+### Context Lost Between Sessions
+- Check capsule.json is being saved
+- Verify memory directory exists
+- Review session-init.js for errors
+
+## WordPress Issues
+
+### Site Crashes After Code Change
+- **Cause**: Usually wp_update_post() in Code Snippets
+- **Fix**: Use $wpdb->update() instead
+- **Prevention**: Never use wp_update_post() in snippets
+
+### REST API Returns 401
+- Check Application Password is correct
+- Verify user has required capabilities
+- Check .htaccess isn't blocking REST routes
+
+## n8n Issues
+
+### Workflow Not Triggering
+- Check workflow is active
+- Verify webhook URL is correct
+- Check n8n logs for errors
+
+### Credentials Not Working
+- Re-authenticate in n8n UI
+- Check token hasn't expired
+- Verify API permissions
+
+## General Debugging
+
+### JSON Parse Errors
+- Validate JSON syntax (trailing commas, quotes)
+- Check for special characters in strings
+- Use JSON.stringify for debugging
+
+### Path Issues on Windows
+- Use path.join() not string concatenation
+- Replace / with \\ or use path.sep
+- Handle drive letters (C:)
+
+---
+
+*Add new issues as they're discovered*

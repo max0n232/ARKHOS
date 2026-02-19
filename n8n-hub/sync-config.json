@@ -1,0 +1,66 @@
+{
+  "version": "1.0.0",
+  "description": "n8n sync configuration: Local DEV -> VPS PROD",
+
+  "environments": {
+    "local": {
+      "name": "Development",
+      "n8n_url": "http://localhost:5678",
+      "role": "development"
+    },
+    "vps": {
+      "name": "Production",
+      "n8n_url": "https://n8n.YOUR_DOMAIN.com",
+      "role": "production",
+      "host": "YOUR_VPS_IP",
+      "ssh_user": "YOUR_SSH_USER"
+    }
+  },
+
+  "databases": {
+    "supabase": {
+      "url": "https://YOUR_PROJECT.supabase.co",
+      "tables": {
+        "logs": "General logging table",
+        "error_logs": "Error tracking",
+        "seo_reports": "SEO audit results",
+        "content_queue": "Content publishing queue"
+      }
+    },
+    "redis": {
+      "host": "YOUR_VPS_IP",
+      "port": 6379,
+      "usage": ["cache", "rate_limiting", "job_queues"]
+    }
+  },
+
+  "projects": {
+    "studiokook": {
+      "source": "C:/Users/sorte/Desktop/Studiokook/n8n",
+      "workflows": {
+        "dev": "dev/",
+        "prod": "prod/"
+      },
+      "credentials_ref": "C:/Users/sorte/Desktop/Studiokook/credentials"
+    }
+  },
+
+  "sync": {
+    "method": "manual",
+    "commands": {
+      "export_local": "n8n export:workflow --all --output={{project}}/n8n/dev/",
+      "deploy_to_vps": "scp -r {{project}}/n8n/prod/* {{ssh_user}}@{{host}}:/home/{{ssh_user}}/n8n-workflows/",
+      "import_vps": "ssh {{ssh_user}}@{{host}} 'cd /home/{{ssh_user}}/n8n-workflows && n8n import:workflow --input=.'"
+    }
+  },
+
+  "placeholders": {
+    "note": "Replace YOUR_* values with actual credentials",
+    "required": [
+      "YOUR_DOMAIN.com",
+      "YOUR_VPS_IP",
+      "YOUR_SSH_USER",
+      "YOUR_PROJECT.supabase.co"
+    ]
+  }
+}

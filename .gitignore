@@ -1,76 +1,43 @@
-# Python
-__pycache__/
-*.py[cod]
-*$py.class
-*.so
-.Python
-venv/
-env/
-ENV/
-.venv/
+# Regeneratable (rebuild on demand)
+mcp-gsc/venv/
+db/node_modules/
+plugins/cache/
 
-# Credentials & Secrets
-credentials/
-agents/.env
-.env
-.env.local
-*.pem
-*.key
+# Session data (local only)
+/projects/
+# Exception: skill project knowledge is tracked
+!skills/**/projects/
+debug/
+todos/
+shell-snapshots/
+session-env/
 
-# Knowledge Base
-knowledge/knowledge.db
-knowledge/knowledge.db-*
-knowledge/memory.db
-knowledge/memory.db-*
-knowledge/knowledge.db.backup
+# Temp files
+*.tmp
+nul
+
+# Secrets (never commit)
+.credentials.json
+**/credentials/
+
+# OS files
+.DS_Store
+Thumbs.db
 
 # IDE
 .vscode/
 .idea/
-*.swp
-*.swo
-
-# OS
-.DS_Store
-Thumbs.db
-nul
-
-# Large media
-Photos/
-
-# n8n
-n8n/.n8n/
 
 # Logs
 *.log
-logs/
 
-# Test / Temp
-.pytest_cache/
-.coverage
-htmlcov/
-*.tmp
-*.bak
-~*
-temp/
-temp-*
+# Cache
+cache/
+statsig/
+stats-cache.json
 
-# WP snippet dumps (large, regenerable)
-all_snips.json
-snips.json
-snips_current.json
-current_snippets.json
-snippets_audit.json
-homepage-content.json
-full_audit.json
-check_mu_plugins.json
-opcache_reset.json
+# Local Claude settings (IDE-specific permissions)
+.claude/settings.local.json
 
-# Session artifacts
-translation-progress.txt
-translations-added-summary.txt
-blocks-*.txt
-check-translation.js
-
-# Archive (large binary data)
-archive/scripts_old/
+# Database files (use schema-*.sql + migrate.js to recreate)
+*.db

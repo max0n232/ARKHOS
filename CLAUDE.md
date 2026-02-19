@@ -1,67 +1,47 @@
-# Studiokook
+# ARKHOS -- Global Configuration
 
-Кухонный бизнес, Tallinn, Estonia. WordPress: studiokook.ee
+## References
 
-## Structure
+@rules/constitution.md
+@rules/code-style.md
+@rules/security.md
+@rules/integration-checklist.md
+@docs/routing.md
 
-```
-Studiokook/
-├── credentials/            ← API ключи (НЕ в git)
-├── knowledge/              ← SQLite DB, schemas
-├── n8n/                    ← Workflows (dev → prod → VPS)
-├── skills/                 ← wp-*, seo-*
-├── code-snippets/          ← PHP сниппеты для WP
-├── deploy/                 ← Скрипты деплоя
-├── docs/                   ← Документация, аудиты, планы
-├── translations/           ← Переводы страниц
-├── .claude/                ← Agents, hooks, memory
-└── archive/                ← Старые файлы
-```
+## Defaults
 
-## Credentials
+- **Language:** RU primary, EN tech terms
+- **Autonomy:** <3 файлов, <200 строк -- решай сам
+- **Token Budget:** 200k. At 50% → STOP and report
 
-Все в `credentials/` (.gitignore). Deploy-скрипты читают `wp-auth.env`.
-Файлы: `wp-auth.env`, `n8n-api.env`, `meta-api.env`, `kieai-api.env`, `pinterest-api.env`, `google_*.json`, `zone_ee.json`
+## Delegation Defaults
 
-## Integrations
+Default mode: Solo.
+Delegation triggers:
+- "аудит/проверь/диагностика" → read-only subagent
+- "исправь/обнови/создай" + >3 files → subagent with write access
+- Parallel independent tasks → team (rare, confirm first)
+- Research/exploration → subagent (saves main context)
 
-- **WP REST:** `curl -u "$WP_USER:$WP_APP_PASS" "studiokook.ee/wp-json/..."`
-- **Custom API (sk/v1):** Elementor, TranslatePress, Deploy API, кэш — см. @docs/api-reference.md
-- **n8n:** `https://n8n.studiokook.ee` (header `X-N8N-API-KEY`)
-- **Meta:** FB Page `108709097229809`, IG `17841461511497185` (@_studiokook)
-- **GSC:** `sc-domain:studiokook.ee` | **GA4:** `properties/441276059`
+Escalation: 3 failed attempts → suggest subagent or team.
 
-## Critical Rules
+## Available Skills (discovery aid)
 
-1. **NEVER** `wp_update_post()` — crashes site. Use `$wpdb->update()`
-2. **PHP на сервер:** ТОЛЬКО через Deploy API (`/sk/v1/deploy-file`). Code Snippets REST API сломан (создаёт пустые записи)
-3. **mu-plugin:** `studiokook-seo.php` = robots.txt + schemas + Deploy API. Обновлять через Deploy API
-4. **Deploy-скрипты:** `deploy/` — Node.js, юзер запускает на своей машине (sandbox блокирует outbound)
-5. **Credentials:** только по имени переменной, NEVER hardcode
-6. **WP code changes:** сначала `/wp-problem-solver`
-7. **TranslatePress:** см. `skills/wp-translatepress/SKILL.md`
+These skills auto-load by description. Listed here to improve routing:
+- wordpress: WP REST API, TranslatePress, Elementor, SEO
+- n8n-expert: n8n workflow automation, nodes, debugging
+- integrations: Telegram Bot API, webhooks, n8n triggers
+- knowledge-manager: DAL knowledge base (decisions, errors, snippets)
+- content-creator: YouTube scripts, Telegram posts, SEO
+- legal: Estonian law, OÜ, contracts, GDPR
+- assistant: daily planning, prioritization, time blocking
+- post-mortem: Error analysis and documentation patching
+- pattern-tracker: Pattern detection across sessions
+- fal-ai: Image generation via fal.ai API
 
-## Languages
-
-ET (primary), RU `/ru/`, EN `/en/`, FI `/fi/`
-
-## Quick Actions
-
-| Action | Skill |
-|--------|-------|
-| WP code changes | /wp-problem-solver |
-| Elementor | skills/wp-elementor/SKILL.md |
-| SEO/AEO audit | skills/seo-aeo/SKILL.md |
-| SMM strategy | skills/seo-smm/SKILL.md |
-| Translations | skills/wp-translatepress/SKILL.md |
-| WP REST/Router | skills/wordpress-router/SKILL.md |
-
-## SMM Funnel — Phase 1 (2026-02-15)
-
-- n8n: Content Generator + Pinterest Pinner — imported, NOT activated
-- mu-plugin: robots.txt (AI crawlers) + FAQPage/HowTo/Service/BreadcrumbList schemas + Deploy API
-- TODO: credentials в n8n, Pinterest OAuth, тест → активация
-
-## Style
-
-RU primary, EN tech terms. Concise. No TODOs in code.
+## Community Skills (installed via git clone)
+- supabase-postgres: Supabase PostgreSQL best practices, RLS, migrations, indexes
+- context-compression: Session compression strategies for long-running tasks
+- context-optimization: Compaction, masking, caching for context management
+- multi-agent-patterns: Orchestrator, peer-to-peer, hierarchical architectures
+- memory-systems: Short-term, long-term, graph-based memory design

@@ -1,0 +1,18 @@
+{
+  "claude-wordpress-skills": {
+    "source": {
+      "source": "github",
+      "repo": "elvismdev/claude-wordpress-skills"
+    },
+    "installLocation": "C:\\Users\\sorte\\.claude\\plugins\\marketplaces\\claude-wordpress-skills",
+    "lastUpdated": "2026-02-02T17:35:59.142Z"
+  },
+  "superpowers-marketplace": {
+    "source": {
+      "source": "github",
+      "repo": "obra/superpowers-marketplace"
+    },
+    "installLocation": "C:\\Users\\sorte\\.claude\\plugins\\marketplaces\\superpowers-marketplace",
+    "lastUpdated": "2026-02-02T17:36:33.098Z"
+  }
+}

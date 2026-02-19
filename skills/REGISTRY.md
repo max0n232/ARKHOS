@@ -1,57 +1,64 @@
-# Studiokook Skills Registry
+# Global Skills Registry
 
-Индекс всех доступных skills для проекта.
+Shared skills available across all projects.
 
-## Quick Reference
+## Available Skills
 
-| Триггер | Skill | Описание |
-|---------|-------|----------|
-| `SEO audit` | seo-aeo | SEO/AEO оптимизация, EEAT |
-| `Instagram` | seo-smm | SEO + SMM стратегия |
-| `WordPress` | wordpress-router | Роутер → wp-* skills |
-| `marketing` | marketing | 25+ marketing skills |
-| `n8n` | n8n-workflow | Workflow automation |
-| `schema` | schema-markup | JSON-LD разметка |
-
-## Skills по Категориям
-
-### SEO & Content
-- **seo-aeo/** — EEAT, metadata, JSON-LD, AEO
-- **seo-smm.md** — SEO + Instagram стратегия
-
-### WordPress
-- **wordpress-router/** — Классификация WP задач
-- **wp-rest-api/** — Endpoints, auth, validation
-- **wp-abilities-api/** — NGG gallery, MCP tools
-- **wp-performance/** — Lazy loading, Core Web Vitals
-- **wp-wpcli-and-ops/** — WP-CLI команды
-- **wp-project-triage/** — Detect plugin/theme type
-
-### Marketing (25+ skills)
-- **marketing/CLAUDE.md** — Entry point
-- **marketing/skills/seo-audit/** — Technical audit
-- **marketing/skills/copywriting/** — Copy creation
-- **marketing/skills/schema-markup/** — Structured data
-- **marketing/skills/analytics-tracking/** — GA4, GTM
-- **marketing/skills/cro/** — Conversion optimization
-- ... (20+ more)
+### Core
+| Skill | Path | Description |
+|-------|------|-------------|
+| assistant | skills/assistant/ | Personal task management and productivity planning |
+| knowledge-manager | skills/knowledge-manager/ | Knowledge DB via DAL |
+| pattern-tracker | skills/pattern-tracker/ | Pattern tracking and correction system |
+| post-mortem | skills/post-mortem/ | Session error analysis, auto-patching SKILL.md |
 
 ### Automation
-- **n8n-workflow** → Global skill (n8n-expert)
+| Skill | Path | Description |
+|-------|------|-------------|
+| n8n-expert | skills/n8n-expert/ | Advanced n8n workflow patterns (7 sub-skills) |
 
-## Activation
+### Content
+| Skill | Path | Description |
+|-------|------|-------------|
+| content-creator | skills/content-creator/ | YouTube, Telegram content strategy |
 
-Skills активируются автоматически через `_triggers.json`:
-1. User prompt анализируется
-2. Matching triggers определяют skill
-3. SKILL.md загружается в контекст
+### Integrations
+| Skill | Path | Description |
+|-------|------|-------------|
+| integrations | skills/integrations/ | Telegram Bot API, n8n webhooks, notifications |
+| fal-ai | skills/fal-ai/ | AI image/audio generation |
 
-## Adding New Skills
+### Compliance
+| Skill | Path | Description |
+|-------|------|-------------|
+| legal | skills/legal/ | Estonian law, OÜ, GDPR, contracts |
 
-1. Создай `skills/{skill-name}/SKILL.md`
-2. Добавь triggers в `_triggers.json`
-3. Обнови этот REGISTRY.md
+### WordPress
+| Skill | Path | Description |
+|-------|------|-------------|
+| wordpress | skills/wordpress/ | studiokook.ee REST API, TranslatePress, Elementor |
+| studiokook-knowledge | skills/wordpress/projects/studiokook/KNOWLEDGE.md | Project-specific quirks, patterns, decisions |
+| studiokook-infra | skills/wordpress/projects/studiokook/INFRASTRUCTURE.md | Full technical reference (plugins, pages, API) |
 
-## Usage Stats
+## Community Skills
 
-Tracked в `knowledge.db` → таблица `skill_usage`
+| Skill | Source | Installed |
+|-------|--------|-----------|
+| supabase-postgres | supabase/agent-skills | 2026-02-13 |
+| context-compression | muratcankoylan/Agent-Skills-for-Context-Engineering | 2026-02-13 |
+| context-optimization | muratcankoylan/Agent-Skills-for-Context-Engineering | 2026-02-13 |
+| multi-agent-patterns | muratcankoylan/Agent-Skills-for-Context-Engineering | 2026-02-13 |
+| memory-systems | muratcankoylan/Agent-Skills-for-Context-Engineering | 2026-02-13 |
+
+## Project Routing
+
+Skills are loaded based on:
+1. YAML frontmatter `description` field (auto-discovery)
+2. Project-specific `_triggers.json`
+3. Explicit user request
+
+## Memory Integration
+
+- Session skills tracked in `capsule.json`
+- Usage stats in project `knowledge.db`
+- Cross-project patterns in `memory/global/`

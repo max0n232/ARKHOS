@@ -1,0 +1,101 @@
+{
+  "name": "Template: Error Notifier",
+  "meta": {
+    "description": "Catch errors and send notifications (Telegram/Email)",
+    "version": "1.0.0",
+    "author": "Claude Router"
+  },
+  "nodes": [
+    {
+      "id": "error_trigger",
+      "name": "Error Trigger",
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [250, 300],
+      "parameters": {}
+    },
+    {
+      "id": "format_error",
+      "name": "Format Error",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [450, 300],
+      "parameters": {
+        "mode": "manual",
+        "duplicateItem": false,
+        "assignments": {
+          "assignments": [
+            {
+              "id": "message",
+              "name": "message",
+              "value": "=**Workflow Error**\n\nWorkflow: {{ $json.workflow.name }}\nNode: {{ $json.execution.error.node.name }}\nError: {{ $json.execution.error.message }}\nTime: {{ new Date().toISOString() }}",
+              "type": "string"
+            },
+            {
+              "id": "severity",
+              "name": "severity",
+              "value": "high",
+              "type": "string"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "telegram",
+      "name": "Telegram",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [650, 200],
+      "parameters": {
+        "chatId": "={{$env.TELEGRAM_CHAT_ID}}",
+        "text": "={{ $json.message }}",
+        "additionalFields": {
+          "parse_mode": "Markdown"
+        }
+      },
+      "credentials": {
+        "telegramApi": {
+          "id": "{{TELEGRAM_CREDENTIAL_ID}}",
+          "name": "Telegram Bot"
+        }
+      }
+    },
+    {
+      "id": "log_to_supabase",
+      "name": "Log to Supabase",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [650, 400],
+      "parameters": {
+        "operation": "insert",
+        "tableId": "error_logs",
+        "fieldsUi": {
+          "fieldValues": [
+            { "fieldName": "workflow_name", "fieldValue": "={{ $('Format Error').item.json.workflow.name }}" },
+            { "fieldName": "error_message", "fieldValue": "={{ $json.message }}" },
+            { "fieldName": "severity", "fieldValue": "={{ $json.severity }}" },
+            { "fieldName": "created_at", "fieldValue": "={{ new Date().toISOString() }}" }
+          ]
+        }
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "{{SUPABASE_CREDENTIAL_ID}}",
+          "name": "Supabase"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Error Trigger": {
+      "main": [[{ "node": "Format Error", "type": "main", "index": 0 }]]
+    },
+    "Format Error": {
+      "main": [[
+        { "node": "Telegram", "type": "main", "index": 0 },
+        { "node": "Log to Supabase", "type": "main", "index": 0 }
+      ]]
+    }
+  }
+}

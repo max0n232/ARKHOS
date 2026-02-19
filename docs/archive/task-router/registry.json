@@ -1,0 +1,132 @@
+{
+  "$schema": "task-router-registry-v1",
+  "version": "1.0.0",
+  "defaults": {
+    "model": "opusplan",
+    "max_teammates": 4,
+    "team_timeout_min": 15,
+    "teammate_timeout_min": 5,
+    "effort": {
+      "solo": "medium",
+      "lead": "high",
+      "teammate": "medium"
+    }
+  },
+  "domains": {
+    "n8n": {
+      "description": "n8n workflow automation",
+      "triggers": ["workflow", "n8n", "нода", "node", "webhook", "trigger"],
+      "skills": ["skills/n8n.md", "skills/n8n-expert/"],
+      "roles": {
+        "analyzer": {
+          "description": "Execution logs, error patterns, data flow",
+          "tools": ["Read", "Grep", "Glob", "Bash"]
+        },
+        "debugger": {
+          "description": "Code nodes, expressions, connections",
+          "agent_ref": "agents/debugger.md",
+          "tools": ["Read", "Grep", "Glob", "Bash"]
+        },
+        "optimizer": {
+          "description": "Performance and architecture",
+          "tools": ["Read", "Grep", "Glob"]
+        },
+        "builder": {
+          "description": "New workflow creation",
+          "tools": ["Read", "Grep", "Glob", "Bash"]
+        }
+      },
+      "team_presets": {
+        "debug": ["analyzer", "debugger"],
+        "full_review": ["analyzer", "debugger", "optimizer"],
+        "build": ["builder", "optimizer"]
+      }
+    },
+    "code": {
+      "description": "Code review, refactoring, development",
+      "triggers": ["review", "аудит", "рефакторинг", "refactor", "код", "code", "баг", "bug"],
+      "roles": {
+        "security": {
+          "description": "Vulnerabilities, injections, authentication",
+          "tools": ["Read", "Grep", "Glob"]
+        },
+        "performance": {
+          "description": "Bottlenecks, complexity, memory",
+          "tools": ["Read", "Grep", "Glob"]
+        },
+        "quality": {
+          "description": "Patterns, readability, DRY",
+          "agent_ref": "agents/code-reviewer.md",
+          "tools": ["Read", "Grep", "Glob"]
+        },
+        "debugger": {
+          "description": "Root cause analysis",
+          "agent_ref": "agents/debugger.md",
+          "tools": ["Read", "Grep", "Glob", "Bash"]
+        }
+      },
+      "team_presets": {
+        "review": ["security", "performance", "quality"],
+        "debug": ["debugger", "quality"],
+        "full_audit": ["security", "performance", "quality", "debugger"]
+      }
+    },
+    "research": {
+      "description": "Research, docs, API exploration",
+      "triggers": ["исследуй", "research", "сравни", "compare", "документация", "docs", "api"],
+      "roles": {
+        "searcher": {
+          "description": "Information gathering",
+          "agent_ref": "agents/researcher.md",
+          "tools": ["Read", "Grep", "Glob"]
+        },
+        "analyst": {
+          "description": "Analysis, comparison, pros/cons",
+          "tools": ["Read", "Grep", "Glob"]
+        },
+        "critic": {
+          "description": "Devil's advocate, risks, edge cases",
+          "tools": ["Read", "Grep", "Glob"]
+        }
+      },
+      "team_presets": {
+        "explore": ["searcher", "analyst"],
+        "deep_dive": ["searcher", "analyst", "critic"]
+      }
+    },
+    "wordpress": {
+      "description": "WordPress / Studiokook",
+      "triggers": ["wordpress", "wp", "сайт", "studiokook", "SEO", "плагин"],
+      "skills": ["claude-wordpress-skills"],
+      "roles": {
+        "developer": {
+          "description": "PHP, Code Snippets, REST API",
+          "tools": ["Read", "Grep", "Glob", "Bash"]
+        },
+        "seo": {
+          "description": "SEO audit, meta tags, structure",
+          "tools": ["Read", "Grep", "Glob"]
+        },
+        "translator": {
+          "description": "TranslatePress translations via sk/v1 API",
+          "agent_ref": "agents/translator.md",
+          "tools": ["Read", "Grep", "Glob", "Bash"]
+        }
+      },
+      "team_presets": {
+        "audit": ["developer", "seo"]
+      },
+      "notes": "Respect rules/constitution.md → WordPress Specific section"
+    }
+  },
+  "escalation_rules": {
+    "retry_threshold": 3,
+    "file_count_threshold": 5,
+    "competing_hypotheses": true
+  },
+  "_meta": {
+    "extensibility": "Add domains by pattern. Router picks up automatically.",
+    "agent_ref": "Reference to existing agents/ file. If present — use as base prompt for teammate.",
+    "pattern_tracker": "Routing decisions go to patterns/ pipeline via pattern-analyzer.js."
+  }
+}
