@@ -165,6 +165,45 @@ function timeSinceLastSession(previous) {
 }
 
 /**
+ * Check for pending self-learning findings from previous session
+ */
+function checkLearningPending(cwd) {
+    const pendingPaths = [
+        { path: path.join(CLAUDE_DIR, 'tmp', 'learning-pending.json'), scope: 'global' },
+        { path: path.join(cwd, '.claude', 'tmp', 'learning-pending.json'), scope: 'project' }
+    ];
+
+    const findings = [];
+    for (const { path: p, scope } of pendingPaths) {
+        try {
+            if (fs.existsSync(p)) {
+                const data = JSON.parse(fs.readFileSync(p, 'utf8'));
+                const count = data.findings?.length || 0;
+                if (count > 0) {
+                    findings.push({
+                        scope,
+                        path: p,
+                        count,
+                        categories: data.stats || {},
+                        sessionId: data.sessionId
+                    });
+                }
+            }
+        } catch (e) {
+            // Skip unreadable pending files
+        }
+    }
+
+    if (findings.length > 0) {
+        const total = findings.reduce((sum, f) => sum + f.count, 0);
+        const scopes = findings.map(f => f.scope).join('+');
+        process.stderr.write(`[SelfLearn] ${total} pending findings (${scopes}) from previous session. Run: node ~/.claude/scripts/learning-applier.js\n`);
+    }
+
+    return findings;
+}
+
+/**
  * Main initialization
  */
 async function initSession() {
@@ -216,6 +255,9 @@ async function initSession() {
         console.error(`Failed to save capsule: ${e.message}`);
     }
 
+    // Check for pending self-learning findings from previous session
+    const learningPending = checkLearningPending(cwd);
+
     // Output session info (shown to user via statusMessage)
     const output = {
         session_id: capsule.session_id,
@@ -227,7 +269,8 @@ async function initSession() {
             files: baseline.files.length
         },
         tokenEstimate: totalTokensLoaded,
-        tokenBudgetPercent: ((totalTokensLoaded / TOKEN_BUDGET) * 100).toFixed(2)
+        tokenBudgetPercent: ((totalTokensLoaded / TOKEN_BUDGET) * 100).toFixed(2),
+        learningPending: learningPending.length > 0 ? learningPending : undefined
     };
 
     // Baseline warning (separate from total warning)

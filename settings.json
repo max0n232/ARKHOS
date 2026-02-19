@@ -79,6 +79,12 @@
         "hooks": [
           {
             "type": "command",
+            "command": "node C:\\Users\\sorte\\.claude\\hooks\\stop\\session-learner.js",
+            "timeout": 10000,
+            "statusMessage": "Extracting session learnings..."
+          },
+          {
+            "type": "command",
             "command": "node C:\\Users\\sorte\\.claude\\hooks\\stop\\pattern-detector.js",
             "timeout": 5000
           }

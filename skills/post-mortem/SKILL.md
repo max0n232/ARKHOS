@@ -144,18 +144,31 @@ If >5 findings: top 5 by confidence, rest in `[DEFERRED]`.
 
 | Script | Location | Purpose |
 |--------|----------|---------|
-| post-mortem-trigger.js | hooks/stop/ | Stop hook: detects errors, creates pending.json |
+| post-mortem-trigger.js | hooks/stop/ | Stop hook: detects errors, creates pending.json (LEGACY, replaced by session-learner) |
+| session-learner.js | hooks/stop/ | Unified Stop hook: extracts errors, workarounds, knowledge, success patterns |
 | post-mortem-analyzer.js | scripts/ | Skill: processes pending, patches SKILL.md, writes patterns/ |
+| learning-applier.js | scripts/ | Applies learning-pending.json to MEMORY files |
 
 ## Integration
 
-**Automatic flow:**
-1. Stop hook runs `post-mortem-trigger.js`
-2. If errors found → creates `tmp/post-mortem-pending.json`
-3. Next session: skill invokes `post-mortem-analyzer.js`
-4. Analyzer patches SKILL.md (≥0.8), writes patterns/ (≥0.5), logs results
+**Automatic flow (Self-Learning):**
+1. Stop hook runs `session-learner.js` — extracts 4 categories of findings
+2. Writes `tmp/learning-pending.json` (global and/or project scope)
+3. Next session: `init-memory.js` detects pending, signals to agent
+4. Agent runs `learning-applier.js` to apply findings to MEMORY
+5. Findings with confidence ≥0.5 → MEMORY update; ≥0.8 → confirmed; <0.5 → log only
+
+**Dual scope:**
+- Global findings → `~/.claude/memory/global/patterns.md` or `troubleshooting.md`
+- Project findings → `{project}/.claude/agent-memory/*/MEMORY.md`
+
+**Legacy flow (Post-Mortem deep analysis):**
+1. Post-mortem skill invokes `post-mortem-analyzer.js` for deep session analysis
+2. Analyzer patches SKILL.md (≥0.8), writes patterns/ (≥0.5), logs results
 
 **Manual invocation:**
 ```bash
-node ~/.claude/scripts/post-mortem-analyzer.js
+node ~/.claude/scripts/learning-applier.js              # apply pending
+node ~/.claude/scripts/learning-applier.js --dry-run    # preview
+node ~/.claude/scripts/post-mortem-analyzer.js           # deep analysis
 ```
