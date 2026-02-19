@@ -17,12 +17,36 @@ Accumulated knowledge from WordPress work on studiokook.ee.
 - Check snippets-registry.json before creating new code
 - Run 5 Whys analysis before fixing
 
+## SSH Access
+
+- Host: `studiokook.ee`, User: `virt103578`
+- Key: `C:/Users/sorte/.ssh/id_studiokook`
+- WP root: `~/domeenid/www.studiokook.ee/htdocs`
+- WP-CLI 2.12.0 (cd to WP root first, `--path=~` doesn't expand)
+- Usage: `ssh -i "C:/Users/sorte/.ssh/id_studiokook" virt103578@studiokook.ee "cd ~/domeenid/www.studiokook.ee/htdocs && wp ..."`
+- SCP: `scp -i "C:/Users/sorte/.ssh/id_studiokook" file virt103578@studiokook.ee:~/domeenid/www.studiokook.ee/htdocs/`
+
 ## Site-Specific Knowledge
+
+### Elementor
+- Front page (ID 8) is Elementor. Content lives in BOTH `post_content` AND `_elementor_data` meta
+- Must update both when editing. After changes: `wp elementor flush-css && wp cache flush`
 
 ### TranslatePress
 - 4 languages: ET (primary), RU, EN, FI
 - URL structure: `/`, `/ru/`, `/en/`, `/fi/`
 - Hreflang must include x-default pointing to ET
+- **API gotcha:** `/sk/v1/trp-update-id` works for EN only (dictionary IDs match original_id). RU and FI dictionary tables have own auto-increment IDs — use `$wpdb->update()` on `wp_trp_dictionary_{lang}` directly
+- Translation workflow for new pages:
+  1. Visit page in all 4 languages to trigger TRP string detection
+  2. Find IDs: `wp db query "SELECT id, LEFT(original,80) FROM wp_trp_dictionary_{lang} WHERE original LIKE '%text%'"`
+  3. Update via PHP eval-file with `$wpdb->update()`, set `status=2`
+  4. Flush: `wp cache flush && wp transient delete --all`
+- **Cache clear via API:** `GET /sk/v1/full-clear` (NOT POST!)
+
+### Code Snippets
+- Table `wp_snippets`, scope `front-end` for frontend-only. Insert via `$wpdb->insert()`
+- REST API broken (creates empty records) — use DB or eval-file
 
 ### NextGen Gallery (NGG)
 - Post IDs: Egger=6309, Fundermax=6335
@@ -64,5 +88,5 @@ mu-plugin `studiokook-seo.php` предоставляет файловый REST 
 Code Snippets plugin REST API **НЕ РАБОТАЕТ** — создаёт пустые записи. Не использовать.
 
 ---
-*Last updated: 2026-02-15*
+*Last updated: 2026-02-19*
 *Update this file after every significant WordPress fix*
