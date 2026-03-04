@@ -1,28 +1,7 @@
-# Code Style Rules
+# Code Style
 
-Global coding conventions.
-
-## General
-
-- No TODOs in committed code
-- No commented-out code blocks
-- Descriptive variable names
-- Functions < 50 lines
-
-## Language preferences
-
-- Primary: RU for communication
-- Technical terms: EN
-- Comments in code: EN
-
-## File conventions
-
-- UTF-8 encoding
-- LF line endings
-- No trailing whitespace
-
-## Commit style
-
-- Imperative mood
-- < 72 chars first line
-- Reference issues when applicable
+- No TODOs in committed code, no commented-out blocks
+- Descriptive variable names, functions < 50 lines
+- Language: RU communication, EN tech terms, EN code comments
+- UTF-8, LF endings, no trailing whitespace
+- Commits: imperative mood, < 72 chars, reference issues
