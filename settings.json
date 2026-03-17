@@ -1,126 +1,7 @@
 {
-  "hooks": {
-    "SessionStart": [
-      {
-        "matcher": "*",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node C:\\Users\\sorte\\.claude\\hooks\\session-start\\init-memory.js",
-            "timeout": 5000,
-            "statusMessage": "Initializing session..."
-          },
-          {
-            "type": "command",
-            "command": "node C:\\Users\\sorte\\.claude\\hooks\\session-start\\scan-lifecycle.js",
-            "timeout": 10000,
-            "statusMessage": "Checking lifecycle..."
-          }
-        ]
-      }
-    ],
-    "SessionEnd": [
-      {
-        "matcher": "*",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node C:\\Users\\sorte\\.claude\\hooks\\session-end\\cleanup.js",
-            "timeout": 30000,
-            "statusMessage": "Cleaning up..."
-          }
-        ]
-      }
-    ],
-    "PreToolUse": [
-      {
-        "matcher": "Bash",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node C:\\Users\\sorte\\.claude\\hooks\\pre-tool-use\\validate-bash.js",
-            "timeout": 5000,
-            "statusMessage": "Validating command..."
-          }
-        ]
-      },
-      {
-        "matcher": "Write|Edit",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node C:\\Users\\sorte\\.claude\\hooks\\pre-tool-use\\validate-file-access.js",
-            "timeout": 5000,
-            "statusMessage": "Validating file access..."
-          }
-        ]
-      }
-    ],
-    "PostToolUse": [
-      {
-        "matcher": "Bash|Write|Edit|Read",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node C:\\Users\\sorte\\.claude\\hooks\\post-tool-use\\audit-log.js",
-            "timeout": 3000
-          },
-          {
-            "type": "command",
-            "command": "node C:\\Users\\sorte\\.claude\\hooks\\post-tool-use\\pattern-analyzer.js",
-            "timeout": 3000
-          }
-        ]
-      }
-    ],
-    "Stop": [
-      {
-        "matcher": "*",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node C:\\Users\\sorte\\.claude\\hooks\\stop\\session-learner.js",
-            "timeout": 10000,
-            "statusMessage": "Extracting session learnings..."
-          },
-          {
-            "type": "command",
-            "command": "node C:\\Users\\sorte\\.claude\\hooks\\stop\\pattern-detector.js",
-            "timeout": 5000
-          }
-        ]
-      }
-    ],
-    "PreCompact": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node C:\\Users\\sorte\\.claude\\hooks\\pre-compact\\save-state.js",
-            "timeout": 5000,
-            "statusMessage": "Saving state before compact..."
-          },
-          {
-            "type": "command",
-            "command": "node C:\\Users\\sorte\\.claude\\hooks\\pre-compact\\pattern-reporter.js",
-            "timeout": 30000,
-            "statusMessage": "Analyzing patterns..."
-          }
-        ]
-      }
-    ],
-    "SubagentStart": [
-      {
-        "matcher": "*",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node C:\\Users\\sorte\\.claude\\hooks\\subagent-start\\audit-log.js agent-start",
-            "timeout": 3000
-          }
-        ]
-      }
-    ]
+  "env": {
+    "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1",
+    "CLAUDE_AUTOCOMPACT_PCT_OVERRIDE": "80"
   },
   "permissions": {
     "allow": [
@@ -139,12 +20,58 @@
       "Bash(chmod 777 *)"
     ]
   },
-  "enabledPlugins": {
-    "claude-wordpress-skills@claude-wordpress-skills": true,
-    "superpowers@superpowers-marketplace": true
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node C:\\Users\\sorte\\.claude\\hooks\\session-start\\init-memory.js",
+            "timeout": 5,
+            "statusMessage": "Initializing session..."
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node C:\\Users\\sorte\\.claude\\hooks\\stop\\trace-collector.js",
+            "timeout": 15
+          },
+          {
+            "type": "command",
+            "command": "node C:\\Users\\sorte\\.claude\\hooks\\stop\\pattern-detector.js",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "PreCompact": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node C:\\Users\\sorte\\.claude\\hooks\\pre-compact\\save-state.js",
+            "timeout": 5,
+            "statusMessage": "Saving state before compact..."
+          },
+          {
+            "type": "prompt",
+            "prompt": "CONTEXT COMPACTION IMMINENT. Perform a structured session audit.\n\n## 1. New Facts\nEndpoints, IDs, configs → MEMORY.md (auto-memory for active project; cross-project → ~/.claude/ project memory).\n\n## 2. Problems Encountered (ОБЯЗАТЕЛЬНО)\nДля КАЖДОЙ проблемы, где было >1 попытки решения:\n- **Проблема**: что именно не работало\n- **Что пробовал**: перечисли подходы (включая неудачные)\n- **Корень**: почему не работало\n- **Решение/Статус**: что сработало ИЛИ что нужно от пользователя\nСохрани в vault `troubleshooting/current` через `mcp__obsidian__patch_note`. Формат: `- [ДАТА] Проблема → Корень → Решение`\n\n## 3. Anti-Patterns\nЕсли создавал workaround — зафиксируй в vault `troubleshooting/global-patterns` через `mcp__obsidian__patch_note`.\n\n## Rules\n- Check existing entries first (`mcp__obsidian__read_note`) — no duplicates\n- Keep entries concise: one line per fact\n- Troubleshooting — append only\n\nAfter saving, continue with the task at hand."
+          }
+        ]
+      }
+    ]
   },
-  "env": {
-    "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1",
-    "CLAUDE_AUTOCOMPACT_PCT_OVERRIDE": "80"
+  "extraKnownMarketplaces": {
+    "claude-plugins-official": {
+      "source": {
+        "source": "github",
+        "repo": "anthropics/claude-plugins-official"
+      }
+    }
   }
 }

@@ -1,17 +1,25 @@
 {
   "permissions": {
     "allow": [
-      "Bash(test:*)",
+      "WebSearch",
       "WebFetch(domain:github.com)",
-      "Bash(dir:*)",
-      "Bash(powershell -Command:*)",
-      "Bash(findstr:*)",
-      "Bash(powershell:*)",
-      "Bash(node:*)",
-      "Bash(npm init:*)",
-      "Bash(npm install:*)",
-      "Bash(New-Item -ItemType Directory -Force -Path \"C:\\\\Users\\\\sorte\\\\.claude\\\\plans\\\\archive\")",
-      "Bash(Move-Item \"C:\\\\Users\\\\sorte\\\\.claude\\\\plans\\\\hazy-sauteeing-honey.md\" \"C:\\\\Users\\\\sorte\\\\.claude\\\\plans\\\\archive\\\\2026-02-09_architecture-complete.md\")"
+      "WebFetch(domain:studiokook.ee)",
+      "mcp__wordpress__mcp-adapter-discover-abilities",
+      "mcp__wordpress__mcp-adapter-get-ability-info",
+      "mcp__n8n-mcp__n8n_list_workflows",
+      "mcp__n8n-mcp__n8n_executions",
+      "mcp__n8n-mcp__n8n_update_full_workflow",
+      "mcp__obsidian__read_note",
+      "mcp__obsidian__search_notes",
+      "mcp__obsidian__get_notes_info",
+      "mcp__obsidian__get_vault_stats",
+      "mcp__obsidian__list_directory",
+      "mcp__obsidian__read_multiple_notes",
+      "mcp__obsidian__get_frontmatter",
+      "mcp__obsidian__write_note",
+      "mcp__obsidian__patch_note",
+      "mcp__obsidian__update_frontmatter",
+      "mcp__obsidian__manage_tags"
     ]
   }
 }
