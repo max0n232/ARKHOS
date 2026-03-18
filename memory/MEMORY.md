@@ -17,6 +17,23 @@ Hook blocks Write to `**/credentials/**`. To add new creds, user must do it manu
 
 **Rule:** For ANY plugin configuration → use admin UI or leave defaults. No shortcuts.
 
+## Claude Code: output-critic Enforcement (Stop hook)
+
+**Status:** ✅ Working. Stop prompt hook blocks completion if generation task lacks critic phase.
+
+**Mechanism:**
+- Stop hook fires after every response
+- Haiku evaluator checks: is this a generation task (code/text/prompt/JSON)?
+- If YES and no "CRITIC PHASE" section → returns `{ok: false}`
+- Claude **forced** to continue and apply output-critic skill
+- `stop_hook_active` flag prevents infinite loops
+
+**Why it works:** Uses separate model for evaluation (not instruction injection), so safety system doesn't block.
+
+**UserPromptSubmit removed:** Soft reminder hook caused chat blocking. Stop hook enforcement is sufficient.
+
+**Caveat:** Haiku must correctly identify generation vs informational tasks. Imperfect heuristic, but no better alternative in Claude Code.
+
 ## WordPress optimization plugins — visual breakage risk
 
 **CRITICAL:** CSS/JS optimization plugins (Asset Cleanup, Autoptimize, WP Rocket) can break site visually even with default settings.
