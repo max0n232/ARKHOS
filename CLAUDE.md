@@ -37,14 +37,15 @@
 
 ## Obsidian Vault
 
-Reference knowledge в `C:/Users/sorte/ObsidianVault`, MCP-сервер: `obsidian` (mcpvault).
+Reference knowledge в `C:/Users/sorte/ObsidianVault`, MCP-сервер: `obsidian` (mcp-obsidian via Local REST API).
 
 | Действие | MCP Tool |
 |----------|----------|
-| Поиск по знаниям | `mcp__obsidian__search_notes` |
-| Чтение заметки | `mcp__obsidian__read_note` |
-| Добавить к заметке | `mcp__obsidian__patch_note` |
-| Записать целиком | `mcp__obsidian__write_note` |
+| Поиск по знаниям | `mcp__obsidian__search` |
+| Чтение заметки | `mcp__obsidian__get_file_contents` |
+| Добавить к заметке | `mcp__obsidian__patch_content` |
+| Создать/записать | `mcp__obsidian__append_content` |
+| Список файлов | `mcp__obsidian__list_files_in_vault` |
 
 **Когда что:**
 - **MEMORY.md** — факты (ID, configs), всегда в контексте
@@ -55,9 +56,9 @@ Reference knowledge в `C:/Users/sorte/ObsidianVault`, MCP-сервер: `obsidi
 
 Перед завершением последней задачи в сессии — проведи мини-аудит:
 1. Новые факты (ID, endpoints, configs) → MEMORY.md
-2. Ошибки/workarounds → vault `troubleshooting/current` (`mcp__obsidian__patch_note`)
-3. Паттерны (повторяемые решения) → vault `troubleshooting/global-patterns` (`mcp__obsidian__patch_note`)
-4. Не дублируй — проверь существующие записи (`mcp__obsidian__read_note`), обнови если нужно
+2. Ошибки/workarounds → vault `troubleshooting/current` (`mcp__obsidian__patch_content`)
+3. Паттерны (повторяемые решения) → vault `troubleshooting/global-patterns` (`mcp__obsidian__patch_content`)
+4. Не дублируй — проверь существующие записи (`mcp__obsidian__get_file_contents`), обнови если нужно
 5. **Проверь лимит:** если vault troubleshooting файлы > 150 строк → запусти Knowledge Distillation (секция ниже)
 
 Ручной триггер: пользователь говорит "distill" / "дистилляция" / "почисти troubleshooting/patterns".
@@ -78,7 +79,7 @@ Reference knowledge в `C:/Users/sorte/ObsidianVault`, MCP-сервер: `obsidi
 ## Knowledge Distillation
 
 Цикл: **накопление → классификация → маршрутизация → очистка**.
-Source: vault `troubleshooting/current`, `troubleshooting/global-patterns` (via `mcp__obsidian__read_note`)
+Source: vault `troubleshooting/current`, `troubleshooting/global-patterns` (via `mcp__obsidian__get_file_contents`)
 
 ### Routing Map (destination → keywords)
 
@@ -110,14 +111,14 @@ Source: vault `troubleshooting/current`, `troubleshooting/global-patterns` (via 
 ### Процедура
 
 ```
-1. `mcp__obsidian__read_note` troubleshooting/current + troubleshooting/global-patterns
+1. `mcp__obsidian__get_file_contents` troubleshooting/current + troubleshooting/global-patterns
 2. Для каждой записи:
    a. Тип: факт | gotcha | пример | паттерн | устаревшее
    b. Destination по keyword match (routing map)
-   c. `mcp__obsidian__read_note` destination — дубликат? → пропусти
-   d. Нет → `mcp__obsidian__patch_note` к подходящей секции
+   c. `mcp__obsidian__get_file_contents` destination — дубликат? → пропусти
+   d. Нет → `mcp__obsidian__patch_content` к подходящей секции
 3. После маршрутизации:
-   a. `mcp__obsidian__write_note` source — удалить absorbed записи
+   a. `mcp__obsidian__append_content` source — перезаписать очищенной версией
    b. Оставить скелет (заголовки + Self-Learning секция)
    c. Нераспределённые → показать user
 4. Отчёт: N обработано, куда ушло, N осталось
@@ -177,26 +178,19 @@ DEPRECATED → [подтверждение] → DELETE
 
 ## OUTPUT QUALITY PROTOCOL
 
-After completing ANY generation task, apply the critic phase using the `output-critic` skill.
+**MANDATORY** after generating: AI prompt, text content, code/script, JSON/config, plan.
+Skill: `output-critic`. Запускай СРАЗУ после генерации v1 — без вопросов к пользователю.
 
-### When critic phase is MANDATORY (auto-trigger):
-- AI prompt generated (image, video, audio)
-- Text content produced (post, article, SEO copy, caption)
-- Code or script written
-- JSON / workflow / structured config created
-- Any task where user asked for a "final" result
+### Workflow:
+1. Generate v1
+2. Run `output-critic` (scores + gaps + v2) — inline, не как отдельный шаг
+3. Deliver v2 (or v1 if no gaps: "Critic pass: no significant gaps")
 
-### When critic phase is SKIPPED:
-- User said: "quick", "draft", "rough", "just sketch", "черновик", "быстро"
-- Iterative back-and-forth (user is actively editing in conversation)
-- Output is purely informational (answer to a question, explanation)
+### Plans:
+Before ExitPlanMode → apply critic to plan (Completeness, Clarity, Goal alignment, Edge cases). Fix if ≤ 3.
 
-### Protocol:
-1. Complete v1 generation as normal
-2. Immediately run critic phase — do NOT ask user permission
-3. Deliver v2 as the actual response (v1 internalized, not shown unless useful for context)
-4. If no gaps found → deliver v1 as final with note: "Critic pass: no significant gaps"
+### Skip when:
+User said: "quick", "draft", "rough", "черновик", "быстро", или iterative editing.
 
-### Override:
-- Disable per-session: "skip critic" / "no review needed"
-- Force on any output: "critique this" / "review" / "is this good enough"
+### Manual trigger:
+"critique this" / "review" / "проверь качество" / "is this good enough"

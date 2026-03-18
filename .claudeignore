@@ -1,0 +1,20 @@
+# Build & temp
+tmp/
+temp/
+*.log
+node_modules/
+__pycache__/
+
+# Large generated files
+*.lock
+*.db
+*.db-journal
+knowledge/knowledge.db
+
+# Backups & history
+backups/
+history.jsonl
+telemetry/
+
+# IDE
+ide/

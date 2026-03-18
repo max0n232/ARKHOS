@@ -1,72 +1,86 @@
 #!/usr/bin/env node
 /**
  * Initialize Pattern Tracker database
- * Uses sql.js (pure JavaScript SQLite)
+ * Schema inlined — no external SQL file needed.
+ * Run: node patterns/init-db.js
  */
 
 const fs = require('fs');
 const path = require('path');
-const initSqlJs = require('../db/node_modules/sql.js');
 
 const CLAUDE_DIR = path.join(process.env.HOME || process.env.USERPROFILE, '.claude');
 const DB_PATH = path.join(CLAUDE_DIR, 'patterns', 'tracker.db');
-const SCHEMA_PATH = path.join(CLAUDE_DIR, 'db', 'schema-tracker.sql');
 
-async function initTrackerDB() {
+const { Database } = require('./db-helper');
+
+const SCHEMA = `
+CREATE TABLE IF NOT EXISTS traces (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    session_id TEXT NOT NULL,
+    timestamp INTEGER NOT NULL,
+    tool_name TEXT NOT NULL,
+    tool_input TEXT,
+    exit_code INTEGER DEFAULT 0,
+    error_output TEXT,
+    duration_ms INTEGER,
+    token_budget_pct REAL DEFAULT 0,
+    project TEXT DEFAULT 'unknown'
+);
+
+CREATE TABLE IF NOT EXISTS detections (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    session_id TEXT NOT NULL,
+    pattern_type TEXT NOT NULL,
+    severity TEXT DEFAULT 'low',
+    description TEXT,
+    context TEXT,
+    resolved INTEGER DEFAULT 0,
+    created_at TEXT DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS config (
+    key TEXT PRIMARY KEY,
+    value TEXT,
+    updated_at TEXT DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_traces_session ON traces(session_id);
+CREATE INDEX IF NOT EXISTS idx_traces_timestamp ON traces(timestamp);
+CREATE INDEX IF NOT EXISTS idx_detections_session ON detections(session_id);
+`;
+
+function initTrackerDB() {
     try {
-        // Create patterns directory
+        if (!Database) {
+            console.error('better-sqlite3 not available. Install: cd ~/.claude/db && npm install better-sqlite3');
+            return false;
+        }
+
         const patternsDir = path.dirname(DB_PATH);
         if (!fs.existsSync(patternsDir)) {
             fs.mkdirSync(patternsDir, { recursive: true });
         }
 
-        // Load schema
-        const schema = fs.readFileSync(SCHEMA_PATH, 'utf-8');
+        const db = new Database(DB_PATH);
+        db.pragma('journal_mode = WAL');
+        db.pragma('foreign_keys = ON');
+        db.exec(SCHEMA);
 
-        // Initialize sql.js
-        const SQL = await initSqlJs();
-
-        // Load existing DB or create new
-        let db;
-        if (fs.existsSync(DB_PATH)) {
-            const buffer = fs.readFileSync(DB_PATH);
-            db = new SQL.Database(buffer);
-        } else {
-            db = new SQL.Database();
-        }
-
-        // Enable foreign key constraints
-        db.run("PRAGMA foreign_keys = ON;");
-
-        // Execute schema
-        db.run(schema);
-
-        // Validate schema execution
-        const tables = db.exec("SELECT name FROM sqlite_master WHERE type='table'");
-        if (!tables.length || !tables[0].values.length) {
-            throw new Error('Schema execution failed - no tables created');
-        }
-
-        // Save to file
-        const data = db.export();
-        const buffer = Buffer.from(data);
-        fs.writeFileSync(DB_PATH, buffer);
-
+        const tables = db.prepare("SELECT name FROM sqlite_master WHERE type='table'").all();
         db.close();
 
         console.log(`Tracker DB initialized: ${DB_PATH}`);
+        console.log(`Tables: ${tables.map(t => t.name).join(', ')}`);
         return true;
     } catch (e) {
         console.error(`Failed to initialize tracker DB: ${e.message}`);
-        console.error(`Schema path: ${SCHEMA_PATH}`);
-        console.error(`DB path: ${DB_PATH}`);
-        if (e.stack) console.error(e.stack);
         return false;
     }
 }
 
 if (require.main === module) {
-    initTrackerDB().then(success => process.exit(success ? 0 : 1));
+    const success = initTrackerDB();
+    process.exit(success ? 0 : 1);
 }
 
 module.exports = { initTrackerDB };

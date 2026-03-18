@@ -26,7 +26,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node C:\\Users\\sorte\\.claude\\hooks\\session-start\\init-memory.js",
+            "command": "node C:/Users/sorte/.claude/hooks/session-start/init-memory.js",
             "timeout": 5,
             "statusMessage": "Initializing session..."
           }
@@ -38,13 +38,27 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node C:\\Users\\sorte\\.claude\\hooks\\stop\\trace-collector.js",
+            "command": "node C:/Users/sorte/.claude/hooks/stop/trace-collector.js",
             "timeout": 15
           },
           {
             "type": "command",
-            "command": "node C:\\Users\\sorte\\.claude\\hooks\\stop\\pattern-detector.js",
+            "command": "node C:/Users/sorte/.claude/hooks/stop/pattern-detector.js",
             "timeout": 10
+          },
+          {
+            "type": "prompt",
+            "prompt": "Analyze the assistant's last response. If stop_hook_active is true, return {\"ok\": true}.\n\nDetermine: Was this a GENERATION task? Generation = code/script written, text content produced, AI prompt generated, JSON/config created, plan via ExitPlanMode. NOT generation = answering questions, running commands, explanations, file reads, search results, status reports, conversational replies.\n\nIf GENERATION task AND response does NOT contain 'CRITIC PHASE' or 'Critic pass:' → return {\"ok\": false, \"reason\": \"Generation task detected without critic phase. Apply output-critic skill: score Completeness/Clarity/Goal alignment/Edge cases (1-5), list gaps ≤3, produce improved v2. Mark with CRITIC PHASE header.\"}.\n\nOtherwise return {\"ok\": true}."
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo REMINDER: After any generation task (code, text, AI prompt, JSON/config), apply output-critic skill. Include CRITIC PHASE section with scores before delivering final output."
           }
         ]
       }
@@ -54,13 +68,13 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node C:\\Users\\sorte\\.claude\\hooks\\pre-compact\\save-state.js",
+            "command": "node C:/Users/sorte/.claude/hooks/pre-compact/save-state.js",
             "timeout": 5,
             "statusMessage": "Saving state before compact..."
           },
           {
             "type": "prompt",
-            "prompt": "CONTEXT COMPACTION IMMINENT. Perform a structured session audit.\n\n## 1. New Facts\nEndpoints, IDs, configs → MEMORY.md (auto-memory for active project; cross-project → ~/.claude/ project memory).\n\n## 2. Problems Encountered (ОБЯЗАТЕЛЬНО)\nДля КАЖДОЙ проблемы, где было >1 попытки решения:\n- **Проблема**: что именно не работало\n- **Что пробовал**: перечисли подходы (включая неудачные)\n- **Корень**: почему не работало\n- **Решение/Статус**: что сработало ИЛИ что нужно от пользователя\nСохрани в vault `troubleshooting/current` через `mcp__obsidian__patch_note`. Формат: `- [ДАТА] Проблема → Корень → Решение`\n\n## 3. Anti-Patterns\nЕсли создавал workaround — зафиксируй в vault `troubleshooting/global-patterns` через `mcp__obsidian__patch_note`.\n\n## Rules\n- Check existing entries first (`mcp__obsidian__read_note`) — no duplicates\n- Keep entries concise: one line per fact\n- Troubleshooting — append only\n\nAfter saving, continue with the task at hand."
+            "prompt": "CONTEXT COMPACTION IMMINENT. Perform a structured session audit.\n\n## 1. New Facts\nEndpoints, IDs, configs → MEMORY.md (auto-memory for active project; cross-project → ~/.claude/ project memory).\n\n## 2. Problems Encountered (ОБЯЗАТЕЛЬНО)\nДля КАЖДОЙ проблемы, где было >1 попытки решения:\n- **Проблема**: что именно не работало\n- **Что пробовал**: перечисли подходы (включая неудачные)\n- **Корень**: почему не работало\n- **Решение/Статус**: что сработало ИЛИ что нужно от пользователя\nСохрани в vault `troubleshooting/current` через `mcp__obsidian__patch_content`. Формат: `- [ДАТА] Проблема → Корень → Решение`\n\n## 3. Anti-Patterns\nЕсли создавал workaround — зафиксируй в vault `troubleshooting/global-patterns` через `mcp__obsidian__patch_content`.\n\n## Rules\n- Check existing entries first (`mcp__obsidian__get_file_contents`) — no duplicates\n- Keep entries concise: one line per fact\n- Troubleshooting — append only\n\nAfter saving, continue with the task at hand."
           }
         ]
       }

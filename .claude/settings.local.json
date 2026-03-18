@@ -9,17 +9,20 @@
       "mcp__n8n-mcp__n8n_list_workflows",
       "mcp__n8n-mcp__n8n_executions",
       "mcp__n8n-mcp__n8n_update_full_workflow",
-      "mcp__obsidian__read_note",
-      "mcp__obsidian__search_notes",
-      "mcp__obsidian__get_notes_info",
-      "mcp__obsidian__get_vault_stats",
-      "mcp__obsidian__list_directory",
-      "mcp__obsidian__read_multiple_notes",
-      "mcp__obsidian__get_frontmatter",
-      "mcp__obsidian__write_note",
-      "mcp__obsidian__patch_note",
-      "mcp__obsidian__update_frontmatter",
-      "mcp__obsidian__manage_tags"
+      "mcp__obsidian__list_files_in_vault",
+      "mcp__obsidian__list_files_in_dir",
+      "mcp__obsidian__get_file_contents",
+      "mcp__obsidian__search",
+      "mcp__obsidian__patch_content",
+      "mcp__obsidian__append_content",
+      "Bash(curl -sk https://127.0.0.1:27124/vault/ -H \"Authorization: Bearer fd592d6558167964667e2ad8c6d61c8419035ea16c4f8e80c6b833969990a91b\")",
+      "Bash(curl -sk \"https://studiokook.ee/wp-content/plugins/translatepress-multilingual/readme.txt\")",
+      "Bash(curl -s \"https://studiokook.ee/\")",
+      "Bash(curl -s \"https://studiokook.ee/ru/\")",
+      "Bash(curl -s \"https://studiokook.ee/en/\")",
+      "Bash(curl -s -I \"https://studiokook.ee/\")",
+      "Bash(curl -s -I -A \"ClaudeBot\" \"https://studiokook.ee/\")",
+      "Bash(curl -s \"https://studiokook.ee/page-sitemap.xml\")"
     ]
   }
 }

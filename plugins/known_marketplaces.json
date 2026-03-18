@@ -1,18 +1,10 @@
 {
-  "claude-wordpress-skills": {
+  "claude-plugins-official": {
     "source": {
       "source": "github",
-      "repo": "elvismdev/claude-wordpress-skills"
+      "repo": "anthropics/claude-plugins-official"
     },
-    "installLocation": "C:\\Users\\sorte\\.claude\\plugins\\marketplaces\\claude-wordpress-skills",
-    "lastUpdated": "2026-02-02T17:35:59.142Z"
-  },
-  "superpowers-marketplace": {
-    "source": {
-      "source": "github",
-      "repo": "obra/superpowers-marketplace"
-    },
-    "installLocation": "C:\\Users\\sorte\\.claude\\plugins\\marketplaces\\superpowers-marketplace",
-    "lastUpdated": "2026-02-02T17:36:33.098Z"
+    "installLocation": "C:\\Users\\sorte\\.claude\\plugins\\marketplaces\\claude-plugins-official",
+    "lastUpdated": "2026-03-14T17:20:36.226Z"
   }
 }

@@ -5,39 +5,33 @@ description: Use after verification-before-completion when task is done - analyz
 
 # Post-Mortem
 
-## Overview
-
-Analyze the PROCESS of task execution, not the result. Two-layer architecture: hook triggers, skill analyzes.
+Analyze the PROCESS of task execution, not the result.
 
 **Core principle:** Every workaround is a documentation bug. Every retry pattern is a learning opportunity.
 
 ## Architecture
 
 ```
-Stop hook (post-mortem-trigger.js)
-    ↓ reads $CLAUDE_TRANSCRIPT_PATH
-    ↓ counts errors/retries
-    ↓ if findings → writes tmp/post-mortem-pending.json
-    ↓
-[verification-before-completion] Phase 3
-    ↓ if pending.json exists
+Stop hooks (trace-collector.js, pattern-detector.js)
+    ↓ parse transcript, detect errors/retries
+    ↓ write to tracker.db (patterns table)
     ↓
 [post-mortem skill] ← YOU ARE HERE
-    ↓ analyzes session context + pending.json
+    ↓ analyzes session context
     ↓ classifies findings with confidence
+    ↓ routes via Knowledge Routing
     ↓ writes logs/post-mortem/
-    ↓ (Phase 2+) patches SKILL.md, writes patterns/
 ```
 
 ## When to Execute
 
 **RUN when:**
-- `tmp/post-mortem-pending.json` exists (hook detected findings)
+- Errors or retries detected in current session
 - After verification-before-completion passes
 
 **SKIP when:**
-- No pending.json (hook determined no findings)
 - Task was trivial (<3 tool calls, no errors)
+- No errors or retries in session
 
 ## The Analysis
 
@@ -65,9 +59,9 @@ final = min(base + boost, 1.0)
 
 | Confidence | Action |
 |------------|--------|
-| ≥0.8 | Auto-patch SKILL.md, write to patterns/ |
-| 0.5–0.79 | Write to patterns/ with `[UNCONFIRMED]` |
-| 0.3–0.49 | Log only, no patterns/ |
+| ≥0.8 | Route via Knowledge Routing: Skill / MEMORY / patterns |
+| 0.5–0.79 | Log + MEMORY.md with `[UNCONFIRMED]` tag |
+| 0.3–0.49 | Log only |
 | <0.3 | Ignore |
 
 ## Classification
@@ -75,42 +69,31 @@ final = min(base + boost, 1.0)
 | Category | Condition | Action | Min Confidence |
 |----------|-----------|--------|----------------|
 | **doc-fix** | SKILL.md method failed, alt worked | Patch SKILL.md | ≥0.8 |
-| **new-pattern** | Undocumented approach succeeded | Write patterns/ | ≥0.5 |
-| **regression** | Previously working method fails | TODO + notify | any |
-| **false-pattern** | Pattern unreliable | Mark in tracker | ≥0.5 |
+| **new-workflow** | Undocumented approach succeeded | Route via Knowledge Routing | ≥0.5 |
+| **regression** | Previously working method fails | Log + notify | any |
+| **false-pattern** | Pattern unreliable | Mark in log | ≥0.5 |
 
 ## Output Format
 
-Write to `logs/post-mortem/YYYY-MM-DD-{session-id}.md`:
+Write to `logs/post-mortem/YYYY-MM-DD-{summary}.md`:
 
 ```markdown
 # Post-Mortem: {task summary}
 Date: {date}
-Task: {description}
-Session: {id from pending.json}
 
 ## Findings
 
-### [{AUTO-FIXED|UNCONFIRMED|NEEDS-REVIEW}] {category}: {location} (confidence: X.X)
+### [{AUTO-FIXED|UNCONFIRMED}] {category}: {location} (confidence: X.X)
 - Problem: {what failed}
 - Resolution: {what worked}
 - Evidence: {HTTP codes, error messages}
-- Action: {patched/logged/TODO}
-
-## Stats
-- Errors: N
-- Retries: N
-- Workarounds: N
-- Docs patched: N (confidence ≥0.8)
-- Patterns added: N (M confirmed, K unconfirmed)
-- TODOs: N
+- Action: {patched/logged}
 ```
 
 ## Limits (Context Protection)
 
 | Component | Limit |
 |-----------|-------|
-| This skill | ≤80 lines active |
 | Post-mortem log | ≤50 lines |
 | Patterns per session | ≤5 |
 | SKILL.md patches | ≤3 |
@@ -123,52 +106,45 @@ If >5 findings: top 5 by confidence, rest in `[DEFERRED]`.
 - Do NOT modify constitution.md, settings.json, hooks/, agents/
 - Do NOT spawn subagents
 - Do NOT block session (graceful fail)
-- Do NOT duplicate verification
-- Do NOT extract skills (only errors + fixes)
+- Do NOT create new skills without user approval (Scaling Rules)
+
+## Knowledge Routing
+
+Route each finding to the RIGHT storage layer. Wrong layer = dead weight.
+
+### Decision Tree
+
+```
+Finding identified → ask:
+
+1. ACTIONABLE checklist/workflow?
+   → YES → Patch existing SKILL.md (ask user before creating new)
+
+2. REFERENCE FACT (ID, config, API)?
+   → YES → MEMORY.md (always in session context)
+
+3. HISTORICAL analysis (root cause, timeline)?
+   → YES → logs/post-mortem/
+
+4. DETECTION RULE read by hook/script?
+   → YES → patterns/ (only if something reads it programmatically)
+   → NO → DON'T STORE (dead weight)
+```
+
+### Routing Table
+
+| Learning Type | Storage | Why |
+|---------------|---------|-----|
+| Checklist / procedure | Skill | Auto-triggered, prevents recurrence |
+| API key / ID / config | MEMORY.md | Always in context |
+| Incident analysis | logs/post-mortem/ | Historical reference |
+| Detection rule for hook | patterns/ | Hook reads it programmatically |
+| Anything else | DON'T STORE | If nothing reads it, it's waste |
 
 ## After Analysis
 
-1. Delete `tmp/post-mortem-pending.json`
-2. If findings: write log to `logs/post-mortem/`
-3. If confidence ≥0.8 AND doc-fix: patch SKILL.md (Phase 2)
-4. If confidence ≥0.5: write to patterns/
-
-## Phase Status
-
-**Phase 1 (MVP):** Analysis + logging + confidence scoring ✅
-**Phase 2:** Auto-patch SKILL.md, write patterns/ ✅
-**Phase 3:** Cross-session analysis, confidence boost ✅
-**Phase 4:** Consolidation `/post-mortem-consolidate`
-
-## Scripts
-
-| Script | Location | Purpose |
-|--------|----------|---------|
-| post-mortem-trigger.js | hooks/stop/ | Stop hook: detects errors, creates pending.json (LEGACY, replaced by session-learner) |
-| session-learner.js | hooks/stop/ | Unified Stop hook: extracts errors, workarounds, knowledge, success patterns |
-| post-mortem-analyzer.js | scripts/ | Skill: processes pending, patches SKILL.md, writes patterns/ |
-| learning-applier.js | scripts/ | Applies learning-pending.json to MEMORY files |
-
-## Integration
-
-**Automatic flow (Self-Learning):**
-1. Stop hook runs `session-learner.js` — extracts 4 categories of findings
-2. Writes `tmp/learning-pending.json` (global and/or project scope)
-3. Next session: `init-memory.js` detects pending, signals to agent
-4. Agent runs `learning-applier.js` to apply findings to MEMORY
-5. Findings with confidence ≥0.5 → MEMORY update; ≥0.8 → confirmed; <0.5 → log only
-
-**Dual scope:**
-- Global findings → `~/.claude/memory/global/patterns.md` or `troubleshooting.md`
-- Project findings → `{project}/.claude/agent-memory/*/MEMORY.md`
-
-**Legacy flow (Post-Mortem deep analysis):**
-1. Post-mortem skill invokes `post-mortem-analyzer.js` for deep session analysis
-2. Analyzer patches SKILL.md (≥0.8), writes patterns/ (≥0.5), logs results
-
-**Manual invocation:**
-```bash
-node ~/.claude/scripts/learning-applier.js              # apply pending
-node ~/.claude/scripts/learning-applier.js --dry-run    # preview
-node ~/.claude/scripts/post-mortem-analyzer.js           # deep analysis
-```
+1. Write log to `logs/post-mortem/` if findings exist
+2. Route each finding through decision tree above
+3. If confidence ≥0.8 AND actionable → patch existing Skill
+4. If confidence ≥0.8 AND reference fact → update MEMORY.md
+5. AVOID writing to patterns/ unless a hook reads it

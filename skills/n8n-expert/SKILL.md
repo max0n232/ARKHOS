@@ -13,7 +13,7 @@ Unified guide for building and debugging n8n workflows via MCP tools.
 
 ## Reference Files (Obsidian Vault)
 
-Read on-demand via `mcp__obsidian__read_note`:
+Read on-demand via `mcp__obsidian__get_file_contents`:
 
 | Domain | Vault Path | When to Read |
 |--------|-----------|-------------|

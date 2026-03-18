@@ -9,8 +9,10 @@ plugins/cache/
 !skills/**/projects/
 debug/
 todos/
+plans/
 shell-snapshots/
 session-env/
+history.jsonl
 
 # Temp files
 *.tmp
@@ -18,7 +20,17 @@ nul
 
 # Secrets (never commit)
 .credentials.json
-**/credentials/
+.claude.json
+credentials/*
+!credentials/README.md
+!credentials/_template.env
+*.key
+*.pem
+token.json
+client_secret*.json
+
+# Backups (may contain sensitive data)
+backups/
 
 # OS files
 .DS_Store
@@ -41,3 +53,4 @@ stats-cache.json
 
 # Database files (use schema-*.sql + migrate.js to recreate)
 *.db
+plugins/marketplaces/*/

@@ -1,64 +1,40 @@
 # Global Skills Registry
 
-Shared skills available across all projects.
+Updated: 2026-03-10
 
-## Available Skills
+## Core (~/.claude/skills/)
 
-### Core
-| Skill | Path | Description |
-|-------|------|-------------|
-| assistant | skills/assistant/ | Personal task management and productivity planning |
-| knowledge-manager | skills/knowledge-manager/ | Knowledge DB via DAL |
-| pattern-tracker | skills/pattern-tracker/ | Pattern tracking and correction system |
-| post-mortem | skills/post-mortem/ | Session error analysis, auto-patching SKILL.md |
+| Skill | Priority | Status | Description |
+|-------|----------|--------|-------------|
+| assistant | P1 | ACTIVE | Cross-project coordinator, priority routing |
+| post-mortem | P3 | ACTIVE | Session error analysis, knowledge routing (Stop hook) |
+| n8n-expert | P2 | ACTIVE | n8n workflows, nodes, expressions, validation, debug |
+| output-critic | P2 | ACTIVE | Universal output quality gate — auto-critic after generation tasks |
 
-### Automation
-| Skill | Path | Description |
-|-------|------|-------------|
-| n8n-expert | skills/n8n-expert/ | Advanced n8n workflow patterns (7 sub-skills) |
+## Studiokook (~/Desktop/Studiokook/.claude/skills/)
 
-### Content
-| Skill | Path | Description |
-|-------|------|-------------|
-| content-creator | skills/content-creator/ | YouTube, Telegram content strategy |
+| Skill | Priority | Status | Description |
+|-------|----------|--------|-------------|
+| wordpress | P1 | ACTIVE | Main WP skill — pages, plugins, Code Snippets, sk/v1 API |
+| wp-problem-solver | P1 | ACTIVE | 5 Whys + safe edit + cache clear + rollback |
+| wp-deploy-verify | P1 | ACTIVE | Post-deployment verification |
+| wp-elementor | P1 | ACTIVE | Elementor REST API content editing |
+| wp-translatepress | P2 | ACTIVE | TranslatePress multilingual (ET/RU/EN/FI) |
+| seo-aeo | P2 | ACTIVE | SEO/AEO optimization, EEAT, structured data |
 
-### Integrations
-| Skill | Path | Description |
-|-------|------|-------------|
-| integrations | skills/integrations/ | Telegram Bot API, n8n webhooks, notifications |
-| fal-ai | skills/fal-ai/ | AI image/audio generation |
+## AiGeneration (~/Desktop/AiGeneration/.claude/skills/)
 
-### Compliance
-| Skill | Path | Description |
-|-------|------|-------------|
-| legal | skills/legal/ | Estonian law, OÜ, GDPR, contracts |
+| Skill | Priority | Status | Description |
+|-------|----------|--------|-------------|
+| content-creator | P2 | ACTIVE | YouTube/Telegram content strategy + templates |
+| smm-context | P2 | ACTIVE | Social media accounts + integrations |
+| visual-style | P2 | ACTIVE | Studiokook visual DNA + AI prompt rules |
+| kling-prompt-engineer | P2 | ACTIVE | Kling AI video prompt methodology |
 
-### WordPress
-| Skill | Path | Description |
-|-------|------|-------------|
-| wordpress | skills/wordpress/ | studiokook.ee REST API, TranslatePress, Elementor |
-| studiokook-knowledge | skills/wordpress/projects/studiokook/KNOWLEDGE.md | Project-specific quirks, patterns, decisions |
-| studiokook-infra | skills/wordpress/projects/studiokook/INFRASTRUCTURE.md | Full technical reference (plugins, pages, API) |
+## Lifecycle
 
-## Community Skills
+```
+ACTIVE → [1 month unused] → REVIEW → [keep/delete] → ACTIVE or DELETE
+```
 
-| Skill | Source | Installed |
-|-------|--------|-----------|
-| supabase-postgres | supabase/agent-skills | 2026-02-13 |
-| context-compression | muratcankoylan/Agent-Skills-for-Context-Engineering | 2026-02-13 |
-| context-optimization | muratcankoylan/Agent-Skills-for-Context-Engineering | 2026-02-13 |
-| multi-agent-patterns | muratcankoylan/Agent-Skills-for-Context-Engineering | 2026-02-13 |
-| memory-systems | muratcankoylan/Agent-Skills-for-Context-Engineering | 2026-02-13 |
-
-## Project Routing
-
-Skills are loaded based on:
-1. YAML frontmatter `description` field (auto-discovery)
-2. Project-specific `_triggers.json`
-3. Explicit user request
-
-## Memory Integration
-
-- Session skills tracked in `capsule.json`
-- Usage stats in project `knowledge.db`
-- Cross-project patterns in `memory/global/`
+P4 skills = first candidates for review.
