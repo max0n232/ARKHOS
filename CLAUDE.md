@@ -1,3 +1,24 @@
+<!-- ghost:header -->
+## Ghost — AI Session Memory
+
+**ALWAYS search Ghost before reading code or grepping.** When asked about a feature, bug, scenario,
+or component — your FIRST action must be a Ghost search. Past sessions contain architecture decisions,
+dead ends, failed approaches, and reasoning that code cannot reveal. Do not skip this step.
+
+Use the `ghost-sessions` MCP tool with `deep_search` (not `search`). Fallback CLI commands:
+
+| Command | Purpose |
+|---------|---------|
+| `ghost search <query>` | Semantic search across past sessions |
+| `ghost show <session-id>` | Read a specific session |
+| `ghost log` | Recent sessions with summaries |
+| `ghost decisions` | Decision log |
+| `ghost decision "desc"` | Log a technical decision mid-session |
+| `ghost mistake "desc"` | Log a mistake or gotcha mid-session |
+| `ghost knowledge "desc"` | Log an insight or pattern mid-session |
+| `ghost strategy "desc"` | Log a trade-off explored mid-session |
+<!-- ghost:header -->
+
 # ARKHOS
 
 @rules/constitution.md
@@ -35,20 +56,53 @@
 - Temp/debug артефакты → не сохранять на диск, выводить в чат
 - Новые директории в `~/.claude/` → спроси пользователя
 
-## Obsidian Vault
+## Obsidian Vault + Knowledge Stack
 
-Reference knowledge в `C:/Users/sorte/ObsidianVault`, MCP-сервер: `obsidian` (mcp-obsidian via Local REST API).
+Vault: `C:/Users/sorte/ObsidianVault` (PARA structure). Три слоя доступа:
+
+### 1. QMD — Semantic Search (always available)
+
+| Collection | Content | Command |
+|-----------|---------|---------|
+| `vault` | All vault notes | `qmd search vault "<query>"` |
+| `ghost-.claude` | Session history | `qmd search ghost-.claude "<query>"` |
+
+**FIRST action for any knowledge query** — search before reading/grepping.
+
+### 2. Obsidian REST API — CRUD (always available)
 
 | Действие | MCP Tool |
 |----------|----------|
-| Поиск по знаниям | `mcp__obsidian__search` |
-| Чтение заметки | `mcp__obsidian__get_file_contents` |
-| Добавить к заметке | `mcp__obsidian__patch_content` |
-| Создать/записать | `mcp__obsidian__append_content` |
-| Список файлов | `mcp__obsidian__list_files_in_vault` |
+| Поиск | `mcp__obsidian__obsidian_simple_search` |
+| Чтение | `mcp__obsidian__obsidian_get_file_contents` |
+| Добавить | `mcp__obsidian__obsidian_patch_content` |
+| Создать | `mcp__obsidian__obsidian_append_content` |
+| Список | `mcp__obsidian__obsidian_list_files_in_vault` |
+
+### 3. Nexus — Full CRUD (when Obsidian app is running)
+
+Prefer Nexus MCP tools (`mcp__nexus__*`) for CRUD when Obsidian is open — keeps sync.
+Fallback: REST API tools above.
+
+### Ghost — Session Memory
+
+```bash
+ghost search "<query>"   # semantic search past sessions
+ghost log                # recent sessions
+ghost decisions          # decision log
+ghost decision "desc"    # log mid-session decision
+ghost mistake "desc"     # log mid-session mistake
+```
+
+**Also available via `ghost-sessions` MCP**: `deep_search` (preferred over `search`).
+
+### Skill: obsidian-router
+
+Use `obsidian-router` skill for routing logic (QMD vs Nexus vs REST API).
 
 **Когда что:**
 - **MEMORY.md** — факты (ID, configs), всегда в контексте
+- **QMD** — semantic/contextual search across vault + sessions
 - **Vault** — reference material, on-demand через search/read
 - **patterns/** — данные для hooks (JS читает программно)
 
@@ -56,9 +110,9 @@ Reference knowledge в `C:/Users/sorte/ObsidianVault`, MCP-сервер: `obsidi
 
 Перед завершением последней задачи в сессии — проведи мини-аудит:
 1. Новые факты (ID, endpoints, configs) → MEMORY.md
-2. Ошибки/workarounds → vault `troubleshooting/current` (`mcp__obsidian__patch_content`)
-3. Паттерны (повторяемые решения) → vault `troubleshooting/global-patterns` (`mcp__obsidian__patch_content`)
-4. Не дублируй — проверь существующие записи (`mcp__obsidian__get_file_contents`), обнови если нужно
+2. Ошибки/workarounds → vault `10-Projects/Studiokook/20-Areas/Infrastructure/troubleshooting-current` (`mcp__obsidian__obsidian_patch_content`)
+3. Паттерны (повторяемые решения) → vault `10-Projects/Studiokook/20-Areas/Infrastructure/global-patterns` (`mcp__obsidian__obsidian_patch_content`)
+4. Не дублируй — проверь существующие записи (`mcp__obsidian__obsidian_get_file_contents`), обнови если нужно
 5. **Проверь лимит:** если vault troubleshooting файлы > 150 строк → запусти Knowledge Distillation (секция ниже)
 
 Ручной триггер: пользователь говорит "distill" / "дистилляция" / "почисти troubleshooting/patterns".
@@ -79,46 +133,46 @@ Reference knowledge в `C:/Users/sorte/ObsidianVault`, MCP-сервер: `obsidi
 ## Knowledge Distillation
 
 Цикл: **накопление → классификация → маршрутизация → очистка**.
-Source: vault `troubleshooting/current`, `troubleshooting/global-patterns` (via `mcp__obsidian__get_file_contents`)
+Source: vault `10-Projects/Studiokook/20-Areas/Infrastructure/troubleshooting-current`, `10-Projects/Studiokook/20-Areas/Infrastructure/global-patterns` (via `mcp__obsidian__obsidian_get_file_contents`)
 
 ### Routing Map (destination → keywords)
 
 | # | Destination | Keywords |
 |---|-------------|----------|
-| 1 | vault `wordpress/windows-gotchas` | curl+UTF-8, encoding, ANSI codepage, Buffer.byteLength, Content-Length, history expansion, `!`, shell-quote, pipe blocking, Base64 auth, Node 24, UV_HANDLE_CLOSING, better-sqlite3, sql.js, path.join, drive letters, node -e, `!==`, Git Bash, platform-specific |
-| 2 | vault `wordpress/translatepress` | wp_trp_dictionary_*, status=0/2, HTML entity mismatch, whitespace sensitivity, Elementor rebuild+translations, emoji/Unicode breaking TRP, trp-search/trp-add internals, output buffer, rendering pipeline |
-| 3 | vault `studiokook/examples` | curl -d @file.json, https.request, Buffer.from(), API endpoint usage (trp-*, elementor/{id}, update-seo), JSON request/response, deploy-file usage, workflow recipes |
-| 4 | vault `studiokook/knowledge` | Architecture quirks, wp_update_post crashes, REST API errors (401/500), Elementor hybrid state, TRP multi-table quirks, cache propagation, MCP Abilities gotchas, SSH→REST fallback |
-| 5 | vault `studiokook/infrastructure` | Zone.ee, PHP version, plugin versions, Code Snippet #numbers, page IDs+slugs, Schema config, Seraphinite cache paths, Yoast setup, hreflang, NGG gallery IDs, dependency map, known issues |
-| 6 | vault `studiokook/seo-strategy` | Keywords (ET/RU/EN), title/meta rules, SMM strategy, Instagram, Google Ads, Meta Ads, CRO, email marketing, KPIs, content automation |
-| 7 | vault `seo/technical-seo` | generateMetadata, Open Graph, robots.txt, Sitemap, Core Web Vitals (LCP/INP/CLS), image/font optimization, canonical URLs, redirects, noindex |
-| 8 | vault `n8n/workflow-patterns` | Webhook/HTTP API/Database/AI Agent/Scheduled patterns, data flow, webhook auth, HMAC, cron, pagination, rate limiting, workflow debugging, n8n local testing |
-| 9 | vault `n8n/mcp-tools` | search_nodes, get_node, validate_node, addNode/removeNode, validation profiles, execution management, version control, template deployment |
-| 10 | vault `wordpress/translation-verify` | Negative-match verification, confirmation bias, scope narrowing, TRP string segmentation, Estonian patterns (õ,ü,verbs), visual browser verification, red flags |
-| 11 | vault `wordpress/problem-solving` | FIX/WORKAROUND/ENHANCEMENT, root cause, 5 Whys, cleanup_after, lifecycle (ACTIVE→DEPRECATED→DELETED) |
+| 1 | vault `10-Projects/Studiokook/20-Areas/WordPress/windows-gotchas` | curl+UTF-8, encoding, ANSI codepage, Buffer.byteLength, Content-Length, history expansion, `!`, shell-quote, pipe blocking, Base64 auth, Node 24, UV_HANDLE_CLOSING, better-sqlite3, sql.js, path.join, drive letters, node -e, `!==`, Git Bash, platform-specific |
+| 2 | vault `10-Projects/Studiokook/20-Areas/WordPress/translatepress` | wp_trp_dictionary_*, status=0/2, HTML entity mismatch, whitespace sensitivity, Elementor rebuild+translations, emoji/Unicode breaking TRP, trp-search/trp-add internals, output buffer, rendering pipeline |
+| 3 | vault `30-Resources/API-Reference/studiokook-examples` | curl -d @file.json, https.request, Buffer.from(), API endpoint usage (trp-*, elementor/{id}, update-seo), JSON request/response, deploy-file usage, workflow recipes |
+| 4 | vault `10-Projects/Studiokook/knowledge` | Architecture quirks, wp_update_post crashes, REST API errors (401/500), Elementor hybrid state, TRP multi-table quirks, cache propagation, MCP Abilities gotchas, SSH→REST fallback |
+| 5 | vault `10-Projects/Studiokook/infrastructure` | Zone.ee, PHP version, plugin versions, Code Snippet #numbers, page IDs+slugs, Schema config, Seraphinite cache paths, Yoast setup, hreflang, NGG gallery IDs, dependency map, known issues |
+| 6 | vault `10-Projects/Studiokook/seo-strategy` | Keywords (ET/RU/EN), title/meta rules, SMM strategy, Instagram, Google Ads, Meta Ads, CRO, email marketing, KPIs, content automation |
+| 7 | vault `30-Resources/Learning/technical-seo` | generateMetadata, Open Graph, robots.txt, Sitemap, Core Web Vitals (LCP/INP/CLS), image/font optimization, canonical URLs, redirects, noindex |
+| 8 | vault `10-Projects/Studiokook/20-Areas/n8n/workflow-patterns` | Webhook/HTTP API/Database/AI Agent/Scheduled patterns, data flow, webhook auth, HMAC, cron, pagination, rate limiting, workflow debugging, n8n local testing |
+| 9 | vault `10-Projects/Studiokook/20-Areas/n8n/mcp-tools` | search_nodes, get_node, validate_node, addNode/removeNode, validation profiles, execution management, version control, template deployment |
+| 10 | vault `10-Projects/Studiokook/20-Areas/WordPress/translation-verify` | Negative-match verification, confirmation bias, scope narrowing, TRP string segmentation, Estonian patterns (õ,ü,verbs), visual browser verification, red flags |
+| 11 | vault `10-Projects/Studiokook/20-Areas/WordPress/problem-solving` | FIX/WORKAROUND/ENHANCEMENT, root cause, 5 Whys, cleanup_after, lifecycle (ACTIVE→DEPRECATED→DELETED) |
 | 12 | `MEMORY.md` (проектный, fallback) | Page IDs, endpoints, configs, API gotchas (method/auth/encoding), version numbers |
 
 ### Классификация
 
 | Тип записи | Destination | Признак |
 |------------|-------------|---------|
-| Факт (ID, config, endpoint) | MEMORY.md или vault `studiokook/infrastructure` | Конкретное значение, lookup |
-| Gotcha (подводный камень) | vault `studiokook/knowledge` или `wordpress/windows-gotchas` | "Ошибка X потому что Y" |
-| Рабочий пример (curl, code) | vault `studiokook/examples` | Содержит копируемый код |
-| Паттерн (повторяемый процесс) | vault `n8n/workflow-patterns` / `wordpress/translation-verify` | Шаги 1-2-3, чеклист |
+| Факт (ID, config, endpoint) | MEMORY.md или vault `10-Projects/Studiokook/infrastructure` | Конкретное значение, lookup |
+| Gotcha (подводный камень) | vault `10-Projects/Studiokook/knowledge` или `10-Projects/Studiokook/20-Areas/WordPress/windows-gotchas` | "Ошибка X потому что Y" |
+| Рабочий пример (curl, code) | vault `30-Resources/API-Reference/studiokook-examples` | Содержит копируемый код |
+| Паттерн (повторяемый процесс) | vault `10-Projects/Studiokook/20-Areas/n8n/workflow-patterns` / `10-Projects/Studiokook/20-Areas/WordPress/translation-verify` | Шаги 1-2-3, чеклист |
 | Устаревшее | УДАЛИТЬ | Проблема не актуальна, система заменена |
 
 ### Процедура
 
 ```
-1. `mcp__obsidian__get_file_contents` troubleshooting/current + troubleshooting/global-patterns
+1. `mcp__obsidian__obsidian_get_file_contents` 10-Projects/Studiokook/20-Areas/Infrastructure/troubleshooting-current + 10-Projects/Studiokook/20-Areas/Infrastructure/global-patterns
 2. Для каждой записи:
    a. Тип: факт | gotcha | пример | паттерн | устаревшее
    b. Destination по keyword match (routing map)
-   c. `mcp__obsidian__get_file_contents` destination — дубликат? → пропусти
-   d. Нет → `mcp__obsidian__patch_content` к подходящей секции
+   c. `mcp__obsidian__obsidian_get_file_contents` destination — дубликат? → пропусти
+   d. Нет → `mcp__obsidian__obsidian_patch_content` к подходящей секции
 3. После маршрутизации:
-   a. `mcp__obsidian__append_content` source — перезаписать очищенной версией
+   a. `mcp__obsidian__obsidian_append_content` source — перезаписать очищенной версией
    b. Оставить скелет (заголовки + Self-Learning секция)
    c. Нераспределённые → показать user
 4. Отчёт: N обработано, куда ушло, N осталось
@@ -183,7 +237,7 @@ Skill: `output-critic`. Запускай СРАЗУ после генераци�
 
 ### Workflow:
 1. Generate v1
-2. Run `output-critic` (scores + gaps + v2) — inline, не как отдельный шаг
+2. **Call `Skill("output-critic")` tool** — в том же ответе, до финальной выдачи (не ждать Stop hook)
 3. Deliver v2 (or v1 if no gaps: "Critic pass: no significant gaps")
 
 ### Plans:

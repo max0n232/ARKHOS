@@ -1,6 +1,6 @@
 # Global Skills Registry
 
-Updated: 2026-03-10
+Updated: 2026-03-18
 
 ## Core (~/.claude/skills/)
 
@@ -10,6 +10,8 @@ Updated: 2026-03-10
 | post-mortem | P3 | ACTIVE | Session error analysis, knowledge routing (Stop hook) |
 | n8n-expert | P2 | ACTIVE | n8n workflows, nodes, expressions, validation, debug |
 | output-critic | P2 | ACTIVE | Universal output quality gate — auto-critic after generation tasks |
+| obsidian-router | P2 | ACTIVE | Routes vault ops between QMD (search) and Nexus/REST API (CRUD) |
+| strategic-critique | P2 | ACTIVE | Self-critique loop for strategic tasks (plans, SEO, architecture, content) |
 
 ## Studiokook (~/Desktop/Studiokook/.claude/skills/)
 

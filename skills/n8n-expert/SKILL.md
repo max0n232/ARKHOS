@@ -13,17 +13,17 @@ Unified guide for building and debugging n8n workflows via MCP tools.
 
 ## Reference Files (Obsidian Vault)
 
-Read on-demand via `mcp__obsidian__get_file_contents`:
+Read on-demand via `mcp__obsidian__obsidian_get_file_contents`:
 
 | Domain | Vault Path | When to Read |
 |--------|-----------|-------------|
-| MCP Tools | `n8n/mcp-tools` | Using any n8n-mcp tool, searching nodes, managing workflows |
-| Expressions | `n8n/expressions` | Writing `{{ }}` expressions, `$json`/`$node` variables |
-| Code JS | `n8n/code-javascript` | JavaScript in Code nodes, `$input`, `$helpers`, DateTime |
-| Code Python | `n8n/code-python` | Python in Code nodes (stdlib only, no external packages) |
-| Node Config | `n8n/node-config` | Configuring node parameters, property dependencies |
-| Validation | `n8n/validation` | Validation errors, profiles, auto-fix, false positives |
-| Patterns | `n8n/workflow-patterns` | Designing workflow architecture, choosing patterns |
+| MCP Tools | `20-Areas/n8n/mcp-tools` | Using any n8n-mcp tool, searching nodes, managing workflows |
+| Expressions | `20-Areas/n8n/expressions` | Writing `{{ }}` expressions, `$json`/`$node` variables |
+| Code JS | `20-Areas/n8n/code-javascript` | JavaScript in Code nodes, `$input`, `$helpers`, DateTime |
+| Code Python | `20-Areas/n8n/code-python` | Python in Code nodes (stdlib only, no external packages) |
+| Node Config | `20-Areas/n8n/node-config` | Configuring node parameters, property dependencies |
+| Validation | `20-Areas/n8n/validation` | Validation errors, profiles, auto-fix, false positives |
+| Patterns | `20-Areas/n8n/workflow-patterns` | Designing workflow architecture, choosing patterns |
 
 ## Routing Guide
 

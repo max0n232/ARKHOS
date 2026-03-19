@@ -54,3 +54,6 @@ stats-cache.json
 # Database files (use schema-*.sql + migrate.js to recreate)
 *.db
 plugins/marketplaces/*/
+
+# Ghost session data (local only)
+.ai-sessions/
