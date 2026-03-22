@@ -1,28 +1,15 @@
 {
-  "session_id": "548e0937",
-  "started_at": "2026-03-11T07:11:01.226Z",
+  "session_id": "982a825e",
+  "started_at": "2026-03-22T07:46:26.350Z",
   "project": ".claude",
   "context": {
     "current_task": null,
-    "loaded_skills": [],
-    "active_credentials": [],
     "files_accessed": []
   },
-  "decisions_this_session": [],
-  "token_budget": {
-    "total": 200000,
-    "used": 0,
-    "thresholds": {
-      "notify": 60000,
-      "stop": 100000,
-      "emergency": 140000
-    }
-  },
-  "last_updated": "2026-03-11T07:11:01.227Z",
+  "last_updated": "2026-03-22T07:46:26.351Z",
   "previous_session": {
-    "id": "30e81825",
+    "id": "b49d620b",
     "project": ".claude",
-    "last_task": null,
-    "ended": "2026-03-03T19:10:23.153Z"
+    "ended": "2026-03-22T07:44:21.908Z"
   }
 }

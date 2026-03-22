@@ -1,0 +1,68 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"/c/Users/sorte/.bun/install/global/node_modules/ghost/ghost\" session-start"
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"/c/Users/sorte/.bun/install/global/node_modules/ghost/ghost\" session-end"
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"/c/Users/sorte/.bun/install/global/node_modules/ghost/ghost\" prompt"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"/c/Users/sorte/.bun/install/global/node_modules/ghost/ghost\" stop"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"/c/Users/sorte/.bun/install/global/node_modules/ghost/ghost\" post-write"
+          }
+        ]
+      },
+      {
+        "matcher": "Task",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"/c/Users/sorte/.bun/install/global/node_modules/ghost/ghost\" post-task"
+          }
+        ]
+      }
+    ]
+  }
+}

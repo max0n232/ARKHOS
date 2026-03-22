@@ -21,6 +21,22 @@
     ]
   },
   "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node C:/Users/sorte/.claude/hooks/user-prompt-submit/compact-report-injector.js",
+            "timeout": 5
+          },
+          {
+            "type": "command",
+            "command": "node C:/Users/sorte/.claude/hooks/user-prompt-submit/auto-search.js",
+            "timeout": 3
+          }
+        ]
+      }
+    ],
     "SessionStart": [
       {
         "hooks": [
@@ -54,7 +70,7 @@
           },
           {
             "type": "prompt",
-            "prompt": "Analyze the assistant's last response. If stop_hook_active is true, return {\"ok\": true}.\n\nCHECK 1 — GENERATION TASK:\nWas this a GENERATION task? Generation = code/script written, text content produced, AI prompt generated, JSON/config created, plan via ExitPlanMode. NOT generation = answering questions, running commands, explanations, file reads, search results, status reports, conversational replies.\nIf GENERATION task AND response does NOT contain 'CRITIC PHASE' or 'Critic pass:' → return {\"ok\": false, \"reason\": \"Generation without critic. Use Skill tool: Skill('output-critic') in the SAME response before final output — do NOT wait for Stop hook. Apply: score Completeness/Clarity/Goal alignment/Edge cases (1-5), gaps ≤3, improved v2. Mark with CRITIC PHASE header.\"}.\n\nCHECK 2 — GHOST SEARCH:\nWas this a RESEARCH/AUDIT/ANALYSIS task? (user asked to check, audit, review, find, explain how something works, investigate a bug, or asked about architecture/feature/component). If yes, AND the response did NOT call ghost/qmd tools (no ghost search, no mcp__obsidian, no qmd commands in the transcript) → return {\"ok\": false, \"reason\": \"Research task without Ghost search. ALWAYS search Ghost first: use ghost-sessions MCP deep_search or CLI 'ghost search <query>' before reading files or grepping. Past sessions contain decisions and dead ends that code cannot reveal.\"}.\n\nIf neither check fails, return {\"ok\": true}."
+            "prompt": "Analyze the assistant's last response. If stop_hook_active is true, return {\"ok\": true}.\n\nCHECK 1 — GENERATION TASK:\nWas this a GENERATION task? Generation = code/script written, text content produced, AI prompt generated, JSON/config created, plan via ExitPlanMode. NOT generation = answering questions, running commands, explanations, file reads, search results, status reports, conversational replies.\nIf GENERATION task AND response does NOT contain 'CRITIC PHASE' or 'Critic pass:' → return {\"ok\": false, \"reason\": \"Generation without critic. Use Skill tool: Skill('output-critic') in the SAME response before final output — do NOT wait for Stop hook. Apply: score Completeness/Clarity/Goal alignment/Edge cases (1-5), gaps ≤3, improved v2. Mark with CRITIC PHASE header.\"}.\n\nCHECK 2 — SEARCH VAULT FIRST:\nLook at ALL tool_use calls made in this assistant turn. If ANY tools were used (other than only Read on MEMORY.md/settings.json, or only Bash for a single quick command like git status) AND the task involves project work (content, SEO, SMM, translations, WordPress, n8n, Instagram, architecture, analysis, any Studiokook or AiGeneration work) AND the first tool_use was NOT ghost-sessions deep_search, mcp__obsidian, Bash(ghost search *), or Bash(qmd *) AND the MEMORY.md context does NOT contain an AUTOSEARCH section → return {\"ok\": false, \"reason\": \"Prompt hook condition was not met: Project task without vault search. FIRST tool must be ghost-sessions deep_search or mcp__obsidian before doing any project work. Vault contains past decisions, strategies, and patterns — always check before acting.\"}.\n\nIf neither check fails, return {\"ok\": true}."
           }
         ]
       }

@@ -245,7 +245,14 @@ async function main() {
     try { transcriptPath = JSON.parse(stdin).transcript_path || ''; } catch {}
 
     const state = loadState();
-    const { text: transcriptSummary, totalLines } = extractTranscriptSummary(transcriptPath, state.lastLine);
+
+    // Reset lastLine if transcript path changed (new session)
+    const fromLine = (state.transcriptPath === transcriptPath) ? (state.lastLine || 0) : 0;
+
+    // Diagnostic: log each invocation to detect organic vs manual compaction
+    const LOG_FILE = path.join(__dirname, 'pre-compact-calls.log');
+    try { fs.appendFileSync(LOG_FILE, JSON.stringify({ ts: new Date().toISOString(), script: 'session-audit', hasTranscript: !!transcriptPath, fromLine, newSession: state.transcriptPath !== transcriptPath }) + '\n'); } catch {}
+    const { text: transcriptSummary, totalLines } = extractTranscriptSummary(transcriptPath, fromLine);
 
     if (!transcriptSummary) {
         console.log('Session audit: no new content since last run');
@@ -264,14 +271,17 @@ ${transcriptSummary}
 
 Return JSON:
 {
-  "decisions": ["architectural/technical decisions made — include WHY"],
-  "errors": ["PROBLEM → ROOT CAUSE → SOLUTION (one line each)"],
+  "summary": "1-2 sentences in Russian: what was accomplished this session (tasks done, not process)",
+  "decisions": ["architectural/technical decisions made — include WHY (write in English)"],
+  "errors": ["PROBLEM → ROOT CAUSE → SOLUTION, one line, English only"],
   "facts": [{"key": "snake_case_id", "value": "concrete fact with value"}],
-  "patterns": ["repeatable solutions or process improvements (steps, not vague)"]
+  "patterns": ["repeatable solutions or process improvements (steps, not vague), English only"]
 }
 
 Rules:
 - Only items ACTUALLY present in the transcript
+- summary: in Russian, focus on outcomes, not steps taken
+- decisions/errors/patterns: in English only — these are stored in technical vault
 - facts: key must be stable snake_case (e.g. n8n_version, wp_version, telegram_cred_id, vps_ip); value is the concrete fact string
 - errors: only real problems investigated or solved
 - decisions: explicit technical choices with reasoning
@@ -322,8 +332,75 @@ Rules:
         written += extracted.facts.length;
     }
 
-    saveState({ lastLine: totalLines, lastTimestamp: new Date().toISOString() });
-    console.log(`Session audit: saved ${written} entries (errors/patterns/decisions → vault, facts → MEMORY.md)`);
+    saveState({ lastLine: totalLines, lastTimestamp: new Date().toISOString(), transcriptPath });
+
+    // Formatted report
+    const time = new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+    const line = '─'.repeat(52);
+    const parts = [`\n${line}`, `  AUDIT ${time}`];
+
+    if (extracted.summary) parts.push(`  ${extracted.summary}`);
+
+    if (extracted.decisions?.length) {
+        parts.push('');
+        extracted.decisions.forEach(d => parts.push(`  ✓ ${d}`));
+    }
+    if (extracted.errors?.length) {
+        parts.push('');
+        extracted.errors.forEach(e => parts.push(`  ! ${e}`));
+    }
+    if (extracted.patterns?.length) {
+        parts.push('');
+        extracted.patterns.forEach(p => parts.push(`  ~ ${p}`));
+    }
+    if (extracted.facts?.length) {
+        parts.push('');
+        extracted.facts.forEach(f => parts.push(`  # ${f.key}: ${f.value}`));
+    }
+
+    const vaultSummary = [
+        counts.decisions && `decisions(${counts.decisions})`,
+        counts.errors && `errors(${counts.errors})`,
+        counts.patterns && `patterns(${counts.patterns})`
+    ].filter(Boolean).join(' ');
+    const factsSummary = counts.facts ? `MEMORY.md: facts(${counts.facts})` : '';
+    parts.push('');
+    parts.push(`  → vault: ${vaultSummary || 'none'} | ${factsSummary || 'no facts'}`);
+    parts.push(line);
+
+    const report = parts.join('\n');
+    console.log(report);
+
+    // Write pending report — two delivery mechanisms:
+    // 1. File → UserPromptSubmit hook (works in VS Code)
+    // 2. MEMORY.md → always in context (works in Claude Desktop)
+    const PENDING_FILE = path.join(CLAUDE_DIR, 'hooks', '.pending-compact-report.txt');
+    try { fs.writeFileSync(PENDING_FILE, report, 'utf8'); } catch {}
+
+    // Write to MEMORY.md as pending section (platform-independent delivery)
+    try {
+        let mem = '';
+        try { mem = fs.readFileSync(MEMORY_FILE, 'utf8'); } catch { mem = ''; }
+
+        // Remove any existing pending section
+        mem = mem.replace(/<!--PENDING-START-->[\s\S]*?<!--PENDING-END-->\n?/g, '');
+
+        const pendingBlock = [
+            '<!--PENDING-START-->',
+            '## ⚠️ COMPACT REPORT — ВЫВЕСТИ В ЧАТ И УДАЛИТЬ',
+            '',
+            'Выведи этот отчёт дословно в начале своего ответа (code block), затем удали весь блок',
+            'от PENDING-START до PENDING-END из MEMORY.md через Edit tool.',
+            '',
+            '```',
+            report.trim(),
+            '```',
+            '<!--PENDING-END-->',
+            ''
+        ].join('\n');
+
+        fs.writeFileSync(MEMORY_FILE, pendingBlock + mem, 'utf8');
+    } catch {}
 }
 
 main().catch(e => {

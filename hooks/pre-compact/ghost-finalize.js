@@ -18,6 +18,10 @@ const COMPLETED_DIR = path.join(SESSIONS_DIR, 'completed');
 const CURRENT_ID_FILE = path.join(ACTIVE_DIR, 'current-id');
 
 function main() {
+    // Diagnostic: log each invocation
+    const LOG_FILE = path.join(CLAUDE_DIR, 'hooks/pre-compact/pre-compact-calls.log');
+    try { fs.appendFileSync(LOG_FILE, JSON.stringify({ ts: new Date().toISOString(), script: 'ghost-finalize' }) + '\n'); } catch {}
+
     // Read current session ID
     if (!fs.existsSync(CURRENT_ID_FILE)) {
         return;
@@ -42,8 +46,9 @@ function main() {
         return;
     }
 
-    // Reindex QMD via bash (qmd is in Git Bash PATH but not cmd.exe)
-    const result = spawnSync('bash', ['-c', 'qmd update && qmd embed'], {
+    // Reindex QMD via bash using full path (qmd sh script, not .exe shim)
+    const QMD = '/c/Users/sorte/.bun/install/global/node_modules/@tobilu/qmd/bin/qmd';
+    const result = spawnSync('bash', ['-c', `"${QMD}" update && "${QMD}" embed`], {
         stdio: 'pipe',
         timeout: 90000
     });

@@ -9,6 +9,9 @@ const path = require('path');
 const CAPSULE_DIR = path.join(__dirname, 'session');
 const CAPSULE_FILE = path.join(CAPSULE_DIR, 'capsule.json');
 
+const LOG_FILE = path.join(__dirname, 'pre-compact-calls.log');
+try { fs.appendFileSync(LOG_FILE, JSON.stringify({ ts: new Date().toISOString(), script: 'save-state' }) + '\n'); } catch {}
+
 function saveState() {
     try {
         // Ensure directory exists

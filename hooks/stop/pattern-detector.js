@@ -173,10 +173,10 @@ function main() {
                 recordDetection(db, sessionId, det);
             }
 
-            // Output most severe warning
+            // Output most severe warning to stdout so Claude sees it
             const critical = detections.find(d => d.severity === 'critical');
             const warning = critical || detections[0];
-            process.stderr.write(warning.message + '\n');
+            process.stdout.write(warning.message + '\n');
 
             db.close();
 
