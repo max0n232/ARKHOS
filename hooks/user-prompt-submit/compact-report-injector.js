@@ -1,24 +1,28 @@
 #!/usr/bin/env node
 /**
- * UserPromptSubmit Hook: Compact Report Injector + AUTOSEARCH Relay
+ * UserPromptSubmit Hook: Compact Report Injector + AUTOSEARCH Relay + Auto-Checkpoint
  *
  * 1. If AUTOSEARCH section exists in MEMORY.md → output it to stdout (VS Code injection).
  *    Does NOT clean it — worker overwrites it on next search; Claude Desktop reads it from MEMORY.md.
  *
  * 2. If pending compact report file exists → inject it to stdout (backup delivery).
  *    PENDING block in MEMORY.md is NOT cleaned here — Claude reads it natively and removes after display.
+ *
+ * 3. Context monitor: at 80% spawns checkpoint-worker.js (once per session) to save
+ *    session summary to Ghost + capsule before compaction destroys context.
  */
 
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
+const { spawn } = require('child_process');
 
 const CLAUDE_DIR = path.join(os.homedir(), '.claude');
 const PENDING_FILE = path.join(CLAUDE_DIR, 'hooks', '.pending-compact-report.txt');
 const MEMORY_FILE = path.join(CLAUDE_DIR, 'projects/C--Users-sorte--claude/memory/MEMORY.md');
+const CHECKPOINT_WORKER = path.join(__dirname, 'checkpoint-worker.js');
 
 const AUTOSEARCH_RE = /<!--AUTOSEARCH-START-->([\s\S]*?)<!--AUTOSEARCH-END-->/;
-// PENDING_RE no longer used here — Claude removes block via Edit tool
 
 let output = [];
 
@@ -85,7 +89,18 @@ try {
                     if (pct >= 90) {
                         output.push(`[CONTEXT] Context at ${pct}% — /compact recommended NOW`);
                     } else if (pct >= 80) {
-                        output.push(`[CONTEXT] Context at ${pct}% — consider /compact or finishing current task`);
+                        output.push('[CONTEXT] Context at ' + pct + '% — consider /compact or finishing current task');
+                        // Auto-checkpoint: spawn worker ONCE per JSONL session
+                        var flagFile = path.join(CLAUDE_DIR, 'hooks', '.checkpoint-' + path.basename(jsonls[0].name, '.jsonl'));
+                        if (!fs.existsSync(flagFile)) {
+                            fs.writeFileSync(flagFile, new Date().toISOString(), 'utf8');
+                            var child = spawn(process.execPath, [CHECKPOINT_WORKER, filePath], {
+                                stdio: 'ignore',
+                                windowsHide: true
+                            });
+                            child.unref();
+                            output.push('[CHECKPOINT] Auto-saving session state — knowledge preserved in Ghost for next session');
+                        }
                     } else if (pct >= 70) {
                         output.push(`[CONTEXT] Context at ${pct}% — approaching limit, plan accordingly`);
                     }

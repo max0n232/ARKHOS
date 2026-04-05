@@ -2,18 +2,13 @@
   "permissions": {
     "allow": [
       "Bash(PYTHONUTF8=1 PYTHON=\"/c/Users/sorte/AppData/Local/Programs/Python/Python312/python.exe\")",
-      "Bash(SKILL_CREATOR=\"/c/Users/sorte/AppData/Roaming/Claude/local-agent-mode-sessions/skills-plugin/19807e47-c489-4266-8312-adf1ac99ad21/1888a06d-c0bf-4732-acf1-0a5d4c3fba82/skills/skill-creator\")",
       "Read(//c/Users/sorte/.claude/**)",
-      "Bash(PYTHONUTF8=1 $PYTHON -m scripts.run_eval --eval-set /tmp/test-eval2.json --skill-path \"/c/Users/sorte/.claude/skills/obsidian-router\" --model claude-opus-4-6 --runs-per-query 1 --verbose)",
       "Bash(source credentials/wp-auth.env)",
-      "Bash(node deploy/query-trp.js \"SELECT d.id, d.original_id, LEFT\\(d.original,40\\) as dict_original, LEFT\\(d.translated,40\\) as translated, d.status FROM wp_trp_dictionary_et_ru_ru d WHERE d.original_id IN \\(7330,7332,7334,3614,7337,7341,7346,7347,7348,7349,7350,7351,7352,7353,7354,7355,7356,7357,7340\\) AND d.original != '''' AND d.status = 0 ORDER BY d.original_id\")",
-      "Bash(for page:*)",
-      "Bash(do echo:*)",
-      "Bash(done)",
-      "Bash(node deploy/query-trp.js \"SELECT option_value FROM wp_options WHERE option_name = ''''trp_advanced_settings''''\")",
       "Bash(python3 -m json.tool)",
       "Bash(node -e \":*)",
-      "Bash(ssh -i ~/.ssh/id_studiokook virt103578@studiokook.ee ':*)"
+      "Bash(ssh -i ~/.ssh/id_studiokook virt103578@studiokook.ee \":*)",
+      "Edit(c:/Users/sorte/.claude/hooks/**)",
+      "Write(c:/Users/sorte/.claude/hooks/**)"
     ]
   }
 }
