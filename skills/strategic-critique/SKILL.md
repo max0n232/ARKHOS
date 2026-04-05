@@ -1,22 +1,8 @@
 ---
 name: strategic-critique
 description: >
-  ALWAYS invoke this skill when user requests стратегия, стратегический план, strategy,
-  content plan, контент-план, architecture decision, or says "with critique" / "со стратегической
-  критикой". Do not generate strategic plans directly — use this skill for multi-round critique
-  loop with rubric scoring. Do NOT trigger on 'audit' or 'roadmap' alone.
-triggers:
-  - стратегия
-  - стратегический план
-  - SEO план
-  - SEO аудит
-  - контент-план
-  - content strategy
-  - архитектурное решение
-  - бизнес-план
-  - roadmap
-  - with critique
-  - с критикой
+  Trigger: стратегия, strategy, content plan, контент-план, architecture decision,
+  "со стратегической критикой". Multi-round critique with scoring. NOT "audit"/"roadmap" alone.
 ---
 
 # Strategic Critique Loop

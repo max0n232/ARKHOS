@@ -1,10 +1,8 @@
 ---
 name: output-critic
 description: >
-  ALWAYS invoke this skill after generating any final output — AI prompts, text content, code,
-  or structured data. Do not deliver final outputs without running this critic first. Also
-  ALWAYS invoke when user says "critique", "improve this", "is this good enough", "check quality",
-  "проверь качество". This is a mandatory quality gate — skip only for conversational replies.
+  Mandatory after generating final outputs (prompts, code, content, config). Manual: "critique",
+  "improve this", "проверь качество". Skip for conversational replies.
 ---
 
 # Output Critic — Universal Quality Protocol

@@ -1,11 +1,8 @@
 ---
 name: obsidian-router
 description: >
-  ALWAYS invoke this skill when the user mentions vault, obsidian, заметки, БЗ, knowledge base,
-  or qmd. Do not search or write to vault files directly — use this skill first to route to
-  the correct tool (QMD search, Nexus CRUD, or REST API). Triggers: "найди в заметках",
-  "поищи в vault", "сохрани в базу знаний", "обнови заметку", "search vault", "save to vault",
-  vault paths like "10-Projects/...".
+  Trigger: vault, obsidian, заметки, БЗ, qmd, "найди в заметках", "сохрани в базу знаний",
+  vault paths. Routes to QMD/Nexus/REST API.
 ---
 
 # obsidian-router
