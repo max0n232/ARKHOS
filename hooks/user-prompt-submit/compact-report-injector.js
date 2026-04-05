@@ -86,6 +86,8 @@ try {
                         output.push(`[CONTEXT] Context at ${pct}% — /compact recommended NOW`);
                     } else if (pct >= 80) {
                         output.push(`[CONTEXT] Context at ${pct}% — consider /compact or finishing current task`);
+                    } else if (pct >= 70) {
+                        output.push(`[CONTEXT] Context at ${pct}% — approaching limit, plan accordingly`);
                     }
                     break;
                 }
