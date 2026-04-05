@@ -127,6 +127,23 @@ function main() {
 
     log(`Done — ${archived} session(s) ${DRY_RUN ? 'would be' : ''} archived`);
 
+
+
+    // --- Stale checkpoint flags cleanup ---
+    try {
+        const hooksDir = path.join(CLAUDE_DIR, 'hooks');
+        const flagAge = 7 * 24 * 60 * 60 * 1000;
+        const flags = fs.readdirSync(hooksDir).filter(f => f.startsWith('.checkpoint-') && !f.endsWith('.md'));
+        let cleaned = 0;
+        for (const flag of flags) {
+            const fp = path.join(hooksDir, flag);
+            if (Date.now() - fs.statSync(fp).mtimeMs > flagAge) {
+                fs.unlinkSync(fp);
+                cleaned++;
+            }
+        }
+        if (cleaned > 0) log('Cleaned ' + cleaned + ' stale checkpoint flag(s)');
+    } catch {}
     // --- Age-based cleanup: remove sessions >90 days with no insights ---
     if (!DRY_RUN && fs.existsSync(ARCHIVE_DIR)) {
         const ageCutoff = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000);
