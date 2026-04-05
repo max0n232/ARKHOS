@@ -1,12 +1,8 @@
 ---
 name: assistant
 description: >
-  ALWAYS invoke this skill when user asks "что делать", "приоритеты", "статус проектов",
-  "weekly review", "monthly review", "что сделано", "progress", or "health check систем".
-  Do not answer project coordination questions directly — use this skill to check both
-  Studiokook and AiGeneration project contexts first. Do NOT trigger on "review" alone.
-  Do NOT trigger on 'review' alone — that may be output-critic (quality review) or
-  code-review (PR review). Only trigger when context is clearly about project coordination.
+  Trigger: "что делать", "приоритеты", "статус проектов", "weekly/monthly review", "progress",
+  "health check". Check project contexts first. NOT "review" alone (may be output-critic).
 ---
 
 # Project Coordinator

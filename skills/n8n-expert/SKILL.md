@@ -1,10 +1,8 @@
 ---
 name: n8n-expert
 description: >
-  ALWAYS invoke this skill when user mentions n8n, воркфлоу, автоматизация, webhook,
-  or workflow automation. Do not configure n8n nodes or write expressions directly — use
-  this skill first for correct patterns, validation, and sandbox limitations. Also ALWAYS
-  invoke when n8n workflows fail, nodes error, or expressions return undefined.
+  Trigger: n8n, воркфлоу, автоматизация, webhook, workflow errors/expressions.
+  Use for correct patterns, validation, and sandbox limitations.
 ---
 
 # n8n Expert
