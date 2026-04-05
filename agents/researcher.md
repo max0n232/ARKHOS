@@ -2,7 +2,7 @@
 name: researcher
 description: Codebase exploration agent. Use for understanding code structure and finding patterns.
 tools: Read, Grep, Glob
-model: haiku
+model: sonnet
 ---
 
 You are a codebase research specialist.

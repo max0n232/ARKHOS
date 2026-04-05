@@ -170,6 +170,14 @@ function main() {
         // 7. Update offset
         setConfig(db, offsetKey, lines.length);
 
+        // 8. Rotation: delete traces and detections older than 7 days
+        const cutoff = Math.floor(Date.now() / 1000) - 7 * 24 * 3600;
+        try {
+            db.prepare('DELETE FROM traces WHERE timestamp < ?').run(cutoff);
+            db.prepare('DELETE FROM detections WHERE timestamp < ?').run(cutoff);
+            db.pragma('wal_checkpoint(TRUNCATE)');
+        } catch (_) {}
+
         db.close();
 
         if (traces.length > 0) {

@@ -1,10 +1,10 @@
 ---
 name: n8n-expert
 description: >
-  Use when building, debugging, or configuring n8n workflows — node configuration,
-  expressions, JavaScript/Python code nodes, validation, workflow patterns, and MCP
-  tools integration. Also use when n8n workflows fail, nodes error, or expressions
-  return undefined.
+  ALWAYS invoke this skill when user mentions n8n, воркфлоу, автоматизация, webhook,
+  or workflow automation. Do not configure n8n nodes or write expressions directly — use
+  this skill first for correct patterns, validation, and sandbox limitations. Also ALWAYS
+  invoke when n8n workflows fail, nodes error, or expressions return undefined.
 ---
 
 # n8n Expert

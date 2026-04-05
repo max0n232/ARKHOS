@@ -113,7 +113,11 @@ Use `obsidian-router` skill for routing logic (QMD vs Nexus vs REST API).
 2. Ошибки/workarounds → vault `10-Projects/Studiokook/20-Areas/Infrastructure/troubleshooting-current` (`mcp__obsidian__obsidian_patch_content`)
 3. Паттерны (повторяемые решения) → vault `10-Projects/Studiokook/20-Areas/Infrastructure/global-patterns` (`mcp__obsidian__obsidian_patch_content`)
 4. Не дублируй — проверь существующие записи (`mcp__obsidian__obsidian_get_file_contents`), обнови если нужно
-5. **Проверь лимит:** если vault troubleshooting файлы > 150 строк → запусти Knowledge Distillation (секция ниже)
+5. **Проверь лимиты** (таблица Growth Limits в Knowledge Distillation): если любой файл превышает лимит → запусти очистку
+6. **TODO для следующей сессии** → три точки сохранения (любая одна выживет):
+   - MEMORY.md pending block (compact report)
+   - Vault: **проектный** path (`Studiokook/knowledge.md`, НЕ `ARKHOS/knowledge.md`)
+   - Ghost: `ghost knowledge` с точными ключевыми словами (страницы, действия: translate, hreflang, schema)
 
 Ручной триггер: пользователь говорит "distill" / "дистилляция" / "почисти troubleshooting/patterns".
 
@@ -135,6 +139,32 @@ Use `obsidian-router` skill for routing logic (QMD vs Nexus vs REST API).
 Цикл: **накопление → классификация → маршрутизация → очистка**.
 Source: vault `10-Projects/Studiokook/20-Areas/Infrastructure/troubleshooting-current`, `10-Projects/Studiokook/20-Areas/Infrastructure/global-patterns` (via `mcp__obsidian__obsidian_get_file_contents`)
 
+### Growth Limits (проверка при session audit)
+
+Два типа файлов — разные правила:
+
+**Accumulators** (записи копятся, устаревают → нужен cleanup):
+
+| Файл | Лимит | Действие |
+|------|-------|----------|
+| troubleshooting-current.md | 150 строк | Distillation → routing map destinations |
+| global-patterns.md | 150 строк | Distillation → routing map destinations |
+| MEMORY.md | 250 строк | Ревью: удалить невалидные `[verified:]` факты, схлопнуть дубли |
+| VPS refresh.log | 50 строк | Auto-rotation (cron) |
+| VPS telegram-reports.archive.log | 30 дней | Auto-trim (report-lifecycle.sh) |
+
+**Reference** (knowledge base, растёт ≈ постоянно — cleanup только дубли/deprecated):
+
+| Файл | Soft limit | Действие |
+|------|-----------|----------|
+| Studiokook/knowledge.md | 500 строк | Merge дублирующих записей, удалить `<!-- audit: -->` маркеры старше 60 дней |
+| Studiokook/infrastructure.md | Без лимита | Это reference (page IDs, configs). Только удалять deprecated записи |
+| Studiokook/seo-strategy.md | 400 строк | Архивировать выполненные action items (✅ → `40-Archive/seo-done.md`) |
+| ARKHOS/knowledge.md | 300 строк | Merge дублей. Deprecated patterns → `40-Archive/` |
+| Routing map destinations (17 файлов) | 300 строк каждый | Если >300 — ревью на дубли при session audit |
+
+**Ключевое правило:** лимит ≠ "удалить лишнее". Лимит = "проверь на дубли, deprecated, и merge". Полезный reference data **никогда не удаляется** — только консолидируется.
+
 ### Routing Map (destination → keywords)
 
 | # | Destination | Keywords |
@@ -151,6 +181,11 @@ Source: vault `10-Projects/Studiokook/20-Areas/Infrastructure/troubleshooting-cu
 | 10 | vault `10-Projects/Studiokook/20-Areas/WordPress/translation-verify` | Negative-match verification, confirmation bias, scope narrowing, TRP string segmentation, Estonian patterns (õ,ü,verbs), visual browser verification, red flags |
 | 11 | vault `10-Projects/Studiokook/20-Areas/WordPress/problem-solving` | FIX/WORKAROUND/ENHANCEMENT, root cause, 5 Whys, cleanup_after, lifecycle (ACTIVE→DEPRECATED→DELETED) |
 | 12 | `MEMORY.md` (проектный, fallback) | Page IDs, endpoints, configs, API gotchas (method/auth/encoding), version numbers |
+| 13 | vault `10-Projects/ARKHOS/knowledge` | Claude Code, hooks, skills, MCP server, ghost session, qmd, semantic search, ARKHOS, prompt engineering, AI agent architecture, session memory, context window |
+| 14 | vault `30-Resources/Learning/ai-ml-patterns` | LLM, RAG, embeddings, vector search, fine-tuning, token optimization, AI agent workflow, model comparison, Claude API, prompt technique |
+| 15 | vault `10-Projects/AiGeneration/content-strategy` | content strategy, brand voice, content calendar, AI content generation, copywriting, editorial workflow, content repurposing, content automation |
+| 16 | vault `10-Projects/SocialMedia/smm-patterns` | Instagram strategy, TikTok, Telegram channel, Threads, SMM automation, posting schedule, engagement, cross-platform content |
+| 17 | vault `10-Projects/Trading/knowledge` | trading, algorithmic trading, market analysis, technical analysis, backtesting, trading bot, exchange API, risk management, portfolio |
 
 ### Классификация
 

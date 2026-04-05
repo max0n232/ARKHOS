@@ -1,23 +1,72 @@
 {
   "env": {
     "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1",
-    "CLAUDE_AUTOCOMPACT_PCT_OVERRIDE": "80"
+    "CLAUDE_AUTOCOMPACT_PCT_OVERRIDE": "80",
+    "SLASH_COMMAND_TOOL_CHAR_BUDGET": "50000"
   },
   "permissions": {
     "allow": [
       "Read",
+      "Edit",
+      "Write",
       "Glob",
       "Grep",
-      "Bash(npm *)",
-      "Bash(node *)",
-      "Bash(git *)",
-      "Bash(mkdir *)",
-      "Bash(ls *)"
+      "WebSearch",
+      "WebFetch",
+      "Bash(npm:*)",
+      "Bash(node:*)",
+      "Bash(git:*)",
+      "Bash(mkdir:*)",
+      "Bash(ls:*)",
+      "Bash(cat:*)",
+      "Bash(head:*)",
+      "Bash(tail:*)",
+      "Bash(find:*)",
+      "Bash(grep:*)",
+      "Bash(wc:*)",
+      "Bash(echo:*)",
+      "Bash(cp:*)",
+      "Bash(mv:*)",
+      "Bash(touch:*)",
+      "Bash(cd:*)",
+      "Bash(pwd:*)",
+      "Bash(bash:*)",
+      "Bash(jq:*)",
+      "Bash(curl:*)",
+      "Bash(ssh:*)",
+      "Bash(scp:*)",
+      "Bash(gh:*)",
+      "Bash(qmd:*)",
+      "Bash(powershell:*)",
+      "Bash(start:*)",
+      "Bash(schtasks:*)",
+      "Bash(tasklist:*)",
+      "Bash(wscript:*)",
+      "mcp__wordpress__*",
+      "mcp__n8n-mcp__*",
+      "mcp__obsidian__*",
+      "mcp__nexus__*",
+      "mcp__firecrawl__*",
+      "mcp__Claude_in_Chrome__*",
+      "mcp__Claude_Preview__*",
+      "mcp__c1fc4002-5f49-5f9d-a4e5-93c4ef5d6a75__*",
+      "mcp__mcp-registry__*",
+      "mcp__scheduled-tasks__*",
+      "mcp__gsc__*",
+      "mcp__google-workspace__*",
+      "mcp__qmd__*"
     ],
     "deny": [
-      "Bash(rm -rf *)",
-      "Bash(sudo *)",
-      "Bash(chmod 777 *)"
+      "Bash(rm -rf /)",
+      "Bash(rm -rf ~)",
+      "Bash(rm -rf /*)",
+      "Bash(sudo rm:*)",
+      "Bash(sudo chmod:*)",
+      "Bash(chmod 777:*)",
+      "Bash(curl *| bash*)",
+      "Bash(wget *| sh*)",
+      "Bash(mkfs:*)",
+      "Bash(dd if=:*)"
     ]
   },
   "hooks": {
@@ -75,15 +124,43 @@
         ]
       }
     ],
-    "PreCompact": [
+    "StopFailure": [
       {
         "hooks": [
           {
             "type": "command",
-            "command": "node C:/Users/sorte/.claude/hooks/pre-compact/save-state.js",
-            "timeout": 5,
-            "statusMessage": "Saving state before compact..."
-          },
+            "command": "node C:/Users/sorte/.claude/hooks/stop/stop-failure-handler.js",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "FileChanged": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node C:/Users/sorte/.claude/hooks/file-changed/vault-change-detector.js",
+            "if": "Edit(*/ObsidianVault/*) || Write(*/ObsidianVault/*)",
+            "timeout": 3
+          }
+        ]
+      }
+    ],
+    "TaskCreated": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node C:/Users/sorte/.claude/hooks/task-created/ghost-task-logger.js",
+            "timeout": 3
+          }
+        ]
+      }
+    ],
+    "PreCompact": [
+      {
+        "hooks": [
           {
             "type": "command",
             "command": "node C:/Users/sorte/.claude/hooks/pre-compact/session-audit.js",

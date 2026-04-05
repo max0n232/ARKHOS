@@ -5,7 +5,8 @@
  * 1. If AUTOSEARCH section exists in MEMORY.md → output it to stdout (VS Code injection).
  *    Does NOT clean it — worker overwrites it on next search; Claude Desktop reads it from MEMORY.md.
  *
- * 2. If pending compact report file exists → inject it to stdout and clean MEMORY.md PENDING section.
+ * 2. If pending compact report file exists → inject it to stdout (backup delivery).
+ *    PENDING block in MEMORY.md is NOT cleaned here — Claude reads it natively and removes after display.
  */
 
 const fs = require('fs');
@@ -17,7 +18,7 @@ const PENDING_FILE = path.join(CLAUDE_DIR, 'hooks', '.pending-compact-report.txt
 const MEMORY_FILE = path.join(CLAUDE_DIR, 'projects/C--Users-sorte--claude/memory/MEMORY.md');
 
 const AUTOSEARCH_RE = /<!--AUTOSEARCH-START-->([\s\S]*?)<!--AUTOSEARCH-END-->/;
-const PENDING_RE = /<!--PENDING-START-->[\s\S]*?<!--PENDING-END-->\n?/g;
+// PENDING_RE no longer used here — Claude removes block via Edit tool
 
 let output = [];
 
@@ -43,12 +44,8 @@ if (fs.existsSync(PENDING_FILE)) {
         const content = fs.readFileSync(PENDING_FILE, 'utf8').trim();
         fs.unlinkSync(PENDING_FILE);
 
-        // Clean PENDING section from MEMORY.md
-        try {
-            let mem = fs.readFileSync(MEMORY_FILE, 'utf8');
-            const cleaned = mem.replace(PENDING_RE, '');
-            if (cleaned !== mem) fs.writeFileSync(MEMORY_FILE, cleaned, 'utf8');
-        } catch {}
+        // PENDING block stays in MEMORY.md — Claude reads it natively
+        // and removes it via Edit tool after displaying the report
 
         if (content) {
             output.unshift(
@@ -57,6 +54,45 @@ if (fs.existsSync(PENDING_FILE)) {
         }
     } catch {}
 }
+
+// --- Context usage monitor ---
+try {
+    const projDir = path.join(CLAUDE_DIR, 'projects/C--Users-sorte--claude');
+    const jsonls = fs.readdirSync(projDir)
+        .filter(f => f.endsWith('.jsonl'))
+        .map(f => ({ name: f, mtime: fs.statSync(path.join(projDir, f)).mtimeMs }))
+        .sort((a, b) => b.mtime - a.mtime);
+
+    if (jsonls.length) {
+        const filePath = path.join(projDir, jsonls[0].name);
+        const stat = fs.statSync(filePath);
+        const readSize = Math.min(stat.size, 8192);
+        const buf = Buffer.alloc(readSize);
+        const fd = fs.openSync(filePath, 'r');
+        fs.readSync(fd, buf, 0, readSize, Math.max(0, stat.size - readSize));
+        fs.closeSync(fd);
+        const tail = buf.toString('utf8');
+        const lines = tail.split('\n').filter(l => l.trim());
+        for (let i = lines.length - 1; i >= 0; i--) {
+            try {
+                const obj = JSON.parse(lines[i]);
+                const usage = obj.usage || obj.message?.usage;
+                if (usage && usage.input_tokens) {
+                    const total = (usage.input_tokens || 0) +
+                        (usage.cache_creation_input_tokens || 0) +
+                        (usage.cache_read_input_tokens || 0);
+                    const pct = Math.round(total / 2000);
+                    if (pct >= 90) {
+                        output.push(`[CONTEXT] Context at ${pct}% — /compact recommended NOW`);
+                    } else if (pct >= 80) {
+                        output.push(`[CONTEXT] Context at ${pct}% — consider /compact or finishing current task`);
+                    }
+                    break;
+                }
+            } catch {}
+        }
+    }
+} catch {}
 
 if (output.length) {
     console.log(output.join('\n\n'));

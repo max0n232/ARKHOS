@@ -1,6 +1,6 @@
 # Global Skills Registry
 
-Updated: 2026-03-18
+Updated: 2026-03-29
 
 ## Core (~/.claude/skills/)
 
@@ -12,6 +12,16 @@ Updated: 2026-03-18
 | output-critic | P2 | ACTIVE | Universal output quality gate — auto-critic after generation tasks |
 | obsidian-router | P2 | ACTIVE | Routes vault ops between QMD (search) and Nexus/REST API (CRUD) |
 | strategic-critique | P2 | ACTIVE | Self-critique loop for strategic tasks (plans, SEO, architecture, content) |
+
+## Agents (~/.claude/agents/)
+
+| Agent | Priority | Status | Description |
+|-------|----------|--------|-------------|
+| researcher | P2 | ACTIVE | Codebase exploration (Haiku, read-only) |
+| translator | P2 | ACTIVE | TranslatePress translations (Sonnet) |
+| wp-auditor | P2 | ACTIVE | WordPress diagnostics, read-only (Sonnet) |
+| wp-specialist | P1 | ACTIVE | WordPress REST API modifications (Sonnet) |
+| librarian | P2 | ACTIVE | Vault librarian — distillation, routing review, maintenance (Sonnet) |
 
 ## Studiokook (~/Desktop/Studiokook/.claude/skills/)
 

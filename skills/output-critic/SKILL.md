@@ -1,6 +1,10 @@
 ---
 name: output-critic
-description: Universal output quality critic for ARKHOS. Automatically triggers after ANY generation task — AI prompts (image/video), text content (posts, SEO, copy), code/scripts, or structured data (JSON, n8n workflows). Use this skill whenever Claude has just produced a final output and needs to self-evaluate and improve it. Also triggers explicitly when user says "review", "critique", "improve this", "is this good enough", or "check quality". Do NOT skip this for final outputs — it is a mandatory quality gate.
+description: >
+  ALWAYS invoke this skill after generating any final output — AI prompts, text content, code,
+  or structured data. Do not deliver final outputs without running this critic first. Also
+  ALWAYS invoke when user says "critique", "improve this", "is this good enough", "check quality",
+  "проверь качество". This is a mandatory quality gate — skip only for conversational replies.
 ---
 
 # Output Critic — Universal Quality Protocol
@@ -27,9 +31,25 @@ Before critiquing, identify output type to apply the correct rubric:
 
 ## Critic Execution Protocol
 
+### Step 0 — Load context (MANDATORY before scoring)
+
+Before ANY scoring, gather context for the output being evaluated:
+
+1. **Identify project** — Studiokook? AiGeneration? Infrastructure?
+2. **Load relevant context** — use Ghost deep_search or vault search for:
+   - Strategy/brand voice if `text-content` or `ai-prompt`
+   - Architecture decisions if `code` or `structured-data`
+   - Page/component purpose if output targets a specific page
+3. **Note what you know** — list 2-3 key context facts that will inform scoring
+4. If context genuinely unavailable (e.g. no project, pure standalone task) — note "standalone, no project context" and proceed
+5. If Ghost/vault search fails or times out — note "context unavailable: [reason]" and cap Context fit at 3/5 max (cannot confirm alignment without context)
+
+**Do NOT score without context.** Do NOT assume facts about the project (languages, features, structure). Check first, score second.
+
 ### Step 1 — Score v1 output
 
 Rate each dimension **1–5**. Be strict. 3 = acceptable but not impressive.
+Scores MUST reference context from Step 0 — not generic assumptions.
 
 #### Universal dimensions (apply to ALL types):
 
@@ -39,6 +59,7 @@ Rate each dimension **1–5**. Be strict. 3 = acceptable but not impressive.
 | **Clarity** | Is the output unambiguous and easy to parse/use? |
 | **Goal alignment** | Does it actually solve what was asked, not just respond to it? |
 | **Edge cases** | Are obvious failure modes or exceptions handled? |
+| **Context fit** | Does it align with project strategy, past decisions, brand voice loaded in Step 0? Score against actual context, not assumptions. |
 
 #### Type-specific dimensions:
 
@@ -133,7 +154,18 @@ DELTA: [what changed]
 ## Hard rules
 
 - Never inflate scores to seem polite. A weak prompt scores 2/5.
+- Never assume facts about the project. If you didn't load it in Step 0 — you don't know it. "Нет мультиязычности" when the site has 4 languages = critic failure.
 - v2 must be substantively different from v1 if gaps were found. Do not just rephrase.
 - Keep v2 in the same format as v1 (if v1 was JSON, v2 is JSON; if v1 was a paragraph, v2 is a paragraph).
+- v2 length ≤ 1.5× v1. Critic improves quality, not inflates volume.
 - For ai-prompts: v2 must be in English regardless of conversation language.
 - For code: v2 must be fully runnable, not pseudo-code.
+- Language: commentary/gaps in RU (user's language), code/prompts in their native language.
+
+## Skip conditions
+
+Do NOT run critic on:
+- Conversational replies, status reports, explanations, search results
+- File reads, git commands, diagnostic output
+- Responses where `stop_hook_active` is true (prevent recursion)
+- Only run on **generation**: code/script written, text content produced, AI prompt, JSON/config, plan

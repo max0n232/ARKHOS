@@ -23,7 +23,7 @@ Hook blocks Write to `**/credentials/**`. To add new creds, user must do it manu
 
 **Mechanism:**
 - Stop hook fires after every response
-- Haiku evaluator checks: is this a generation task (code/text/prompt/JSON)?
+- Sonnet 4.6 evaluator checks: is this a generation task (code/text/prompt/JSON)?
 - If YES and no "CRITIC PHASE" section → returns `{ok: false}`
 - Claude **forced** to continue and apply output-critic skill
 - `stop_hook_active` flag prevents infinite loops
@@ -32,7 +32,7 @@ Hook blocks Write to `**/credentials/**`. To add new creds, user must do it manu
 
 **UserPromptSubmit removed:** Soft reminder hook caused chat blocking. Stop hook enforcement is sufficient.
 
-**Caveat:** Haiku must correctly identify generation vs informational tasks. Imperfect heuristic, but no better alternative in Claude Code.
+**Caveat:** Sonnet 4.6 evaluator must correctly identify generation vs informational tasks. More accurate than Haiku but still heuristic.
 
 ## WordPress optimization plugins — visual breakage risk
 

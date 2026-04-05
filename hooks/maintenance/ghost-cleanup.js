@@ -114,7 +114,8 @@ function main() {
         if (archived > 0) {
             const result = spawnSync('bash', ['-c', 'qmd update && qmd embed'], {
                 stdio: 'ignore',
-                timeout: 120000
+                timeout: 90000,
+                windowsHide: true
             });
             if (result.status === 0) {
                 log('QMD reindexed');
@@ -125,6 +126,28 @@ function main() {
     }
 
     log(`Done — ${archived} session(s) ${DRY_RUN ? 'would be' : ''} archived`);
+
+    // --- Age-based cleanup: remove sessions >90 days with no insights ---
+    if (!DRY_RUN && fs.existsSync(ARCHIVE_DIR)) {
+        const ageCutoff = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000);
+        const archiveFiles = fs.readdirSync(ARCHIVE_DIR).filter(f => f.endsWith('.md'));
+        let purged = 0;
+        for (const file of archiveFiles) {
+            const filePath = path.join(ARCHIVE_DIR, file);
+            try {
+                const stat = fs.statSync(filePath);
+                if (stat.mtimeMs >= ageCutoff.getTime()) continue;
+                const content = fs.readFileSync(filePath, 'utf8');
+                const hasInsights = /## Decisions|## Mistakes|## Knowledge|## Strategy/i.test(content)
+                    && content.length > 500;
+                if (!hasInsights) {
+                    fs.unlinkSync(filePath);
+                    purged++;
+                }
+            } catch {}
+        }
+        if (purged > 0) log(`Purged ${purged} empty archived session(s) older than 90d`);
+    }
 }
 
 main();

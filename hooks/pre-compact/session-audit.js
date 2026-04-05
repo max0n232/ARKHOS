@@ -2,9 +2,8 @@
 /**
  * PreCompact Hook: Session Knowledge Auditor
  *
- * Reads the session transcript, calls Anthropic API (Haiku) to extract
+ * Reads the session transcript, calls Anthropic API (Sonnet) to extract
  * actionable knowledge, and writes to Obsidian vault files directly.
- * Replaces the unreliable type:"prompt" PreCompact hook.
  *
  * Triggered: PreCompact (before context compression)
  * Input: stdin JSON with transcript_path
@@ -12,15 +11,14 @@
 
 const fs = require('fs');
 const path = require('path');
-const https = require('https');
 const os = require('os');
 
-const CLAUDE_DIR = path.join(os.homedir(), '.claude');
-const VAULT_DIR = 'C:/Users/sorte/ObsidianVault';
+const { CLAUDE_DIR, VAULT_DIR } = require('../shared/paths');
+const { callSonnet, appendToVault } = require('../shared/obsidian-api');
+
 const INFRA_DIR = '10-Projects/Studiokook/20-Areas/Infrastructure';
 const TROUBLESHOOTING = path.join(VAULT_DIR, INFRA_DIR, 'troubleshooting-current.md');
 const PATTERNS = path.join(VAULT_DIR, INFRA_DIR, 'global-patterns.md');
-const DECISIONS = path.join(VAULT_DIR, INFRA_DIR, 'decisions-log.md');
 const STATE_FILE = path.join(CLAUDE_DIR, 'hooks/pre-compact/.audit-state.json');
 const MEMORY_FILE = path.join(CLAUDE_DIR, 'projects/C--Users-sorte--claude/memory/MEMORY.md');
 
@@ -79,116 +77,19 @@ function extractTranscriptSummary(transcriptPath, fromLine = 0) {
         } catch {}
     }
 
-    return { text: parts.join('\n').slice(-8000), totalLines: lines.length };
+    const full = parts.join('\n');
+    let sampled;
+    if (full.length <= 12000) {
+        sampled = full;
+    } else {
+        const head = full.slice(0, 2000);
+        const tail = full.slice(-10000);
+        sampled = head + '\n[...middle truncated...]\n' + tail;
+    }
+    return { text: sampled, totalLines: lines.length };
 }
 
-// --- Anthropic API ---
-
-function callHaiku(systemPrompt, userMessage) {
-    return new Promise((resolve, reject) => {
-        let apiKey = process.env.ANTHROPIC_API_KEY;
-        if (!apiKey) {
-            try {
-                const keyFile = path.join(CLAUDE_DIR, 'credentials/anthropic-api.key');
-                apiKey = fs.readFileSync(keyFile, 'utf8').trim();
-            } catch {}
-        }
-        if (!apiKey) return reject(new Error('ANTHROPIC_API_KEY not set'));
-
-        const body = JSON.stringify({
-            model: 'claude-haiku-4-5-20251001',
-            max_tokens: 1024,
-            system: systemPrompt,
-            messages: [{ role: 'user', content: userMessage }]
-        });
-
-        const req = https.request({
-            hostname: 'api.anthropic.com',
-            path: '/v1/messages',
-            method: 'POST',
-            headers: {
-                'x-api-key': apiKey,
-                'anthropic-version': '2023-06-01',
-                'content-type': 'application/json',
-                'content-length': Buffer.byteLength(body)
-            }
-        }, res => {
-            let data = '';
-            res.on('data', chunk => data += chunk);
-            res.on('end', () => {
-                try {
-                    const text = JSON.parse(data).content?.[0]?.text || '';
-                    resolve(text);
-                } catch (e) { reject(new Error(`API parse error: ${e.message}`)); }
-            });
-        });
-
-        req.on('error', reject);
-        req.setTimeout(30000, () => { req.destroy(); reject(new Error('API timeout')); });
-        req.write(body);
-        req.end();
-    });
-}
-
-// --- Obsidian REST API (primary) + file fallback ---
-
-function obsidianApiKey() {
-    try {
-        const cfg = JSON.parse(fs.readFileSync(path.join(os.homedir(), '.claude.json'), 'utf8'));
-        return cfg.mcpServers?.obsidian?.env?.OBSIDIAN_API_KEY || '';
-    } catch { return ''; }
-}
-
-function appendViaRestApi(vaultRelPath, content) {
-    return new Promise((resolve, reject) => {
-        const apiKey = obsidianApiKey();
-        if (!apiKey) return reject(new Error('no obsidian key'));
-
-        const body = Buffer.from(content, 'utf8');
-        const req = https.request({
-            hostname: 'localhost',
-            port: 27124,
-            path: `/vault/${encodeURIComponent(vaultRelPath)}`,
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${apiKey}`,
-                'Content-Type': 'text/markdown',
-                'Content-Length': body.length
-            },
-            rejectUnauthorized: false
-        }, res => {
-            res.resume();
-            res.on('end', () => resolve(res.statusCode));
-        });
-
-        req.on('error', reject);
-        req.setTimeout(5000, () => { req.destroy(); reject(new Error('obsidian timeout')); });
-        req.write(body);
-        req.end();
-    });
-}
-
-async function appendToVault(absolutePath, content) {
-    if (!content.trim()) return;
-    const today = new Date().toISOString().slice(0, 10);
-    const entry = `\n<!-- audit:${today} -->\n${content.trim()}\n`;
-
-    // Try REST API first (keeps Obsidian sync)
-    const relPath = absolutePath.replace(/\\/g, '/').replace(VAULT_DIR + '/', '');
-    try {
-        await appendViaRestApi(relPath, entry);
-        return;
-    } catch {}
-
-    // Fallback: direct file write
-    fs.appendFileSync(absolutePath, entry, 'utf8');
-}
-
-function appendToFile(filePath, content) {
-    if (!content.trim()) return;
-    const today = new Date().toISOString().slice(0, 10);
-    fs.appendFileSync(filePath, `\n<!-- audit:${today} -->\n${content.trim()}\n`, 'utf8');
-}
+// --- Facts upsert ---
 
 function upsertFacts(filePath, facts, today) {
     if (!facts || !facts.length) return;
@@ -245,13 +146,7 @@ async function main() {
     try { transcriptPath = JSON.parse(stdin).transcript_path || ''; } catch {}
 
     const state = loadState();
-
-    // Reset lastLine if transcript path changed (new session)
     const fromLine = (state.transcriptPath === transcriptPath) ? (state.lastLine || 0) : 0;
-
-    // Diagnostic: log each invocation to detect organic vs manual compaction
-    const LOG_FILE = path.join(__dirname, 'pre-compact-calls.log');
-    try { fs.appendFileSync(LOG_FILE, JSON.stringify({ ts: new Date().toISOString(), script: 'session-audit', hasTranscript: !!transcriptPath, fromLine, newSession: state.transcriptPath !== transcriptPath }) + '\n'); } catch {}
     const { text: transcriptSummary, totalLines } = extractTranscriptSummary(transcriptPath, fromLine);
 
     if (!transcriptSummary) {
@@ -261,9 +156,12 @@ async function main() {
 
     console.log(`Session audit: processing ${totalLines - state.lastLine} new turns...`);
 
-    const systemPrompt = `You are a technical knowledge extractor for a software development session.
-Extract ONLY concrete, actionable knowledge. Respond with valid JSON only, no prose.
-If a category has nothing meaningful, return an empty array.`;
+    const systemPrompt = `You are a strict technical knowledge extractor. CRITICAL RULES:
+1. Extract ONLY facts explicitly stated in the transcript. NEVER infer, guess, or fabricate.
+2. If you are not 100% certain something was mentioned — DO NOT include it.
+3. If a category has nothing — return an empty array. Empty is better than wrong.
+4. Respond with valid JSON only, no prose.
+5. NEVER invent file paths, test counts, module names, or vault paths not in the transcript.`;
 
     const userMessage = `Extract knowledge from this Claude Code session transcript:
 
@@ -272,7 +170,6 @@ ${transcriptSummary}
 Return JSON:
 {
   "summary": "1-2 sentences in Russian: what was accomplished this session (tasks done, not process)",
-  "decisions": ["architectural/technical decisions made — include WHY (write in English)"],
   "errors": ["PROBLEM → ROOT CAUSE → SOLUTION, one line, English only"],
   "facts": [{"key": "snake_case_id", "value": "concrete fact with value"}],
   "patterns": ["repeatable solutions or process improvements (steps, not vague), English only"]
@@ -280,16 +177,24 @@ Return JSON:
 
 Rules:
 - Only items ACTUALLY present in the transcript
-- summary: in Russian, focus on outcomes, not steps taken
-- decisions/errors/patterns: in English only — these are stored in technical vault
-- facts: key must be stable snake_case (e.g. n8n_version, wp_version, telegram_cred_id, vps_ip); value is the concrete fact string
+- ALL text in Russian (summary, errors, patterns) — user reads Russian
+- facts: value in Russian, key always snake_case English
+- facts: ONLY system config that someone would need to look up later:
+  * API endpoints, credentials IDs, server IPs, port numbers
+  * Software versions, dependency versions
+  * File paths for config/infrastructure (NOT temp output dirs)
+  * Service URLs, webhook paths
+  NEVER include as facts: task outputs, line counts, test results, temp dirs, one-time debug findings, project status, key lengths, file sizes
+  NEVER re-extract facts that already exist (obsidian_vault_path, n8n_version etc) — only NEW discoveries
+  key must be stable snake_case (e.g. n8n_version, vps_ip, telegram_cred_id)
+  When in doubt — DO NOT add a fact. 0 facts is better than 1 wrong fact.
 - errors: only real problems investigated or solved
-- decisions: explicit technical choices with reasoning
-- patterns: established repeatable processes`;
+- patterns: established repeatable processes
+- Do NOT extract decisions — they are handled by a separate system (Ghost)`;
 
     let extracted;
     try {
-        const response = await callHaiku(systemPrompt, userMessage);
+        const response = await callSonnet(systemPrompt, userMessage, 1500);
         const jsonMatch = response.match(/\{[\s\S]*\}/);
         if (!jsonMatch) throw new Error('no JSON in response');
         extracted = JSON.parse(jsonMatch[0]);
@@ -299,37 +204,26 @@ Rules:
     }
 
     const counts = {
-        decisions: extracted.decisions?.length || 0,
         errors: extracted.errors?.length || 0,
         patterns: extracted.patterns?.length || 0,
         facts: extracted.facts?.length || 0
     };
-    console.log(`Session audit: extracted decisions=${counts.decisions} errors=${counts.errors} patterns=${counts.patterns} facts=${counts.facts}`);
+    console.log(`Session audit: extracted errors=${counts.errors} patterns=${counts.patterns} facts=${counts.facts}`);
 
     const today = new Date().toISOString().slice(0, 10);
-    let written = 0;
 
     if (extracted.errors?.length) {
         const content = extracted.errors.map(e => `- [${today}] ${e}`).join('\n');
         await appendToVault(TROUBLESHOOTING, content);
-        written += extracted.errors.length;
     }
 
     if (extracted.patterns?.length) {
         const content = extracted.patterns.map(p => `- [${today}] ${p}`).join('\n');
         await appendToVault(PATTERNS, content);
-        written += extracted.patterns.length;
-    }
-
-    if (extracted.decisions?.length) {
-        const content = extracted.decisions.map(d => `- [${today}] ${d}`).join('\n');
-        await appendToVault(DECISIONS, content);
-        written += extracted.decisions.length;
     }
 
     if (extracted.facts?.length) {
         upsertFacts(MEMORY_FILE, extracted.facts, today);
-        written += extracted.facts.length;
     }
 
     saveState({ lastLine: totalLines, lastTimestamp: new Date().toISOString(), transcriptPath });
@@ -341,10 +235,6 @@ Rules:
 
     if (extracted.summary) parts.push(`  ${extracted.summary}`);
 
-    if (extracted.decisions?.length) {
-        parts.push('');
-        extracted.decisions.forEach(d => parts.push(`  ✓ ${d}`));
-    }
     if (extracted.errors?.length) {
         parts.push('');
         extracted.errors.forEach(e => parts.push(`  ! ${e}`));
@@ -359,7 +249,6 @@ Rules:
     }
 
     const vaultSummary = [
-        counts.decisions && `decisions(${counts.decisions})`,
         counts.errors && `errors(${counts.errors})`,
         counts.patterns && `patterns(${counts.patterns})`
     ].filter(Boolean).join(' ');
@@ -382,11 +271,17 @@ Rules:
         let mem = '';
         try { mem = fs.readFileSync(MEMORY_FILE, 'utf8'); } catch { mem = ''; }
 
-        // Remove any existing pending section
+        const pendingMatch = mem.match(/<!--PENDING-TS:(\d+)-->/);
+        if (pendingMatch) {
+            const pendingAge = Date.now() - parseInt(pendingMatch[1]);
+            if (pendingAge > 3600000) {
+                process.stderr.write('[SessionAudit] Removing stale pending block (>1h old)\n');
+            }
+        }
         mem = mem.replace(/<!--PENDING-START-->[\s\S]*?<!--PENDING-END-->\n?/g, '');
 
         const pendingBlock = [
-            '<!--PENDING-START-->',
+            `<!--PENDING-START--><!--PENDING-TS:${Date.now()}-->`,
             '## ⚠️ COMPACT REPORT — ВЫВЕСТИ В ЧАТ И УДАЛИТЬ',
             '',
             'Выведи этот отчёт дословно в начале своего ответа (code block), затем удали весь блок',
@@ -404,7 +299,6 @@ Rules:
 }
 
 main().catch(e => {
-    // Non-blocking — PreCompact must proceed regardless
     console.error(`Session audit failed: ${e.message}`);
     process.exit(0);
 });

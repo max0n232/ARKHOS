@@ -1,6 +1,10 @@
 ---
 name: post-mortem
-description: Use after verification-before-completion when task is done - analyzes session PROCESS for errors, workarounds, doc mismatches; uses confidence scoring for auto-actions; triggered by Stop hook when errors detected
+description: >
+  ALWAYS invoke this skill when user says post-mortem, ретроспектива, "что пошло не так",
+  "разбор ошибок", "analyze errors", or "debug session". Do not analyze session process
+  directly — use this skill to systematically review HOW a task was completed, find errors,
+  workarounds, retries, and route learnings to the right knowledge store.
 ---
 
 # Post-Mortem

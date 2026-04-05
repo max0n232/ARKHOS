@@ -9,37 +9,42 @@
 
 const fs = require('fs');
 const path = require('path');
-const os = require('os');
 const { spawnSync } = require('child_process');
 
-const CLAUDE_DIR = path.join(os.homedir(), '.claude');
+const { CLAUDE_DIR, QMD } = require('../shared/paths');
 const MEMORY_FILE = path.join(CLAUDE_DIR, 'projects/C--Users-sorte--claude/memory/MEMORY.md');
-const QMD = '/c/Users/sorte/.bun/install/global/node_modules/@tobilu/qmd/bin/qmd';
 const MARKER_S = '<!--AUTOSEARCH-START-->';
 const MARKER_E = '<!--AUTOSEARCH-END-->';
 
 const query = process.argv[2] || '';
 if (!query) process.exit(0);
+const deepMode = process.argv[3] === 'deep';
 
-function vsearch(collection) {
+function qmdSearch(collection) {
+    const n = deepMode ? 5 : 3;
+    const cmd = deepMode ? 'search' : 'vsearch';
     const r = spawnSync(
         'bash',
-        ['-c', `"${QMD}" vsearch "${query.replace(/"/g, ' ')}" -c ${collection} -n 3`],
-        { encoding: 'utf8', timeout: 15000, stdio: 'pipe' }
+        ['-c', `"${QMD}" ${cmd} "${query.replace(/"/g, ' ')}" -c ${collection} -n ${n}`],
+        { encoding: 'utf8', timeout: deepMode ? 5000 : 15000, stdio: 'pipe', windowsHide: true }
     );
     const out = (r.stdout || '').trim();
     if (!out || out === 'No results found.' || out.startsWith('Error')) return '';
     return out.replace(/^Context:.*$/gm, '').replace(/\n{3,}/g, '\n\n').trim();
 }
 
-const vault = vsearch('vault');
-const ghost = vsearch('ghost-.claude');
+const vault = qmdSearch('vault');
+const ghost = qmdSearch('ghost-.claude');
 
 if (!vault && !ghost) process.exit(0);
 
-const lines = [MARKER_S, '## Relevant context (from previous message search)'];
-if (ghost) { lines.push('', '**Past sessions:**', ghost.slice(0, 1500)); }
-if (vault) { lines.push('', '**Vault:**', vault.slice(0, 800)); }
+const ghostLimit = deepMode ? 3000 : 1500;
+const vaultLimit = deepMode ? 1500 : 800;
+const header = deepMode ? '## Recall: context from memory (deep search)' : '## Relevant context (from previous message search)';
+
+const lines = [MARKER_S, header];
+if (ghost) { lines.push('', '**Past sessions:**', ghost.slice(0, ghostLimit)); }
+if (vault) { lines.push('', '**Vault:**', vault.slice(0, vaultLimit)); }
 lines.push(MARKER_E, '');
 
 try {

@@ -16,6 +16,8 @@ const { spawn } = require('child_process');
 const WORKER = path.join(__dirname, 'auto-search-worker.js');
 const MIN_LENGTH = 25;
 
+const RECALL_PATTERNS = /помнишь|напомни|что мы решили|ранее|до этого|в прошлой сессии|мы обсуждали|мы делали|we discussed|remind me|you said|what did we decide|remember when|previously|last session|last time/i;
+
 function readStdin() {
     return new Promise(resolve => {
         let data = '';
@@ -38,10 +40,11 @@ async function main() {
     if (prompt.trim().length < MIN_LENGTH) return;
 
     const query = prompt.slice(0, 200).replace(/"/g, ' ').trim();
+    const deep = RECALL_PATTERNS.test(prompt) ? 'deep' : '';
 
     // Spawn worker detached — exits immediately, worker runs in background
     // windowsHide prevents console popup on Windows; unref allows hook to exit without waiting
-    const child = spawn(process.execPath, [WORKER, query], {
+    const child = spawn(process.execPath, [WORKER, query, deep], {
         stdio: 'ignore',
         windowsHide: true
     });
