@@ -63,3 +63,8 @@ telemetry/
 ide/
 skills-workspace/
 mcp-needs-auth-cache.json
+# Runtime state (changes every session)
+memory/session/capsule.json
+hooks/pre-compact/.audit-state.json
+scripts/.router-state.json
+plugins/install-counts-cache.json
