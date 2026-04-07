@@ -260,6 +260,47 @@ function main() {
         log(`  WARNING: ${totalStats.archive} entries in archive tier — consider running distillation`);
     }
 
+
+
+    // --- Vault hygiene: detect and remove empty orphan files ---
+    try {
+        const rootFiles = fs.readdirSync(VAULT_DIR)
+            .filter(f => f.endsWith('.md') && f !== 'MOC-Главный.md' && f !== 'CLAUDE.md');
+        const orphans = [];
+        for (const file of rootFiles) {
+            const fp = path.join(VAULT_DIR, file);
+            try {
+                const stat = fs.statSync(fp);
+                if (stat.size === 0) {
+                    orphans.push({ file, reason: 'empty' });
+                    if (!DRY_RUN) fs.unlinkSync(fp);
+                } else {
+                    // Check if duplicate exists in PARA structure
+                    const name = file;
+                    const paraHit = ['10-Projects', '30-Resources', '40-Archive'].some(dir => {
+                        try {
+                            const found = require('child_process').execSync(
+                                'find "' + path.join(VAULT_DIR, dir) + '" -name "' + name.replace(/"/g, '') + '" -type f 2>/dev/null',
+                                { encoding: 'utf8', timeout: 3000 }
+                            ).trim();
+                            return found.length > 0;
+                        } catch { return false; }
+                    });
+                    if (paraHit) orphans.push({ file, reason: 'duplicate (exists in PARA)' });
+                }
+            } catch {}
+        }
+        if (orphans.length > 0) {
+            const deleted = orphans.filter(o => o.reason === 'empty').length;
+            const dupes = orphans.filter(o => o.reason !== 'empty');
+            if (deleted > 0) log('Vault hygiene: deleted ' + deleted + ' empty root files');
+            if (dupes.length > 0) {
+                log('Vault orphans (need manual review): ' + dupes.map(o => o.file).join(', '));
+            }
+        }
+    } catch (e) {
+        log('Vault hygiene error: ' + e.message);
+    }
     if (!DRY_RUN) updateStamp();
 }
 

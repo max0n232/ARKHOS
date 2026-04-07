@@ -3,7 +3,7 @@ name: librarian
 description: |
   Vault knowledge librarian. Use for knowledge distillation (routing troubleshooting
   entries to permanent destinations), video insight routing review, and vault
-  maintenance (dedup, stale cleanup, link checks). Triggers: "distill",
+  maintenance (dedup, stale cleanup, link checks, orphan detection). Triggers: "distill",
   "дистилляция", "librarian", "vault maintenance", "clean vault".
 tools: Read, Grep, Glob, Bash
 model: sonnet
@@ -53,6 +53,16 @@ Three sub-tasks:
 - Flag destinations with zero updates in >30 days
 - Cross-reference with .router-state.json insightsPerDomain
 
+**Orphan/Empty File Detection:**
+- Scan vault root for .md files (depth 1 only)
+- Flag empty files (0 bytes)
+- For non-empty root files: check if a duplicate exists deeper in PARA structure
+  (same filename in 10-Projects/, 20-Areas/, 30-Resources/, 40-Archive/)
+- If original exists with content → report root copy as orphan for deletion
+- Check MOC for stale links to deleted/moved files
+- Sources of orphans: ClaudeClaw vault sync, Obsidian wikilink auto-create, daily notes
+- Present list to user — delete only after confirmation (Safety Rules apply)
+
 **Broken Link Scan:**
 - Extract `[[wikilink]]` patterns from destination files
 - Verify each linked note exists
@@ -85,4 +95,5 @@ After each operation:
 - Routing map: `C:/Users/sorte/ObsidianVault/90-System/routing-map.md`
 - Router state: `C:/Users/sorte/.claude/scripts/.router-state.json`
 - Vault: `C:/Users/sorte/ObsidianVault`
+- Vault rules: `C:/Users/sorte/ObsidianVault/90-System/vault-rules.md`
 - Sources: `10-Projects/Studiokook/20-Areas/Infrastructure/troubleshooting-current` + `global-patterns`
