@@ -200,9 +200,6 @@ function callAnthropic(model, systemPrompt, userMessage, maxTokens = 1500) {
     });
 }
 
-function callHaiku(systemPrompt, userMessage, maxTokens) {
-    return callAnthropic('claude-sonnet-4-6', systemPrompt, userMessage, maxTokens || 2048);
-}
 
 function callSonnet(systemPrompt, userMessage, maxTokens) {
     return callAnthropic('claude-sonnet-4-6', systemPrompt, userMessage, maxTokens || 2048);
@@ -253,7 +250,6 @@ module.exports = {
     appendToVault,
     appendToVaultByRelPath,
     callAnthropic,
-    callHaiku,
     callSonnet,
     getTelegramToken,
     sendTelegram
