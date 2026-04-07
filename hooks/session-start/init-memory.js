@@ -14,18 +14,6 @@ const CLAUDE_DIR = path.join(process.env.HOME || process.env.USERPROFILE, '.clau
 const CAPSULE_PATH = path.join(CLAUDE_DIR, 'memory', 'session', 'capsule.json');
 
 function detectProject(cwd) {
-    const projectsPath = path.join(CLAUDE_DIR, 'projects.json');
-    try {
-        if (fs.existsSync(projectsPath)) {
-            const projects = JSON.parse(fs.readFileSync(projectsPath, 'utf-8'));
-            for (const [name, config] of Object.entries(projects)) {
-                const projectPath = (config.path || config).replace(/\//g, path.sep);
-                if (cwd.toLowerCase().includes(projectPath.toLowerCase())) {
-                    return name;
-                }
-            }
-        }
-    } catch (e) {}
     return path.basename(cwd) || 'unknown';
 }
 
