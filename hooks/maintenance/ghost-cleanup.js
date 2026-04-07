@@ -112,16 +112,15 @@ function main() {
     if (!DRY_RUN) {
         updateStamp();
         if (archived > 0) {
-            const result = spawnSync('bash', ['-c', 'qmd update && qmd embed'], {
-                stdio: 'ignore',
-                timeout: 90000,
+            // Fire-and-forget: avoid WAL contention with QMD MCP server at startup
+            const { spawn } = require("child_process");
+            const child = spawn("bash", ["-c", "sleep 5 && qmd update && qmd embed"], {
+                stdio: "ignore",
+                detached: false,
                 windowsHide: true
             });
-            if (result.status === 0) {
-                log('QMD reindexed');
-            } else {
-                log('QMD reindex failed (run: qmd update && qmd embed)');
-            }
+            child.unref();
+            log("QMD reindex scheduled (background, 5s delay)");
         }
     }
 
