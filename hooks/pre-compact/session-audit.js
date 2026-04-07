@@ -228,6 +228,24 @@ Rules:
 
     saveState({ lastLine: totalLines, lastTimestamp: new Date().toISOString(), transcriptPath });
 
+    // P1: Auto-distillation trigger — check accumulator sizes
+    try {
+        const tsLines = fs.existsSync(TROUBLESHOOTING) ? fs.readFileSync(TROUBLESHOOTING, 'utf8').split('\n').length : 0;
+        const ptLines = fs.existsSync(PATTERNS) ? fs.readFileSync(PATTERNS, 'utf8').split('\n').length : 0;
+        const THRESHOLD = 100;
+        if (tsLines > THRESHOLD || ptLines > THRESHOLD) {
+            console.log(`[AUTO-DISTILL] Accumulators over threshold: troubleshooting=${tsLines} patterns=${ptLines} (limit=${THRESHOLD})`);
+            console.log('[AUTO-DISTILL] Run "distill" in next session to route entries to permanent destinations');
+            // Write flag for compact-report-injector to surface
+            const flagPath = path.join(CLAUDE_DIR, 'hooks', '.distill-needed');
+            fs.writeFileSync(flagPath, JSON.stringify({
+                timestamp: new Date().toISOString(),
+                troubleshooting: tsLines,
+                patterns: ptLines
+            }), 'utf8');
+        }
+    } catch {}
+
     // Formatted report
     const time = new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
     const line = '─'.repeat(52);
