@@ -1,10 +1,12 @@
 # Regeneratable (rebuild on demand)
 mcp-gsc/venv/
+node_modules/
 db/node_modules/
 plugins/cache/
 
 # Session data (local only)
 /projects/
+file-history/
 # Exception: skill project knowledge is tracked
 !skills/**/projects/
 debug/
@@ -66,5 +68,9 @@ mcp-needs-auth-cache.json
 # Runtime state (changes every session)
 memory/session/capsule.json
 hooks/pre-compact/.audit-state.json
+hooks/maintenance/.last-decay
+hooks/.distill-needed
+hooks/maintenance/.last-decay
+hooks/.distill-needed
 scripts/.router-state.json
 plugins/install-counts-cache.json

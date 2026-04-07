@@ -111,6 +111,50 @@ try {
     }
 } catch {}
 
+// --- Creative recall: surface a random cold/archive entry from vault ---
+try {
+    const VAULT_DIR = 'C:/Users/sorte/ObsidianVault';
+    const DECAY_RE = /<!--\s*decay:\S+\s+tier:(cold|archive)\s+rel:[\d.]+\s*-->/;
+    const destinations = [
+        '10-Projects/Studiokook/knowledge.md',
+        '10-Projects/ARKHOS/knowledge.md',
+        '10-Projects/Studiokook/20-Areas/n8n/workflow-patterns.md',
+        '30-Resources/Learning/technical-seo.md',
+        '30-Resources/Learning/ai-ml-patterns.md',
+        '10-Projects/Studiokook/20-Areas/Infrastructure/global-patterns.md'
+    ];
+    const coldEntries = [];
+    for (const rel of destinations) {
+        const fp = path.join(VAULT_DIR, rel);
+        if (!fs.existsSync(fp)) continue;
+        const lines = fs.readFileSync(fp, 'utf8').split('\n');
+        for (const line of lines) {
+            if (line.startsWith('- ') && DECAY_RE.test(line)) {
+                const clean = line.replace(DECAY_RE, '').trim();
+                coldEntries.push({ text: clean, source: path.basename(rel, '.md') });
+            }
+        }
+    }
+    if (coldEntries.length >= 3) {
+        const pick = coldEntries[Math.floor(Math.random() * coldEntries.length)];
+        output.push(`[CREATIVE RECALL] From ${pick.source}: ${pick.text.slice(0, 200)}`);
+    }
+} catch {}
+
+// --- Distillation needed flag ---
+try {
+    const distillFlag = path.join(CLAUDE_DIR, 'hooks', '.distill-needed');
+    if (fs.existsSync(distillFlag)) {
+        const data = JSON.parse(fs.readFileSync(distillFlag, 'utf8'));
+        const age = Date.now() - new Date(data.timestamp).getTime();
+        if (age < 7 * 24 * 60 * 60 * 1000) {
+            output.push(`[DISTILL NEEDED] Accumulators over limit: troubleshooting=${data.troubleshooting} patterns=${data.patterns}. Run "distill" to route to permanent destinations.`);
+        } else {
+            fs.unlinkSync(distillFlag);
+        }
+    }
+} catch {}
+
 if (output.length) {
     console.log(output.join('\n\n'));
 }

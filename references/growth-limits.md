@@ -23,3 +23,24 @@
 | Routing map destinations (17 файлов) | 300 строк каждый | Ревью на дубли при session audit |
 
 **Правило:** лимит ≠ "удалить лишнее". Лимит = "проверь на дубли, deprecated, merge". Полезные данные никогда не удаляются — только консолидируются.
+
+## Memory Decay (automated)
+
+Linear decay runs every 3 days via `hooks/maintenance/memory-decay.js` (SessionStart hook).
+Formula: `relevance = max(0.1, 1.0 - days * 0.015)`. Nothing is ever deleted.
+
+| Tier | Days | Behavior |
+|------|------|----------|
+| active | 0-7 | Normal visibility |
+| warm | 8-21 | Normal visibility |
+| cold | 22-60 | Decay marker added. Creative recall candidate |
+| archive | 60+ | Decay marker added. Creative recall candidate |
+
+Touch: reading an entry promotes it one tier (graduated recall, not instant reset).
+Creative recall: compact-report-injector.js randomly surfaces cold/archive entries at session start.
+
+## Auto-Distillation Trigger
+
+session-audit.js (PreCompact) checks accumulator sizes. If troubleshooting-current.md or
+global-patterns.md exceeds 100 lines → writes `.distill-needed` flag → compact-report-injector.js
+surfaces warning in next session. Flag expires after 7 days.
