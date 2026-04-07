@@ -261,11 +261,25 @@ function main() {
     }
 
 
-
     // --- Vault hygiene: detect and remove empty orphan files ---
     try {
         const rootFiles = fs.readdirSync(VAULT_DIR)
             .filter(f => f.endsWith('.md') && f !== 'MOC-Главный.md' && f !== 'CLAUDE.md');
+
+        // Pre-build set of all .md filenames in PARA structure (pure Node, no shell)
+        const paraNames = new Set();
+        const paraDirs = ['10-Projects', '30-Resources', '40-Archive'];
+        function collectNames(dir) {
+            try {
+                for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+                    const full = path.join(dir, entry.name);
+                    if (entry.isDirectory() && !entry.name.startsWith('.')) collectNames(full);
+                    else if (entry.name.endsWith('.md')) paraNames.add(entry.name);
+                }
+            } catch {}
+        }
+        for (const d of paraDirs) collectNames(path.join(VAULT_DIR, d));
+
         const orphans = [];
         for (const file of rootFiles) {
             const fp = path.join(VAULT_DIR, file);
@@ -274,19 +288,8 @@ function main() {
                 if (stat.size === 0) {
                     orphans.push({ file, reason: 'empty' });
                     if (!DRY_RUN) fs.unlinkSync(fp);
-                } else {
-                    // Check if duplicate exists in PARA structure
-                    const name = file;
-                    const paraHit = ['10-Projects', '30-Resources', '40-Archive'].some(dir => {
-                        try {
-                            const found = require('child_process').execSync(
-                                'find "' + path.join(VAULT_DIR, dir) + '" -name "' + name.replace(/"/g, '') + '" -type f 2>/dev/null',
-                                { encoding: 'utf8', timeout: 3000 }
-                            ).trim();
-                            return found.length > 0;
-                        } catch { return false; }
-                    });
-                    if (paraHit) orphans.push({ file, reason: 'duplicate (exists in PARA)' });
+                } else if (paraNames.has(file)) {
+                    orphans.push({ file, reason: 'duplicate (exists in PARA)' });
                 }
             } catch {}
         }
@@ -301,7 +304,6 @@ function main() {
     } catch (e) {
         log('Vault hygiene error: ' + e.message);
     }
-    if (!DRY_RUN) updateStamp();
 }
 
 main();
