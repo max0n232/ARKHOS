@@ -171,7 +171,7 @@ Return JSON:
 {
   "summary": "1-2 sentences in Russian: what was accomplished this session (tasks done, not process)",
   "errors": ["PROBLEM → ROOT CAUSE → SOLUTION, one line, English only"],
-  "facts": [{"key": "snake_case_id", "value": "concrete fact with value"}],
+  "facts": [{"key": "snake_case_id", "value": "concrete fact with value", "confidence": "high|medium"}],
   "patterns": ["repeatable solutions or process improvements (steps, not vague), English only"]
 }
 
@@ -223,7 +223,9 @@ Rules:
     }
 
     if (extracted.facts?.length) {
-        upsertFacts(MEMORY_FILE, extracted.facts, today);
+        // Filter out low-confidence facts — only high/medium pass
+        const verifiedFacts = extracted.facts.filter(f => !f.confidence || f.confidence !== 'low');
+        if (verifiedFacts.length) upsertFacts(MEMORY_FILE, verifiedFacts, today);
     }
 
     saveState({ lastLine: totalLines, lastTimestamp: new Date().toISOString(), transcriptPath });
