@@ -154,7 +154,7 @@ async function main() {
         return;
     }
 
-    console.log(`Session audit: processing ${totalLines - state.lastLine} new turns...`);
+    console.log(`Session audit: processing ${totalLines - fromLine} new turns...`);
 
     const systemPrompt = `You are a strict technical knowledge extractor. CRITICAL RULES:
 1. Extract ONLY facts explicitly stated in the transcript. NEVER infer, guess, or fabricate.
