@@ -9,6 +9,39 @@ const path = require('path');
 
 const { VAULT_DIR } = require('./paths');
 
+/**
+ * Auto-link known hub terms in content with [[wikilinks]].
+ * Only links terms that aren't already inside [[ ]].
+ */
+// Precompiled regexes — built once at module load, not on every call
+const HUB_LINKS = [
+    ['TranslatePress', 'translatepress'],
+    ['Claude Code', 'claude'],
+    ['Elementor', 'knowledge'],
+    ['ARKHOS', '10-Projects/ARKHOS/_index'],
+    ['Studiokook', '10-Projects/Studiokook/_index'],
+    ['n8n', 'workflow-patterns'],
+    ['PageSpeed', 'technical-seo'],
+    ['Core Web Vitals', 'technical-seo'],
+    ['Obsidian', 'obsidian'],
+    ['QMD', 'qmd'],
+    ['Ghost', 'ghost'],
+].map(([term, target]) => ({
+    re: new RegExp('(?<!\\[\\[)\\b(' + term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ')\\b(?!\\]\\]|[^\\[]*\\]\\])', 'gi'),
+    target,
+    termLower: term.toLowerCase(),
+}));
+
+function autoWikilink(text) {
+    for (const { re, target, termLower } of HUB_LINKS) {
+        re.lastIndex = 0;
+        text = text.replace(re, (match) => {
+            return target === termLower ? '[[' + match + ']]' : '[[' + target + '|' + match + ']]';
+        });
+    }
+    return text;
+}
+
 function obsidianApiKey() {
     try {
         const cfg = JSON.parse(fs.readFileSync(path.join(os.homedir(), '.claude.json'), 'utf8'));
@@ -90,6 +123,9 @@ async function appendToVault(absolutePath, content, opts = {}) {
             content = newLines.join('\n');
         } catch {} // file doesn't exist — proceed
     }
+
+    // Auto-link: wrap known hub names in [[wikilinks]] if not already linked
+    content = autoWikilink(content);
 
     const today = new Date().toISOString().slice(0, 10);
     const entry = '\n<!-- audit:' + today + ' -->\n' + content.trim() + '\n';

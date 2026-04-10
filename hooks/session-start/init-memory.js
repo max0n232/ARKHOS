@@ -60,11 +60,21 @@ function main() {
         })()
         : 'first session';
 
+    // QMD health check — warn if USERPROFILE fix is missing
+    const qmdStore = path.join(process.env.HOME || process.env.USERPROFILE || '', 'AppData', 'Roaming', 'npm', 'node_modules', '@tobilu', 'qmd', 'dist', 'store.js');
+    let qmdWarning = '';
+    try {
+        const src = fs.readFileSync(qmdStore, 'utf8');
+        if (src.includes("process.env.HOME || \"/tmp\"") && !src.includes("USERPROFILE")) {
+            qmdWarning = ' | ⚠️ QMD missing USERPROFILE fix — run: sed -i \'s/process.env.HOME || "\\/tmp"/process.env.HOME || process.env.USERPROFILE || "\\/tmp"/\' "' + qmdStore.replace(/\\/g, '/') + '"';
+        }
+    } catch {}
+
     console.log(JSON.stringify({
         session_id: capsule.session_id,
         project: capsule.project,
         previous: timeSince
-    }));
+    }) + qmdWarning);
 }
 
 main();
