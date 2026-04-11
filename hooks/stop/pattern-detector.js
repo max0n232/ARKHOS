@@ -39,15 +39,23 @@ function fingerprint(input) {
  * Tag format: <!-- pattern:TYPE key:HASH -->
  * Line under tag: - [YYYY-MM-DD] TYPE: description [count:N]
  * Existing lines get counter incremented and date refreshed.
+ *
+ * P4 (success streaks) dedup by session_id so each session writes
+ * at most one entry — existing one gets updated with latest streak length.
  */
-function routeToVault(detection) {
-    const fp = fingerprint(detection.tool_input || detection.type + (detection.total || 0));
+function routeToVault(detection, sessionId) {
+    const isP4 = detection.type === 'P4';
+    const fp = isP4
+        ? `session_${sessionId}`
+        : fingerprint(detection.tool_input || detection.type + (detection.total || 0));
     const tag = `<!-- pattern:${detection.type} key:${fp} -->`;
     const today = new Date().toISOString().slice(0, 10);
 
-    const snippet = (detection.tool_input || detection.message.split('\n')[0])
-        .replace(/\s+/g, ' ')
-        .slice(0, 120);
+    const snippet = isP4
+        ? `streak of ${detection.count} successful ops`
+        : (detection.tool_input || detection.message.split('\n')[0])
+            .replace(/\s+/g, ' ')
+            .slice(0, 120);
 
     let content = '';
     try { content = fs.readFileSync(GLOBAL_PATTERNS, 'utf8'); } catch { content = ''; }
@@ -187,7 +195,7 @@ function detectSuccessPatterns(db, sessionId) {
             `Success pattern: ${streak} consecutive successful operations`,
             JSON.stringify({ type: 'success_streak', count: streak })
         );
-        return { type: 'P4', count: streak };
+        return { type: 'P4', severity: 'low', count: streak, message: `Success streak: ${streak} ops` };
     }
     return null;
 }
@@ -226,12 +234,17 @@ function main() {
         const p2 = detectBudgetBurn(db, sessionId);
         const p4 = detectSuccessPatterns(db, sessionId);
 
+        // P4 routes to vault but does not surface a warning to stdout
+        if (p4) {
+            try { routeToVault(p4, sessionId); } catch (_) {}
+        }
+
         const detections = [p3, p1, p2].filter(d => d !== null);
 
         if (detections.length > 0) {
             for (const det of detections) {
                 recordDetection(db, sessionId, det);
-                try { routeToVault(det); } catch (_) {}
+                try { routeToVault(det, sessionId); } catch (_) {}
             }
 
             // Output most severe warning to stdout so Claude sees it
