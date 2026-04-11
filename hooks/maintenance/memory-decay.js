@@ -36,6 +36,14 @@ const TIERS = {
 
 const STAMP_FILE = path.join(CLAUDE_DIR, 'hooks', 'maintenance', '.last-decay');
 const LOG_FILE = path.join(CLAUDE_DIR, 'logs', 'memory-decay.log');
+const USAGE_TRACKER = path.join(CLAUDE_DIR, 'patterns', 'usage-tracker.json');
+
+// Touch promotion: files referenced in AUTOSEARCH get their effective age reduced.
+// Fresh touch (<=7d) → -14 days, warm touch (<=21d) → -7 days.
+const TOUCH_FRESH_DAYS = 7;
+const TOUCH_WARM_DAYS = 21;
+const TOUCH_FRESH_BOOST = 14;
+const TOUCH_WARM_BOOST = 7;
 
 // Vault destinations from routing-map (rows 1-11, 13-17 — files that accumulate entries)
 const DESTINATIONS = [
@@ -85,6 +93,38 @@ function isDue() {
 
 function updateStamp() {
     try { fs.writeFileSync(STAMP_FILE, new Date().toISOString()); } catch {}
+}
+
+/**
+ * Load usage-tracker.json and build a case-insensitive lookup map.
+ * Keys normalized to lowercase forward-slash paths (qmd emits lowercase).
+ */
+function loadUsageTracker() {
+    try {
+        const data = JSON.parse(fs.readFileSync(USAGE_TRACKER, 'utf8'));
+        const map = new Map();
+        for (const [p, entry] of Object.entries(data)) {
+            map.set(p.toLowerCase().replace(/\\/g, '/'), entry);
+        }
+        return map;
+    } catch {
+        return new Map();
+    }
+}
+
+/**
+ * Compute touch-promotion boost in days for a vault file.
+ * Returns how many days to subtract from each entry's effective age.
+ */
+function getTouchBoost(relPath, tracker, todayMs) {
+    if (tracker.size === 0) return 0;
+    const key = relPath.toLowerCase().replace(/\\/g, '/');
+    const entry = tracker.get(key);
+    if (!entry || !entry.last) return 0;
+    const daysSince = Math.floor((todayMs - new Date(entry.last).getTime()) / 86400000);
+    if (daysSince <= TOUCH_FRESH_DAYS) return TOUCH_FRESH_BOOST;
+    if (daysSince <= TOUCH_WARM_DAYS) return TOUCH_WARM_BOOST;
+    return 0;
 }
 
 function getTier(days) {
@@ -174,7 +214,7 @@ function parseEntries(content) {
  * Process a single vault file: calculate decay, update tier markers.
  * Returns stats about the file.
  */
-function processFile(filePath) {
+function processFile(filePath, touchBoost = 0) {
     if (!fs.existsSync(filePath)) return null;
 
     const content = fs.readFileSync(filePath, 'utf8');
@@ -183,7 +223,7 @@ function processFile(filePath) {
     if (entries.length === 0) return null;
 
     const today = new Date();
-    const stats = { total: 0, active: 0, warm: 0, cold: 0, archive: 0, noDate: 0 };
+    const stats = { total: 0, active: 0, warm: 0, cold: 0, archive: 0, noDate: 0, boosted: 0 };
     let modified = false;
 
     for (const entry of entries) {
@@ -195,7 +235,9 @@ function processFile(filePath) {
         }
 
         const entryDate = new Date(entry.date);
-        const days = Math.floor((today - entryDate) / (24 * 60 * 60 * 1000));
+        const rawDays = Math.floor((today - entryDate) / (24 * 60 * 60 * 1000));
+        const days = Math.max(0, rawDays - touchBoost);
+        if (touchBoost > 0 && rawDays > 0) stats.boosted++;
         const tier = getTier(days);
         const rel = calcRelevance(days);
         stats[tier]++;
@@ -232,15 +274,19 @@ function main() {
 
     log('Memory decay scan starting...');
 
-    const totalStats = { files: 0, total: 0, active: 0, warm: 0, cold: 0, archive: 0, noDate: 0 };
+    const tracker = loadUsageTracker();
+    const todayMs = Date.now();
+    const totalStats = { files: 0, total: 0, active: 0, warm: 0, cold: 0, archive: 0, noDate: 0, boosted: 0, touchedFiles: 0 };
 
     for (const relPath of DESTINATIONS) {
         const absPath = path.join(VAULT_DIR, relPath);
-        const stats = processFile(absPath);
+        const touchBoost = getTouchBoost(relPath, tracker, todayMs);
+        const stats = processFile(absPath, touchBoost);
         if (!stats) continue;
 
         totalStats.files++;
-        for (const key of ['total', 'active', 'warm', 'cold', 'archive', 'noDate']) {
+        if (touchBoost > 0) totalStats.touchedFiles++;
+        for (const key of ['total', 'active', 'warm', 'cold', 'archive', 'noDate', 'boosted']) {
             totalStats[key] += stats[key];
         }
 
@@ -255,6 +301,9 @@ function main() {
 
     log(`Decay complete: ${totalStats.files} files, ${totalStats.total} entries`);
     log(`  Active:${totalStats.active} Warm:${totalStats.warm} Cold:${totalStats.cold} Archive:${totalStats.archive}${totalStats.noDate ? ' NoDate:' + totalStats.noDate : ''}`);
+    if (totalStats.touchedFiles > 0) {
+        log(`  Touch-promoted: ${totalStats.boosted} entries across ${totalStats.touchedFiles} recently-used files`);
+    }
 
     if (totalStats.archive > 20) {
         log(`  WARNING: ${totalStats.archive} entries in archive tier — consider running distillation`);

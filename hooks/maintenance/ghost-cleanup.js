@@ -144,9 +144,14 @@ function main() {
         if (cleaned > 0) log('Cleaned ' + cleaned + ' stale checkpoint flag(s)');
     } catch {}
     // --- Age-based cleanup: remove sessions >90 days with no insights ---
+    // Before purging, write a digest line (first user prompt + date) to the
+    // vault digest file so basic session trails survive in QMD search.
     if (!DRY_RUN && fs.existsSync(ARCHIVE_DIR)) {
         const ageCutoff = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000);
         const archiveFiles = fs.readdirSync(ARCHIVE_DIR).filter(f => f.endsWith('.md'));
+        const VAULT_DIR = path.join(process.env.USERPROFILE || process.env.HOME, 'ObsidianVault');
+        const DIGEST_FILE = path.join(VAULT_DIR, '10-Projects/ARKHOS/ghost-archive-digest.md');
+        const digestLines = [];
         let purged = 0;
         for (const file of archiveFiles) {
             const filePath = path.join(ARCHIVE_DIR, file);
@@ -157,10 +162,27 @@ function main() {
                 const hasInsights = /## Decisions|## Mistakes|## Knowledge|## Strategy/i.test(content)
                     && content.length > 500;
                 if (!hasInsights) {
+                    // Extract first user prompt as digest signal
+                    const firstPrompt = (content.match(/^> \[[^\]]+\][^\n]*\n([^\n]+)/m) || [])[1]
+                        || content.split('\n').find(l => l.trim() && !l.startsWith('#') && !l.startsWith('---'))
+                        || '';
+                    const date = stat.mtime.toISOString().slice(0, 10);
+                    const snippet = firstPrompt.replace(/\s+/g, ' ').slice(0, 160);
+                    if (snippet) digestLines.push(`- [${date}] ${file.replace('.md', '')}: ${snippet}`);
                     fs.unlinkSync(filePath);
                     purged++;
                 }
             } catch {}
+        }
+        if (digestLines.length > 0) {
+            try {
+                fs.mkdirSync(path.dirname(DIGEST_FILE), { recursive: true });
+                const header = fs.existsSync(DIGEST_FILE) ? '' : '# Ghost Archive Digest\n\nSessions purged at 90d with no formal insights — first-prompt trail only.\n\n';
+                fs.appendFileSync(DIGEST_FILE, header + digestLines.join('\n') + '\n', 'utf8');
+                log(`Digest: wrote ${digestLines.length} trail(s) to ${path.basename(DIGEST_FILE)}`);
+            } catch (e) {
+                log(`Digest write failed: ${e.message}`);
+            }
         }
         if (purged > 0) log(`Purged ${purged} empty archived session(s) older than 90d`);
     }

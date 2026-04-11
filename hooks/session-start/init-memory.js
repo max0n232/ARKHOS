@@ -12,6 +12,52 @@ const crypto = require('crypto');
 
 const CLAUDE_DIR = path.join(process.env.HOME || process.env.USERPROFILE, '.claude');
 const CAPSULE_PATH = path.join(CLAUDE_DIR, 'memory', 'session', 'capsule.json');
+const CHECKPOINT_FILE = path.join(CLAUDE_DIR, 'hooks', '.checkpoint-capsule.md');
+const MEMORY_FILE = path.join(CLAUDE_DIR, 'projects', 'C--Users-sorte--claude', 'memory', 'MEMORY.md');
+const CHECKPOINT_TTL_DAYS = 7;
+
+/**
+ * Inject fresh auto-checkpoint from previous session into MEMORY.md.
+ * Removes stale checkpoint blocks and deletes the source file after injection
+ * so the checkpoint appears exactly once in the next session.
+ */
+function injectCheckpoint() {
+    let checkpoint = '';
+    let ageMs = Infinity;
+    try {
+        const stat = fs.statSync(CHECKPOINT_FILE);
+        ageMs = Date.now() - stat.mtimeMs;
+        checkpoint = fs.readFileSync(CHECKPOINT_FILE, 'utf8').trim();
+    } catch {
+        return false;
+    }
+
+    const ttlMs = CHECKPOINT_TTL_DAYS * 86400000;
+    if (!checkpoint || ageMs > ttlMs) {
+        try { fs.unlinkSync(CHECKPOINT_FILE); } catch {}
+        return false;
+    }
+
+    let mem = '';
+    try { mem = fs.readFileSync(MEMORY_FILE, 'utf8'); } catch { return false; }
+
+    mem = mem.replace(/<!--CHECKPOINT-START-->[\s\S]*?<!--CHECKPOINT-END-->\n?/g, '');
+
+    const block = [
+        '<!--CHECKPOINT-START-->',
+        checkpoint,
+        '<!--CHECKPOINT-END-->',
+        ''
+    ].join('\n');
+
+    try {
+        fs.writeFileSync(MEMORY_FILE, block + mem, 'utf8');
+        fs.unlinkSync(CHECKPOINT_FILE);
+        return true;
+    } catch {
+        return false;
+    }
+}
 
 function detectProject(cwd) {
     return path.basename(cwd) || 'unknown';
@@ -53,6 +99,8 @@ function main() {
         console.error(`Failed to save capsule: ${e.message}`);
     }
 
+    const checkpointInjected = injectCheckpoint();
+
     const timeSince = previous?.last_updated
         ? (() => {
             const h = Math.floor((Date.now() - new Date(previous.last_updated)) / 3600000);
@@ -73,7 +121,8 @@ function main() {
     console.log(JSON.stringify({
         session_id: capsule.session_id,
         project: capsule.project,
-        previous: timeSince
+        previous: timeSince,
+        checkpoint: checkpointInjected || undefined
     }) + qmdWarning);
 }
 

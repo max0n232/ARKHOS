@@ -11,12 +11,72 @@
  * Uses better-sqlite3 (sync, native) with prepared statements.
  */
 
+const fs = require('fs');
+const path = require('path');
+const crypto = require('crypto');
+
 const { getDb, getConfig, loadCapsule } = require('../../patterns/db-helper');
+const { VAULT_DIR } = require('../shared/paths');
+
+const GLOBAL_PATTERNS = path.join(
+    VAULT_DIR,
+    '10-Projects/Studiokook/20-Areas/Infrastructure/global-patterns.md'
+);
 
 // Sanitize output (remove ANSI escape codes and control characters)
 function sanitizeOutput(str) {
     if (!str) return '';
     return String(str).replace(/[\x00-\x1F\x7F]/g, '');
+}
+
+// Short deterministic fingerprint for dedup keys
+function fingerprint(input) {
+    return crypto.createHash('md5').update(String(input)).digest('hex').slice(0, 8);
+}
+
+/**
+ * Route a detection to global-patterns.md with counter-based dedup.
+ * Tag format: <!-- pattern:TYPE key:HASH -->
+ * Line under tag: - [YYYY-MM-DD] TYPE: description [count:N]
+ * Existing lines get counter incremented and date refreshed.
+ */
+function routeToVault(detection) {
+    const fp = fingerprint(detection.tool_input || detection.type + (detection.total || 0));
+    const tag = `<!-- pattern:${detection.type} key:${fp} -->`;
+    const today = new Date().toISOString().slice(0, 10);
+
+    const snippet = (detection.tool_input || detection.message.split('\n')[0])
+        .replace(/\s+/g, ' ')
+        .slice(0, 120);
+
+    let content = '';
+    try { content = fs.readFileSync(GLOBAL_PATTERNS, 'utf8'); } catch { content = ''; }
+
+    const SECTION = '## Detections [machine-managed]';
+    if (!content.includes(SECTION)) {
+        content = content.trimEnd() + '\n\n' + SECTION + '\n<!-- managed by pattern-detector.js -->\n';
+    }
+
+    const lines = content.split('\n');
+    const tagIdx = lines.findIndex(l => l.trim() === tag);
+
+    if (tagIdx >= 0) {
+        const nextIdx = tagIdx + 1;
+        if (nextIdx < lines.length && lines[nextIdx].startsWith('- ')) {
+            const existing = lines[nextIdx];
+            const countMatch = existing.match(/\[count:(\d+)\]/);
+            const n = countMatch ? parseInt(countMatch[1]) + 1 : 2;
+            lines[nextIdx] = `- [${today}] ${detection.type} ${detection.severity}: ${snippet} [count:${n}]`;
+        }
+    } else {
+        lines.push(tag);
+        lines.push(`- [${today}] ${detection.type} ${detection.severity}: ${snippet} [count:1]`);
+    }
+
+    try {
+        fs.mkdirSync(path.dirname(GLOBAL_PATTERNS), { recursive: true });
+        fs.writeFileSync(GLOBAL_PATTERNS, lines.join('\n'), 'utf8');
+    } catch {}
 }
 
 // P1: Loop Detection
@@ -171,6 +231,7 @@ function main() {
         if (detections.length > 0) {
             for (const det of detections) {
                 recordDetection(db, sessionId, det);
+                try { routeToVault(det); } catch (_) {}
             }
 
             // Output most severe warning to stdout so Claude sees it
