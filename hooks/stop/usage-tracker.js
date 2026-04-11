@@ -18,11 +18,13 @@ const TRACKER = path.join(CLAUDE_DIR, 'patterns/usage-tracker.json');
 try {
     const mem = fs.readFileSync(MEMORY_FILE, 'utf8');
 
-    // Extract AUTOSEARCH section
+    // Extract AUTOSEARCH section, then only the newest entry (first)
+    // to avoid inflating counts for older rolling-window results.
     const match = mem.match(/<!--AUTOSEARCH-START-->([\s\S]*?)<!--AUTOSEARCH-END-->/);
     if (!match) process.exit(0);
 
-    const section = match[1];
+    const entryMatch = match[1].match(/<!--AS-ENTRY-START-->([\s\S]*?)<!--AS-ENTRY-END-->/);
+    const section = entryMatch ? entryMatch[1] : match[1];
 
     // Extract vault file paths from qmd:// URIs
     const paths = [];

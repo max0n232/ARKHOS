@@ -18,6 +18,9 @@ const MIN_LENGTH = 25;
 
 const RECALL_PATTERNS = /помнишь|напомни|что мы решили|ранее|до этого|в прошлой сессии|мы обсуждали|мы делали|we discussed|remind me|you said|what did we decide|remember when|previously|last session|last time/i;
 
+// Short follow-ups that imply recall ("продолжаем", "дальше") bypass MIN_LENGTH
+const FOLLOWUP_PATTERNS = /^(продолж|дальше|что дальше|далее|next|continue|keep going|go on|ещё|еще|повтори)/i;
+
 function readStdin() {
     return new Promise(resolve => {
         let data = '';
@@ -37,10 +40,12 @@ async function main() {
     // Worker handles its own AUTOSEARCH cleanup before writing — no cleanup needed here.
     // Cleaning here would destroy AUTOSEARCH before the model sees it in MEMORY.md context.
 
-    if (prompt.trim().length < MIN_LENGTH) return;
+    const trimmed = prompt.trim();
+    const isFollowup = FOLLOWUP_PATTERNS.test(trimmed);
+    if (trimmed.length < MIN_LENGTH && !isFollowup) return;
 
     const query = prompt.slice(0, 200).replace(/"/g, ' ').trim();
-    const deep = RECALL_PATTERNS.test(prompt) ? 'deep' : '';
+    const deep = (RECALL_PATTERNS.test(prompt) || isFollowup) ? 'deep' : '';
 
     // Spawn worker detached — exits immediately, worker runs in background
     // windowsHide prevents console popup on Windows; unref allows hook to exit without waiting

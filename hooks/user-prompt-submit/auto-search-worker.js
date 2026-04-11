@@ -40,16 +40,39 @@ if (!vault && !ghost) process.exit(0);
 
 const ghostLimit = deepMode ? 3000 : 1500;
 const vaultLimit = deepMode ? 1500 : 800;
-const header = deepMode ? '## Recall: context from memory (deep search)' : '## Relevant context (from previous message search)';
+const ts = new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+const header = deepMode
+    ? `## Recall [${ts}] "${query.slice(0, 60)}"`
+    : `## Search [${ts}] "${query.slice(0, 60)}"`;
 
-const lines = [MARKER_S, header];
-if (ghost) { lines.push('', '**Past sessions:**', ghost.slice(0, ghostLimit)); }
-if (vault) { lines.push('', '**Vault:**', vault.slice(0, vaultLimit)); }
-lines.push(MARKER_E, '');
+const ENTRY_S = '<!--AS-ENTRY-START-->';
+const ENTRY_E = '<!--AS-ENTRY-END-->';
+const MAX_ENTRIES = 3;
+
+const entry = [ENTRY_S, header];
+if (ghost) { entry.push('', '**Past sessions:**', ghost.slice(0, ghostLimit)); }
+if (vault) { entry.push('', '**Vault:**', vault.slice(0, vaultLimit)); }
+entry.push(ENTRY_E);
 
 try {
     let mem = '';
     try { mem = fs.readFileSync(MEMORY_FILE, 'utf8'); } catch {}
+
+    // Extract existing AUTOSEARCH block and its entries
+    const blockMatch = mem.match(new RegExp(`${MARKER_S}([\\s\\S]*?)${MARKER_E}\\n?`));
+    const existingEntries = [];
+    if (blockMatch) {
+        const entryRe = new RegExp(`${ENTRY_S}[\\s\\S]*?${ENTRY_E}`, 'g');
+        let m;
+        while ((m = entryRe.exec(blockMatch[1])) !== null) {
+            existingEntries.push(m[0]);
+        }
+    }
+
+    // Newest first, cap at MAX_ENTRIES (FIFO rotation)
+    const allEntries = [entry.join('\n'), ...existingEntries].slice(0, MAX_ENTRIES);
+    const block = [MARKER_S, ...allEntries, MARKER_E, ''].join('\n');
+
     const cleaned = mem.replace(new RegExp(`${MARKER_S}[\\s\\S]*?${MARKER_E}\\n?`), '');
-    fs.writeFileSync(MEMORY_FILE, lines.join('\n') + cleaned, 'utf8');
+    fs.writeFileSync(MEMORY_FILE, block + cleaned, 'utf8');
 } catch {}
