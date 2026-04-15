@@ -1,6 +1,6 @@
 # Global Skills Registry
 
-Updated: 2026-03-29
+Updated: 2026-04-15
 
 ## Core (~/.claude/skills/)
 
@@ -12,6 +12,8 @@ Updated: 2026-03-29
 | output-critic | P2 | ACTIVE | Universal output quality gate — auto-critic after generation tasks |
 | obsidian-router | P2 | ACTIVE | Routes vault ops between QMD (search) and Nexus/REST API (CRUD) |
 | strategic-critique | P2 | ACTIVE | Self-critique loop for strategic tasks (plans, SEO, architecture, content) |
+| legal | P2 | ACTIVE | Legal router: research (find law/case law), review (contract analysis), draft (clauses/letters) |
+| direct-response-copy | P2 | ACTIVE | Marketing/sales copy — landing pages, headlines, CTAs, emails; classical frameworks (Schwartz, Hopkins, Ogilvy) + modern techniques |
 
 ## Agents (~/.claude/agents/)
 

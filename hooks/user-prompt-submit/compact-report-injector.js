@@ -19,26 +19,20 @@ const { spawn } = require('child_process');
 
 const CLAUDE_DIR = path.join(os.homedir(), '.claude');
 const PENDING_FILE = path.join(CLAUDE_DIR, 'hooks', '.pending-compact-report.txt');
-const MEMORY_FILE = path.join(CLAUDE_DIR, 'projects/C--Users-sorte--claude/memory/MEMORY.md');
+const CACHE_FILE = path.join(CLAUDE_DIR, 'hooks', '.autosearch-cache.md');
 const CHECKPOINT_WORKER = path.join(__dirname, 'checkpoint-worker.js');
-
-const AUTOSEARCH_RE = /<!--AUTOSEARCH-START-->([\s\S]*?)<!--AUTOSEARCH-END-->/;
 
 let output = [];
 
-// --- AUTOSEARCH relay ---
+// --- AUTOSEARCH relay (read from dedicated cache, not MEMORY.md) ---
 try {
-    const mem = fs.readFileSync(MEMORY_FILE, 'utf8');
-    const match = mem.match(AUTOSEARCH_RE);
-    if (match) {
-        const content = match[1].trim();
-        if (content) {
-            output.push(
-                '[AUTOSEARCH] Vault/Ghost results from previous query — use DIRECTLY, skip manual search:',
-                content,
-                '→ If content is irrelevant to current task → then do manual vault/ghost search.'
-            );
-        }
+    const content = fs.readFileSync(CACHE_FILE, 'utf8').trim();
+    if (content) {
+        output.push(
+            '[AUTOSEARCH] Vault/Ghost results from previous query — use DIRECTLY, skip manual search:',
+            content,
+            '→ If content is irrelevant to current task → then do manual vault/ghost search.'
+        );
     }
 } catch {}
 
@@ -151,6 +145,20 @@ try {
             output.push(`[DISTILL NEEDED] Accumulators over limit: troubleshooting=${data.troubleshooting} patterns=${data.patterns}. Run "distill" to route to permanent destinations.`);
         } else {
             fs.unlinkSync(distillFlag);
+        }
+    }
+} catch {}
+
+// --- Inbox extraction needed flag ---
+try {
+    const inboxFlag = path.join(CLAUDE_DIR, 'hooks', '.inbox-extraction-needed');
+    if (fs.existsSync(inboxFlag)) {
+        const data = JSON.parse(fs.readFileSync(inboxFlag, 'utf8'));
+        const age = Date.now() - new Date(data.timestamp).getTime();
+        if (age < 14 * 24 * 60 * 60 * 1000) {
+            output.push(`[INBOX EXTRACTION — MANDATORY] ${data.count} triaged inbox cards require extraction. This is AUTONOMOUS — act NOW before answering user:\n1. Spawn librarian agent with mode "triage" to extract insights from triaged cards and route to vault destinations\n2. After extraction completes, delete flag file: ~/.claude/hooks/.inbox-extraction-needed\n3. Then proceed with user's request\nCards: ${data.cards.join(', ')}`);
+        } else {
+            fs.unlinkSync(inboxFlag);
         }
     }
 } catch {}

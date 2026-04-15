@@ -3,7 +3,8 @@
  * Auto Search Worker (background process)
  *
  * Spawned detached by auto-search.js. Runs qmd vsearch (vector, cross-lingual)
- * and writes results to MEMORY.md AUTOSEARCH section.
+ * and writes results to ~/.claude/hooks/.autosearch-cache.md (FIFO, 3 entries).
+ * compact-report-injector.js reads this file and injects to stdout.
  * Query passed as process.argv[2].
  */
 
@@ -12,9 +13,7 @@ const path = require('path');
 const { spawnSync } = require('child_process');
 
 const { CLAUDE_DIR, QMD } = require('../shared/paths');
-const MEMORY_FILE = path.join(CLAUDE_DIR, 'projects/C--Users-sorte--claude/memory/MEMORY.md');
-const MARKER_S = '<!--AUTOSEARCH-START-->';
-const MARKER_E = '<!--AUTOSEARCH-END-->';
+const CACHE_FILE = path.join(CLAUDE_DIR, 'hooks', '.autosearch-cache.md');
 
 const query = process.argv[2] || '';
 if (!query) process.exit(0);
@@ -55,24 +54,17 @@ if (vault) { entry.push('', '**Vault:**', vault.slice(0, vaultLimit)); }
 entry.push(ENTRY_E);
 
 try {
-    let mem = '';
-    try { mem = fs.readFileSync(MEMORY_FILE, 'utf8'); } catch {}
+    let cache = '';
+    try { cache = fs.readFileSync(CACHE_FILE, 'utf8'); } catch {}
 
-    // Extract existing AUTOSEARCH block and its entries
-    const blockMatch = mem.match(new RegExp(`${MARKER_S}([\\s\\S]*?)${MARKER_E}\\n?`));
     const existingEntries = [];
-    if (blockMatch) {
-        const entryRe = new RegExp(`${ENTRY_S}[\\s\\S]*?${ENTRY_E}`, 'g');
-        let m;
-        while ((m = entryRe.exec(blockMatch[1])) !== null) {
-            existingEntries.push(m[0]);
-        }
+    const entryRe = new RegExp(`${ENTRY_S}[\\s\\S]*?${ENTRY_E}`, 'g');
+    let m;
+    while ((m = entryRe.exec(cache)) !== null) {
+        existingEntries.push(m[0]);
     }
 
     // Newest first, cap at MAX_ENTRIES (FIFO rotation)
     const allEntries = [entry.join('\n'), ...existingEntries].slice(0, MAX_ENTRIES);
-    const block = [MARKER_S, ...allEntries, MARKER_E, ''].join('\n');
-
-    const cleaned = mem.replace(new RegExp(`${MARKER_S}[\\s\\S]*?${MARKER_E}\\n?`), '');
-    fs.writeFileSync(MEMORY_FILE, block + cleaned, 'utf8');
+    fs.writeFileSync(CACHE_FILE, allEntries.join('\n') + '\n', 'utf8');
 } catch {}
