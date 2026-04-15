@@ -5,10 +5,7 @@
 ## Core Tenets
 
 1. **Evidence over claims** — Проверяй перед заявлением "готово"
-2. **Test-Driven** — Тесты сначала, код потом
-3. **Systematic over ad-hoc** — Процесс важнее догадок
-4. **Simplicity** — Минимум сложности для текущей задачи
-5. **DRY + YAGNI** — Не повторяйся, не добавляй лишнего
+2. **YAGNI → DRY** — Не добавляй впрок; абстрагируй на 3-й копии
 
 ## Forbidden Operations
 
@@ -56,6 +53,15 @@
 - Destructive → require explicit approval + preserve data before deleting
 - >3 files or >200 lines → ask or plan first
 - New skill/command/agent → ALWAYS ask user first (File Discipline above)
+- **File ownership exception** — правка за пределами зоны ответственности проекта: не обходи, запроси доступ. Формат: "Нужно тронуть {path} (зона {project}) для {reason}. Разрешить?". Не "тихо правлю и надеюсь"
+
+## Parallel Agents (merge policy)
+
+Когда 2+ subagent вернули конфликтные результаты:
+1. **Specificity wins** — более конкретный/узкий агент имеет приоритет (wp-specialist > researcher по WP-задаче)
+2. **Read-only vs write** — если один read-only, другой write — доверяй write-агенту (он измерил факт)
+3. **Свежесть данных** — агент, читавший файл/API последним
+4. **Fallback** — при равной уверенности → спроси пользователя, не выбирай случайно
 
 ### Anti-Spiral Rule
 
