@@ -2,7 +2,7 @@
 /**
  * SessionStart Hook: Session Capsule Generator
  *
- * Creates session capsule with unique ID for trace-collector and pattern-detector.
+ * Creates session capsule with unique ID for stop-analytics.
  * Capsule stored at ~/.claude/memory/session/capsule.json
  */
 
@@ -124,6 +124,47 @@ function main() {
         previous: timeSince,
         checkpoint: checkpointInjected || undefined
     }) + qmdWarning);
+
+    // --- Janitor: clean transient files ---
+    const now = Date.now();
+    const DAY = 86400000;
+
+    // Checkpoint flags (1 day TTL)
+    try {
+        const hooksDir = path.join(CLAUDE_DIR, 'hooks');
+        for (const f of fs.readdirSync(hooksDir)) {
+            if (!f.startsWith('.checkpoint-')) continue;
+            const fp = path.join(hooksDir, f);
+            const age = now - fs.statSync(fp).mtimeMs;
+            if (age > DAY) fs.unlinkSync(fp);
+        }
+    } catch {}
+
+    // tmp/ (3 day TTL)
+    try {
+        const tmpDir = path.join(CLAUDE_DIR, 'tmp');
+        if (fs.existsSync(tmpDir)) {
+            for (const f of fs.readdirSync(tmpDir)) {
+                const fp = path.join(tmpDir, f);
+                const stat = fs.statSync(fp);
+                if (now - stat.mtimeMs > 3 * DAY) {
+                    if (stat.isDirectory()) fs.rmSync(fp, { recursive: true, force: true });
+                    else fs.unlinkSync(fp);
+                }
+            }
+        }
+    } catch {}
+
+    // paste-cache/ (7 day TTL)
+    try {
+        const pcDir = path.join(CLAUDE_DIR, 'paste-cache');
+        if (fs.existsSync(pcDir)) {
+            for (const f of fs.readdirSync(pcDir)) {
+                const fp = path.join(pcDir, f);
+                if (now - fs.statSync(fp).mtimeMs > 7 * DAY) fs.unlinkSync(fp);
+            }
+        }
+    } catch {}
 }
 
 main();

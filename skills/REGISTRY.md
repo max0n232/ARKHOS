@@ -45,6 +45,22 @@ Updated: 2026-04-15
 | visual-style | P2 | ACTIVE | Studiokook visual DNA + AI prompt rules |
 | kling-prompt-engineer | P2 | ACTIVE | Kling AI video prompt methodology |
 
+## Trigger Overlaps (конфликтные зоны)
+
+Проверяй при добавлении/правке skill. При совпадении — приоритет по specificity (первый матч).
+
+| Ambiguous trigger | Skills матча | Правило выбора |
+|-------------------|--------------|----------------|
+| "review" | assistant, output-critic, post-mortem | "review" один → output-critic; "review проектов" → assistant; "review сессии/ошибок" → post-mortem |
+| "критика" / "critique" | output-critic, strategic-critique | strategic-critique только для: стратегия/архитектура/контент-план. Иначе output-critic |
+| "стратегия" / "strategy" | strategic-critique, assistant | assistant для: статус/приоритеты. strategic-critique для: критика плана/архитектуры |
+| "автоматизация" | n8n-expert, update-config | n8n-expert для workflow-движка. update-config для hooks/behaviors |
+| "найди" / "поиск" | obsidian-router, legal | legal триггеры (закон/договор/VÕS) имеют приоритет. Иначе obsidian-router |
+| "copy" / "написать текст" | direct-response-copy, content-creator | direct-response-copy для: landing/CTA/email/sales. content-creator для: YouTube/Telegram серий |
+| "помнишь" / "last session" | auto-search hook, ghost | обрабатывается auto-search worker (deep mode), не skill |
+
+**При росте skills >15** — пересмотреть матрицу, искать "мёртвые" триггеры (покрываются двумя skills одинаково).
+
 ## Lifecycle
 
 ```

@@ -14,7 +14,7 @@ Analyze the PROCESS of task execution, not the result.
 ## Architecture
 
 ```
-Stop hooks (trace-collector.js, pattern-detector.js)
+Stop hook (stop-analytics.js — merged traces + patterns + usage)
     ↓ parse transcript, detect errors/retries
     ↓ write to tracker.db (patterns table)
     ↓
