@@ -24,6 +24,13 @@ const CHECKPOINT_WORKER = path.join(__dirname, 'checkpoint-worker.js');
 
 let output = [];
 
+// --- Hook input (transcript_path for THIS session, not latest-mtime JSONL) ---
+let hookInput = {};
+try {
+    const raw = fs.readFileSync(0, 'utf8');
+    if (raw && raw.trim()) hookInput = JSON.parse(raw);
+} catch {}
+
 // --- AUTOSEARCH relay (read from dedicated cache, not MEMORY.md) ---
 try {
     const content = fs.readFileSync(CACHE_FILE, 'utf8').trim();
@@ -55,14 +62,19 @@ if (fs.existsSync(PENDING_FILE)) {
 
 // --- Context usage monitor ---
 try {
-    const projDir = path.join(CLAUDE_DIR, 'projects/C--Users-sorte--claude');
-    const jsonls = fs.readdirSync(projDir)
-        .filter(f => f.endsWith('.jsonl'))
-        .map(f => ({ name: f, mtime: fs.statSync(path.join(projDir, f)).mtimeMs }))
-        .sort((a, b) => b.mtime - a.mtime);
+    // Prefer transcript_path from hook stdin — uniquely identifies THIS session,
+    // avoids reading a parallel session's JSONL (which was causing 94% false alarms).
+    let filePath = hookInput && hookInput.transcript_path;
+    if (!filePath || !fs.existsSync(filePath)) {
+        const projDir = path.join(CLAUDE_DIR, 'projects/C--Users-sorte--claude');
+        const jsonls = fs.readdirSync(projDir)
+            .filter(f => f.endsWith('.jsonl'))
+            .map(f => ({ name: f, mtime: fs.statSync(path.join(projDir, f)).mtimeMs }))
+            .sort((a, b) => b.mtime - a.mtime);
+        filePath = jsonls.length ? path.join(projDir, jsonls[0].name) : null;
+    }
 
-    if (jsonls.length) {
-        const filePath = path.join(projDir, jsonls[0].name);
+    if (filePath && fs.existsSync(filePath)) {
         const stat = fs.statSync(filePath);
         const readSize = Math.min(stat.size, 8192);
         const buf = Buffer.alloc(readSize);
@@ -79,13 +91,17 @@ try {
                     const total = (usage.input_tokens || 0) +
                         (usage.cache_creation_input_tokens || 0) +
                         (usage.cache_read_input_tokens || 0);
-                    const pct = Math.round(total / 2000);
-                    if (pct >= 90) {
+                    // Opus 4.7 [1M context] = 1,000,000 tokens.
+                    // Thresholds scaled down: Opus attention/recall degrades well before
+                    // the hard limit (noticeable >200K of effective context), so warn early.
+                    const CTX_LIMIT = 1000000;
+                    const pct = Math.round(total * 100 / CTX_LIMIT);
+                    if (pct >= 25) {
                         output.push(`[CONTEXT] Context at ${pct}% — /compact recommended NOW`);
-                    } else if (pct >= 80) {
+                    } else if (pct >= 20) {
                         output.push('[CONTEXT] Context at ' + pct + '% — consider /compact or finishing current task');
                         // Auto-checkpoint: spawn worker ONCE per JSONL session
-                        var flagFile = path.join(CLAUDE_DIR, 'hooks', '.checkpoint-' + path.basename(jsonls[0].name, '.jsonl'));
+                        var flagFile = path.join(CLAUDE_DIR, 'hooks', '.checkpoint-' + path.basename(filePath, '.jsonl'));
                         if (!fs.existsSync(flagFile)) {
                             fs.writeFileSync(flagFile, new Date().toISOString(), 'utf8');
                             var child = spawn(process.execPath, [CHECKPOINT_WORKER, filePath], {
@@ -95,8 +111,8 @@ try {
                             child.unref();
                             output.push('[CHECKPOINT] Auto-saving session state — knowledge preserved in Ghost for next session');
                         }
-                    } else if (pct >= 70) {
-                        output.push(`[CONTEXT] Context at ${pct}% — approaching limit, plan accordingly`);
+                    } else if (pct >= 15) {
+                        output.push(`[CONTEXT] Context at ${pct}% — approaching soft limit, plan accordingly`);
                     }
                     break;
                 }
