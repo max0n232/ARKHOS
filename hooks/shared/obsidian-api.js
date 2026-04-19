@@ -200,6 +200,7 @@ function callAnthropic(model, systemPrompt, userMessage, maxTokens = 1500) {
         const body = JSON.stringify({
             model,
             max_tokens: maxTokens,
+            temperature: 0,
             system: systemPrompt,
             messages: [{ role: 'user', content: userMessage }]
         });
@@ -239,6 +240,86 @@ function callAnthropic(model, systemPrompt, userMessage, maxTokens = 1500) {
 
 function callSonnet(systemPrompt, userMessage, maxTokens) {
     return callAnthropic('claude-sonnet-4-6', systemPrompt, userMessage, maxTokens || 2048);
+}
+
+/**
+ * Call Google Gemini API. Free tier: gemini-2.5-flash.
+ * Same interface as callAnthropic.
+ */
+function callGemini(systemPrompt, userMessage, maxTokens = 2048, model = 'gemini-2.5-flash') {
+    return new Promise((resolve, reject) => {
+        const CLAUDE_DIR = path.join(os.homedir(), '.claude');
+        let apiKey = process.env.GEMINI_API_KEY;
+        if (!apiKey) {
+            try { apiKey = fs.readFileSync(path.join(CLAUDE_DIR, 'credentials/gemini-api.key'), 'utf8').trim(); } catch {}
+        }
+        if (!apiKey) return reject(new Error('GEMINI_API_KEY not set'));
+
+        const thinkingBudget = maxTokens >= 2048 ? 1024 : 0;
+        const body = JSON.stringify({
+            systemInstruction: { parts: [{ text: systemPrompt }] },
+            contents: [{ role: 'user', parts: [{ text: userMessage }] }],
+            generationConfig: {
+                maxOutputTokens: maxTokens,
+                temperature: 0,
+                thinkingConfig: { thinkingBudget }
+            }
+        });
+
+        const req = https.request({
+            hostname: 'generativelanguage.googleapis.com',
+            path: `/v1beta/models/${model}:generateContent?key=${apiKey}`,
+            method: 'POST',
+            headers: { 'content-type': 'application/json', 'content-length': Buffer.byteLength(body) }
+        }, res => {
+            let data = '';
+            res.on('data', chunk => data += chunk);
+            res.on('end', () => {
+                try {
+                    const parsed = JSON.parse(data);
+                    if (parsed.error) return reject(new Error(`Gemini API error: ${parsed.error.message || data.slice(0,200)}`));
+                    const text = parsed.candidates?.[0]?.content?.parts?.[0]?.text;
+                    if (!text) return reject(new Error('Empty Gemini response: ' + data.slice(0, 300)));
+                    resolve(text);
+                } catch (e) { reject(new Error('Gemini parse error: ' + e.message)); }
+            });
+        });
+
+        req.on('error', reject);
+        req.setTimeout(45000, () => { req.destroy(); reject(new Error('Gemini timeout')); });
+        req.write(body);
+        req.end();
+    });
+}
+
+/**
+ * Call LLM with primary → fallback chain. Pattern for all scripts: try free tier first,
+ * fall back to paid only on explicit failure (quota/rate/network).
+ *
+ * @param {string} systemPrompt
+ * @param {string} userMessage
+ * @param {number} [maxTokens=2048]
+ * @param {object} [opts]
+ * @param {('gemini'|'sonnet')} [opts.primary='gemini']
+ * @param {('sonnet'|'gemini'|null)} [opts.fallback='sonnet']
+ * @returns {Promise<{text:string, model:string}>}
+ */
+async function callWithFallback(systemPrompt, userMessage, maxTokens, opts = {}) {
+    const primary = opts.primary || 'gemini';
+    const fallback = opts.fallback === undefined ? 'sonnet' : opts.fallback;
+    const callers = {
+        gemini: () => callGemini(systemPrompt, userMessage, maxTokens),
+        sonnet: () => callSonnet(systemPrompt, userMessage, maxTokens)
+    };
+    try {
+        const text = await callers[primary]();
+        return { text, model: primary };
+    } catch (err) {
+        if (!fallback) throw err;
+        process.stderr.write(`[llm-fallback] ${primary} failed: ${err.message} → trying ${fallback}\n`);
+        const text = await callers[fallback]();
+        return { text, model: fallback };
+    }
 }
 
 /**
@@ -287,6 +368,8 @@ module.exports = {
     appendToVaultByRelPath,
     callAnthropic,
     callSonnet,
+    callGemini,
+    callWithFallback,
     getTelegramToken,
     sendTelegram
 };

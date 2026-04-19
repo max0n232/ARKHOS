@@ -37,6 +37,17 @@ function readStdin() {
 
 // --- Transcript parsing ---
 
+function stripAuditBlocks(text) {
+    // Remove PENDING/compact audit report blocks that echo prior sessions —
+    // they poison the LLM into confabulating the PREVIOUS session's narrative.
+    // Matches "AUDIT HH:MM ... → vault: …" sandwiched by rules or code-fence markers.
+    let cleaned = text.replace(/─{3,}[\s\S]*?AUDIT \d{2}:\d{2}[\s\S]*?→ vault:[^\n]*[\s\S]*?─{3,}/g, '[prior audit report stripped]');
+    cleaned = cleaned.replace(/AUDIT \d{2}:\d{2}\n[\s\S]*?→ vault:[^\n]*/g, '[prior audit report stripped]');
+    cleaned = cleaned.replace(/\[AUTOSEARCH\][\s\S]*?(?=\n(?:USER|ASSISTANT|TOOLS_USED):|$)/g, '[autosearch stripped]');
+    cleaned = cleaned.replace(/\[COMPACT REPORT\][\s\S]*?(?=\n(?:USER|ASSISTANT|TOOLS_USED):|$)/g, '[compact report stripped]');
+    return cleaned;
+}
+
 function extractTranscriptSummary(transcriptPath, fromLine = 0) {
     if (!transcriptPath || !fs.existsSync(transcriptPath)) return { text: '', totalLines: 0 };
 
@@ -59,7 +70,7 @@ function extractTranscriptSummary(transcriptPath, fromLine = 0) {
                     .join(' ')
                     .trim();
                 if (text && !text.startsWith('<system-reminder')) {
-                    parts.push(`USER: ${text.slice(0, 300)}`);
+                    parts.push(`USER: ${stripAuditBlocks(text).slice(0, 300)}`);
                 }
             } else if (role === 'assistant') {
                 const text = content
@@ -71,7 +82,7 @@ function extractTranscriptSummary(transcriptPath, fromLine = 0) {
                     .filter(c => c.type === 'tool_use')
                     .map(c => c.name)
                     .filter((v, i, a) => a.indexOf(v) === i);
-                if (text) parts.push(`ASSISTANT: ${text.slice(0, 400)}`);
+                if (text) parts.push(`ASSISTANT: ${stripAuditBlocks(text).slice(0, 400)}`);
                 if (tools.length) parts.push(`TOOLS_USED: ${tools.join(', ')}`);
             }
         } catch {}
@@ -256,7 +267,9 @@ async function main() {
 2. If you are not 100% certain something was mentioned — DO NOT include it.
 3. If a category has nothing — return an empty array. Empty is better than wrong.
 4. Respond with valid JSON only, no prose.
-5. NEVER invent file paths, test counts, module names, or vault paths not in the transcript.`;
+5. NEVER invent file paths, test counts, module names, or vault paths not in the transcript.
+6. The transcript may quote PRIOR audit reports (strings like "воспроизведение 11 задач", "Plan A/B", "18 триажных карточек", "COMPACT REPORT"). These describe OLD sessions — DO NOT treat them as this session's work. Summarize only the CURRENT USER/ASSISTANT turns.
+7. If transcript has no substantive actions, return summary: "Session idle — no substantive work" and empty arrays.`;
 
     const userMessage = `Extract knowledge from this Claude Code session transcript:
 
@@ -341,17 +354,18 @@ Rules:
             : 0;
         const THRESHOLD = 100;
         const FACTS_THRESHOLD = 60;
+        const flagPath = path.join(CLAUDE_DIR, 'hooks', '.distill-needed');
         if (tsLines > THRESHOLD || ptLines > THRESHOLD || factsCount > FACTS_THRESHOLD) {
             console.log(`[AUTO-DISTILL] Over threshold: troubleshooting=${tsLines} patterns=${ptLines} facts=${factsCount} (limits=${THRESHOLD}/${THRESHOLD}/${FACTS_THRESHOLD})`);
             console.log('[AUTO-DISTILL] Run "distill" in next session to synthesize entries');
-            // Write flag for compact-report-injector to surface
-            const flagPath = path.join(CLAUDE_DIR, 'hooks', '.distill-needed');
             fs.writeFileSync(flagPath, JSON.stringify({
                 timestamp: new Date().toISOString(),
                 troubleshooting: tsLines,
                 patterns: ptLines,
                 facts: factsCount
             }), 'utf8');
+        } else if (fs.existsSync(flagPath)) {
+            fs.unlinkSync(flagPath);
         }
     } catch {}
 
