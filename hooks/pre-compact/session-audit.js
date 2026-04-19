@@ -14,7 +14,7 @@ const path = require('path');
 const os = require('os');
 
 const { CLAUDE_DIR, VAULT_DIR } = require('../shared/paths');
-const { callSonnet, appendToVault } = require('../shared/obsidian-api');
+const { callWithFallback, appendToVault } = require('../shared/obsidian-api');
 
 const INFRA_DIR = '10-Projects/Studiokook/20-Areas/Infrastructure';
 const TROUBLESHOOTING = path.join(VAULT_DIR, INFRA_DIR, 'troubleshooting-current.md');
@@ -89,7 +89,73 @@ function extractTranscriptSummary(transcriptPath, fromLine = 0) {
     return { text: sampled, totalLines: lines.length };
 }
 
+// --- Facts filtering ---
+
+const JUNK_KEY_SUBSTRINGS = [
+    'timestamp', 'source_file', 'source_line', 'error_source',
+    'destination_path', 'flag_path', 'score_range',
+    'column_type', 'hooks_runtime', 'runtime_components',
+    'base_directory', 'hook_marker', 'md_path',
+    'md_file_discipline', 'overflow_destination',
+    'extraction_date', 'extraction_vault_path',
+    'agent_error', 'log_error', 'error_log', 'error_time',
+    'error_file', 'error_line', 'error_log_line',
+    'primary_model', 'fallback_model', 'helper_path',
+    'version', 'context_limit', 'model_date', 'vbs_path',
+    'file_example', 'repo_path'
+];
+
+function isJunkFact(fact) {
+    if (!fact || !fact.key || !fact.value) return true;
+    const key = String(fact.key).toLowerCase();
+    const value = String(fact.value).trim();
+
+    for (const pat of JUNK_KEY_SUBSTRINGS) {
+        if (key.includes(pat)) return true;
+    }
+    // Too short to be meaningful config
+    if (value.length < 15) return true;
+    // Pure number / single enum token
+    if (/^\d+$/.test(value)) return true;
+    if (/^[A-Z_]+$/.test(value)) return true;
+    // Datetime-only value (e.g. "2026-04-18 15:05 UTC") — one-off event, not config
+    if (/^\d{4}-\d{2}-\d{2}[\s\d:UTC+-]*$/.test(value)) return true;
+    // Obvious Windows/Unix paths under user home with no other config info
+    if (/^C:\\Users\\[^\\]+\\\.claude\\[^\s]+$/.test(value) && !/\s/.test(value)) return true;
+    // Vault-relative .md pointer — ENTIRE value is a path ending in .md, no prose
+    if (/^[\w\-./]+\.md$/.test(value)) return true;
+    // Ends with _path but value is just the repo-relative segment → probably obvious
+    if (/^(hooks|scripts|agents|skills)\//.test(value) && value.length < 40) return true;
+    return false;
+}
+
 // --- Facts upsert ---
+
+function purgeJunkFactMarkers(lines) {
+    // Self-heal: sweep existing fact markers, drop any whose key matches JUNK_KEY_SUBSTRINGS
+    const out = [];
+    let i = 0;
+    let purged = 0;
+    while (i < lines.length) {
+        const m = lines[i].match(/^<!-- fact:([a-z0-9_]+) -->$/);
+        if (m) {
+            const key = m[1].toLowerCase();
+            const junk = JUNK_KEY_SUBSTRINGS.some(p => key.includes(p));
+            if (junk) {
+                // Skip marker + blank lines + following content line
+                i++;
+                while (i < lines.length && lines[i].trim() === '') i++;
+                if (i < lines.length && lines[i].startsWith('- ')) i++;
+                purged++;
+                continue;
+            }
+        }
+        out.push(lines[i]);
+        i++;
+    }
+    if (purged > 0) console.error(`Session audit: purged ${purged} existing junk fact(s) from MEMORY.md`);
+    return out;
+}
 
 function upsertFacts(filePath, facts, today) {
     if (!facts || !facts.length) return;
@@ -101,7 +167,21 @@ function upsertFacts(filePath, facts, today) {
         content = content.trimEnd() + '\n\n' + SECTION + '\n<!-- managed by session-audit.js -->\n';
     }
 
-    const lines = content.split('\n');
+    let lines = content.split('\n');
+    lines = purgeJunkFactMarkers(lines);
+
+    // Build set of existing fact values (normalized) for dedup
+    const existingValues = new Set();
+    for (let i = 0; i < lines.length; i++) {
+        if (lines[i].trim().startsWith('<!-- fact:')) {
+            let j = i + 1;
+            while (j < lines.length && lines[j].trim() === '') j++;
+            if (j < lines.length && lines[j].startsWith('- ')) {
+                const val = lines[j].slice(2).replace(/\s*\[verified:[^\]]+\]\s*$/, '').trim().toLowerCase();
+                if (val) existingValues.add(val);
+            }
+        }
+    }
 
     for (const fact of facts) {
         if (!fact || typeof fact !== 'object' || !fact.key || !fact.value) continue;
@@ -110,6 +190,12 @@ function upsertFacts(filePath, facts, today) {
         const newLine = `- ${fact.value} [verified:${today}]`;
 
         const tagIdx = lines.findIndex(l => l.trim() === tag);
+        // Value dedup: if this value already exists under a different key, skip
+        const normVal = String(fact.value).trim().toLowerCase();
+        if (tagIdx < 0 && existingValues.has(normVal)) {
+            console.error(`Session audit: skipped duplicate value for key ${key}`);
+            continue;
+        }
         if (tagIdx >= 0) {
             let nextIdx = tagIdx + 1;
             while (nextIdx < lines.length && lines[nextIdx].trim() === '') nextIdx++;
@@ -194,7 +280,8 @@ Rules:
 
     let extracted;
     try {
-        const response = await callSonnet(systemPrompt, userMessage, 1500);
+        const { text: response, model: llmModel } = await callWithFallback(systemPrompt, userMessage, 1500);
+        if (llmModel !== 'gemini') console.error(`Session audit: used fallback model ${llmModel}`);
         const jsonMatch = response.match(/\{[\s\S]*\}/);
         if (!jsonMatch) throw new Error('no JSON in response');
         extracted = JSON.parse(jsonMatch[0]);
@@ -222,11 +309,17 @@ Rules:
         await appendToVault(PATTERNS, content);
     }
 
+    let cleanFacts = [];
     if (extracted.facts?.length) {
-        // Filter out low-confidence facts — only high/medium pass
         const verifiedFacts = extracted.facts.filter(f => !f.confidence || f.confidence !== 'low');
-        if (verifiedFacts.length) upsertFacts(MEMORY_FILE, verifiedFacts, today);
+        cleanFacts = verifiedFacts.filter(f => !isJunkFact(f));
+        const dropped = verifiedFacts.length - cleanFacts.length;
+        if (dropped > 0) console.error(`Session audit: filtered ${dropped} junk fact(s)`);
+        if (cleanFacts.length) upsertFacts(MEMORY_FILE, cleanFacts, today);
+        counts.facts = cleanFacts.length;
     }
+    // Replace extracted.facts so display shows the filtered set (consistent with header count)
+    extracted.facts = cleanFacts;
 
     saveState({ lastLine: totalLines, lastTimestamp: new Date().toISOString(), transcriptPath });
 
