@@ -102,7 +102,12 @@ const JUNK_KEY_SUBSTRINGS = [
     'error_file', 'error_line', 'error_log_line',
     'primary_model', 'fallback_model', 'helper_path',
     'version', 'context_limit', 'model_date', 'vbs_path',
-    'file_example', 'repo_path'
+    'file_example', 'repo_path',
+    // Generic atomic-data suffixes — single value without context = dead weight
+    '_path', '_name', '_id', '_status', '_pattern', '_patter',
+    'schtask', 'commit_pattern', 'model_name', 'workflow_name',
+    'workflow_id', 'plugin_status', 'library_path', 'log_path',
+    'notes_path', 'hook_path'
 ];
 
 function isJunkFact(fact) {
@@ -114,18 +119,22 @@ function isJunkFact(fact) {
         if (key.includes(pat)) return true;
     }
     // Too short to be meaningful config
-    if (value.length < 15) return true;
+    if (value.length < 20) return true;
     // Pure number / single enum token
     if (/^\d+$/.test(value)) return true;
-    if (/^[A-Z_]+$/.test(value)) return true;
+    if (/^[A-Z][A-Z0-9_-]+$/.test(value)) return true;
     // Datetime-only value (e.g. "2026-04-18 15:05 UTC") — one-off event, not config
     if (/^\d{4}-\d{2}-\d{2}[\s\d:UTC+-]*$/.test(value)) return true;
-    // Obvious Windows/Unix paths under user home with no other config info
-    if (/^C:\\Users\\[^\\]+\\\.claude\\[^\s]+$/.test(value) && !/\s/.test(value)) return true;
+    // Bare path (any absolute/relative path, no prose context) — no spaces, < 60 chars
+    if (!/\s/.test(value) && value.length < 60 && /[/\\]/.test(value)) return true;
+    // Starts with C:\Users\…\.claude — user-home artefact
+    if (/^C:\\Users\\[^\\]+\\\.claude\\[^\s]+$/.test(value)) return true;
     // Vault-relative .md pointer — ENTIRE value is a path ending in .md, no prose
     if (/^[\w\-./]+\.md$/.test(value)) return true;
-    // Ends with _path but value is just the repo-relative segment → probably obvious
-    if (/^(hooks|scripts|agents|skills)\//.test(value) && value.length < 40) return true;
+    // Repo-relative segment, short
+    if (/^(hooks|scripts|agents|skills)\//.test(value) && value.length < 60) return true;
+    // Single-token value without pipes/commas/colons (just a name or ID)
+    if (!/[\s,|:;—–-]/.test(value) && value.length < 40) return true;
     return false;
 }
 

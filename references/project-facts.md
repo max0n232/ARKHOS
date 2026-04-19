@@ -22,6 +22,7 @@ Lookup facts for specific projects. Not always in context.
 - Router: dedup ~56%, routes to workflow-patterns/mcp-tools/infrastructure/knowledge
 
 ## Portfolio (Studiokook)
+- Skill files live in `~/Desktop/Studiokook/.claude/skills/` (authoritative location, NOT global `~/.claude/skills/`)
 - NGG gallery 7: 105 photos (koogid), pages 3133+3010 updated, 134 thumbnails with captions
 - Rena template v1 approved: Playfair, designer narratives ET+RU, scroll animations, masonry layout
 - 16/16 projects: unique alt-texts, narrative agent generates 7 texts per project per angle
