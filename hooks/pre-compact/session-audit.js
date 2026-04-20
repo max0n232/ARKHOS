@@ -45,6 +45,12 @@ function stripAuditBlocks(text) {
     cleaned = cleaned.replace(/AUDIT \d{2}:\d{2}\n[\s\S]*?→ vault:[^\n]*/g, '[prior audit report stripped]');
     cleaned = cleaned.replace(/\[AUTOSEARCH\][\s\S]*?(?=\n(?:USER|ASSISTANT|TOOLS_USED):|$)/g, '[autosearch stripped]');
     cleaned = cleaned.replace(/\[COMPACT REPORT\][\s\S]*?(?=\n(?:USER|ASSISTANT|TOOLS_USED):|$)/g, '[compact report stripped]');
+    // Skill/system-prompt fragments echoed back by the assistant — rules, not actions
+    cleaned = cleaned.replace(/### Skill:[\s\S]*?(?=\n(?:USER|ASSISTANT|TOOLS_USED):|$)/g, '[skill block stripped]');
+    cleaned = cleaned.replace(/Output Critic[\s\S]*?(?=\n(?:USER|ASSISTANT|TOOLS_USED):|$)/g, '[critic block stripped]');
+    cleaned = cleaned.replace(/CRITIC PHASE[\s\S]*?(?=\n(?:USER|ASSISTANT|TOOLS_USED):|$)/g, '[critic block stripped]');
+    // CLAUDE.md / Constitution / rules quotes (markdown sections with rule-like headers)
+    cleaned = cleaned.replace(/#{1,3}\s+(File Discipline|Core Tenets|Forbidden Operations|Quality Gates|Knowledge Routing|Escalation|Parallel Agents|Anti-Spiral Rule|Scaling Rules|Constitution|Code Style)[\s\S]*?(?=\n(?:USER|ASSISTANT|TOOLS_USED):|\n#{1,3}\s|$)/g, '[rules block stripped]');
     return cleaned;
 }
 
@@ -249,7 +255,12 @@ async function main() {
     const stdin = await readStdin();
 
     let transcriptPath = '';
-    try { transcriptPath = JSON.parse(stdin).transcript_path || ''; } catch {}
+    let sessionId = '';
+    try {
+        const parsed = JSON.parse(stdin);
+        transcriptPath = parsed.transcript_path || '';
+        sessionId = parsed.session_id || '';
+    } catch {}
 
     const state = loadState();
     const fromLine = (state.transcriptPath === transcriptPath) ? (state.lastLine || 0) : 0;
@@ -297,7 +308,13 @@ Rules:
   key must be stable snake_case (e.g. n8n_version, vps_ip, telegram_cred_id)
   When in doubt — DO NOT add a fact. 0 facts is better than 1 wrong fact.
 - errors: only real problems investigated or solved
-- patterns: established repeatable processes
+- patterns: REPEATABLE PROCESSES DISCOVERED OR APPLIED in THIS session's work (user+assistant turns).
+  NEVER quote rules that were already in the system prompt, CLAUDE.md, skill definitions, or constitution.
+  Bad patterns (REJECT these): "run critic phase after outputs", "MEMORY.md = facts, overflow → references/",
+  "File Discipline", "YAGNI → DRY", "Parallel Agents merge policy" — these are pre-existing rules, not session patterns.
+  Good patterns (ACCEPT): "use bash cp staging.md target.md to bypass mtime race on actively-rewritten files",
+  "read transcript_path from stdin instead of latest-mtime when multiple parallel sessions exist".
+  If nothing actionable was discovered this session → return empty array.
 - Do NOT extract decisions — they are handled by a separate system (Ghost)`;
 
     let extracted;
@@ -401,41 +418,22 @@ Rules:
     const report = parts.join('\n');
     console.log(report);
 
-    // Write pending report — two delivery mechanisms:
-    // 1. File → UserPromptSubmit hook (works in VS Code)
-    // 2. MEMORY.md → always in context (works in Claude Desktop)
-    const PENDING_FILE = path.join(CLAUDE_DIR, 'hooks', '.pending-compact-report.txt');
-    try { fs.writeFileSync(PENDING_FILE, report, 'utf8'); } catch {}
+    // Write pending report to a per-session file. MEMORY.md is cross-session shared,
+    // so writing a PENDING block there leaks another session's report into this one.
+    // compact-report-injector.js reads only `${sessionId}.txt` if session_id arrives in stdin.
+    if (sessionId) {
+        const pendingFile = path.join(CLAUDE_DIR, 'hooks', `.pending-report-${sessionId}.txt`);
+        try { fs.writeFileSync(pendingFile, report, 'utf8'); } catch {}
+    } else {
+        process.stderr.write('[SessionAudit] no session_id in stdin — skipping pending-report write (would leak across sessions)\n');
+    }
 
-    // Write to MEMORY.md as pending section (platform-independent delivery)
+    // Sweep any legacy shared-file or MEMORY.md PENDING block that older hook versions wrote.
+    try { fs.unlinkSync(path.join(CLAUDE_DIR, 'hooks', '.pending-compact-report.txt')); } catch {}
     try {
-        let mem = '';
-        try { mem = fs.readFileSync(MEMORY_FILE, 'utf8'); } catch { mem = ''; }
-
-        const pendingMatch = mem.match(/<!--PENDING-TS:(\d+)-->/);
-        if (pendingMatch) {
-            const pendingAge = Date.now() - parseInt(pendingMatch[1]);
-            if (pendingAge > 3600000) {
-                process.stderr.write('[SessionAudit] Removing stale pending block (>1h old)\n');
-            }
-        }
-        mem = mem.replace(/<!--PENDING-START-->[\s\S]*?<!--PENDING-END-->\n?/g, '');
-
-        const pendingBlock = [
-            `<!--PENDING-START--><!--PENDING-TS:${Date.now()}-->`,
-            '## ⚠️ COMPACT REPORT — ВЫВЕСТИ В ЧАТ И УДАЛИТЬ',
-            '',
-            'Выведи этот отчёт дословно в начале своего ответа (code block), затем удали весь блок',
-            'от PENDING-START до PENDING-END из MEMORY.md через Edit tool.',
-            '',
-            '```',
-            report.trim(),
-            '```',
-            '<!--PENDING-END-->',
-            ''
-        ].join('\n');
-
-        fs.writeFileSync(MEMORY_FILE, pendingBlock + mem, 'utf8');
+        let mem = fs.readFileSync(MEMORY_FILE, 'utf8');
+        const cleaned = mem.replace(/<!--PENDING-START-->[\s\S]*?<!--PENDING-END-->\n?/g, '');
+        if (cleaned !== mem) fs.writeFileSync(MEMORY_FILE, cleaned, 'utf8');
     } catch {}
 }
 
