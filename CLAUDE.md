@@ -56,58 +56,15 @@ Use the `ghost-sessions` MCP tool with `deep_search` (not `search`). Fallback CL
 - Temp/debug артефакты → не сохранять на диск, выводить в чат
 - Новые директории в `~/.claude/` → спроси пользователя
 
-## Obsidian Vault + Knowledge Stack
+## Obsidian Vault
 
-Vault: `C:/Users/sorte/ObsidianVault` (PARA structure). Три слоя доступа:
+Path: `C:/Users/sorte/ObsidianVault` (PARA). Доступ → skill `obsidian-router` (QMD semantic search / Nexus CRUD when app running / REST API fallback). Коллекции QMD: `vault`, `ghost-.claude`.
 
-### 1. QMD — Semantic Search (always available)
+## Session Audit
 
-| Collection | Content | Command |
-|-----------|---------|---------|
-| `vault` | All vault notes | `qmd search vault "<query>"` |
-| `ghost-.claude` | Session history | `qmd search ghost-.claude "<query>"` |
+Автомат: `hooks/pre-compact/session-audit.js` извлекает facts/errors/patterns → MEMORY.md + vault. Ghost перехватывает decisions/mistakes/knowledge.
 
-**FIRST action for any knowledge query** — search before reading/grepping.
-
-### 2. Obsidian REST API — CRUD (always available)
-
-| Действие | MCP Tool |
-|----------|----------|
-| Поиск | `mcp__obsidian__obsidian_simple_search` |
-| Чтение | `mcp__obsidian__obsidian_get_file_contents` |
-| Добавить | `mcp__obsidian__obsidian_patch_content` |
-| Создать | `mcp__obsidian__obsidian_append_content` |
-| Список | `mcp__obsidian__obsidian_list_files_in_vault` |
-
-### 3. Nexus — Full CRUD (when Obsidian app is running)
-
-Prefer Nexus MCP tools (`mcp__nexus__*`) for CRUD when Obsidian is open — keeps sync.
-Fallback: REST API tools above.
-
-### Skill: obsidian-router
-
-Use `obsidian-router` skill for routing logic (QMD vs Nexus vs REST API).
-
-**Когда что:**
-- **MEMORY.md** — факты (ID, configs), всегда в контексте
-- **QMD** — semantic/contextual search across vault + sessions
-- **Vault** — reference material, on-demand через search/read
-- **patterns/** — данные для hooks (JS читает программно)
-
-## Session Audit (автоматический)
-
-Перед завершением последней задачи в сессии — проведи мини-аудит:
-1. Новые факты (ID, endpoints, configs) → MEMORY.md
-2. Ошибки/workarounds → vault `10-Projects/Studiokook/20-Areas/Infrastructure/troubleshooting-current` (`mcp__obsidian__obsidian_patch_content`)
-3. Паттерны (повторяемые решения) → vault `10-Projects/Studiokook/20-Areas/Infrastructure/global-patterns` (`mcp__obsidian__obsidian_patch_content`)
-4. Не дублируй — проверь существующие записи, обнови если нужно
-5. **Проверь лимиты** → read `references/growth-limits.md`, если файл превышает лимит → запусти очистку
-6. **TODO для следующей сессии** → три точки сохранения (любая одна выживет):
-   - MEMORY.md pending block (compact report)
-   - Vault: **проектный** path (`Studiokook/knowledge.md`, НЕ `ARKHOS/knowledge.md`)
-   - Ghost: `ghost knowledge` с точными ключевыми словами
-
-Ручной триггер: "distill" / "дистилляция" → запусти librarian agent.
+Ручное: создан/изменён компонент инфры (VPS service, hook, n8n, MCP, bot) → `10-Projects/ARKHOS/components/{name}.md` (см. `components-registry.md`).
 
 ## Knowledge Routing
 
@@ -124,54 +81,38 @@ Use `obsidian-router` skill for routing logic (QMD vs Nexus vs REST API).
 
 ## Knowledge Distillation
 
-Триггер: "distill" / "дистилляция" → librarian agent.
-Routing map + classification: vault `90-System/routing-map.md` (single source of truth).
-Growth limits: `references/growth-limits.md` (read on-demand при audit step 5).
+Триггер: "distill" / "дистилляция" → librarian agent. Routing map: vault `90-System/routing-map.md`. Growth limits: `references/growth-limits.md`.
 
 ## Scaling Rules
 
-Каждый skill/command/agent = ~100 слов metadata overhead в КАЖДОЙ сессии навсегда.
+Каждый skill/command/agent ≈ 100 слов в контекст каждой сессии навсегда. Перед созданием:
 
-### Перед созданием нового skill/command/agent:
+- <2 использований → inline, не создавай
+- Только manual (нет авто-триггера) → не создавай (мёртвый груз)
+- Похожий существует в `skills/REGISTRY.md` → расширяй
+- Reference doc >300 строк → согласование
 
-1. **Проверь REGISTRY.md** — уже есть похожий? → Расширяй его
-2. Будет использоваться >1 раза? Нет → **не создавай, сделай inline**
-3. Триггерится автоматически? Нет → **не создавай** (manual-only = мёртвый груз)
-4. **Спроси пользователя** перед созданием любого нового skill/command/agent
-
-### Запрещено:
-
-- Создавать skill "на будущее" или "на всякий случай" (YAGNI)
-- Создавать command для одноразовой операции
-- Дублировать функциональность существующего skill — расширяй
-- Создавать agent без явного запроса пользователя
-- Создавать reference docs >300 строк без согласования
-
-### Бюджет:
-
-- SKILL.md: ≤200 строк (больше → выноси в references/)
-- Reference files на skill: ≤5 файлов
-- Всего own skills: сверяй с REGISTRY.md, не плоди
-- Приоритеты: P0 (security) → P1 (weekly use) → P2 (monthly) → P3 (infra/hooks) → P4 (rare, review candidate)
-- Жизненный цикл: ACTIVE → [1 month unused] → REVIEW → DEPRECATED → DELETE. Новый skill → REGISTRY.md + дата + приоритет.
+File discipline (approval, ≤200 строк, data homes) → `constitution.md § File Discipline`. Lifecycle + priorities → `skills/REGISTRY.md`.
 
 ---
 
-## OUTPUT QUALITY PROTOCOL
+## Output Quality
 
-**MANDATORY** after generating: AI prompt, text content, code/script, JSON/config, plan.
-Skill: `output-critic`. Запускай СРАЗУ после генерации v1 — без вопросов к пользователю.
+После генерации (code/prompt/content/config/plan) — `Skill("output-critic")` в том же ответе перед финальной выдачей, включая перед ExitPlanMode. Skip: "quick"/"draft"/"rough"/"черновик"/"быстро"/iterative edits.
 
-### Workflow:
-1. Generate v1
-2. **Call `Skill("output-critic")` tool** — в том же ответе, до финальной выдачи (не ждать Stop hook)
-3. Deliver v2 (or v1 if no gaps: "Critic pass: no significant gaps")
+## Causal Rules
 
-### Plans:
-Before ExitPlanMode → apply critic to plan (Completeness, Clarity, Goal alignment, Edge cases). Fix if ≤ 3.
+Перед решениями в типовых ситуациях → vault `10-Projects/ARKHOS/causal-rules.md` (IF→THEN). Триггеры:
+- ASEO drop, health-check fail, >3 corrections, >3 файла в задаче
+- **Параметрическая/математическая** (DC формулы, координаты, layout, геометрия, EasyKitchen, SU) → Zero Point First + mandatory topic-file reads
+- **EK/DC задача** (set_attribute, redraw, FACADE, BLEND, d106, lenz, mm!key, parent!, CHOOSE) → Read dc-mechanics/facade-gap-standards/formulas/export-pipeline/composition/schema перед кодом
+- **Knowledge routing** (distill, librarian, vault, _index.md) → Read routing-map; new topic-файл = добавь row в routing-map; folder-MOC ≠ свалка
+- **Hooks/agents/settings правка** — Plan agent перед write
 
-### Skip when:
-User said: "quick", "draft", "rough", "черновик", "быстро", или iterative editing.
+## Rollback Protocol
 
-### Manual trigger:
-"critique this" / "review" / "проверь качество" / "is this good enough"
+Перед мульти-шаговыми операциями над критичными файлами (settings.json, hooks/*, CLAUDE.md, rules/*, n8n WF, WP):
+1. `git stash` или зафиксируй HEAD hash
+2. Выполни операции
+3. Ошибка mid-way → `git checkout -- <files>` для отката
+4. Для MCP write (n8n, WP, vault) → прочитай текущее состояние ДО write, лог previous version в `logs/rollback/`

@@ -127,6 +127,9 @@ const JUNK_KEY_SUBSTRINGS = [
     'notes_path', 'hook_path'
 ];
 
+// Keys where short values are legitimate (versions, ports, IDs, credentials refs)
+const SHORT_VALUE_OK_KEY_PATTERNS = /(_version|_port|_id$|_ip$|_host$|_cred_?id|_key$|_token$|_schema$|_contract|_symbol)/i;
+
 function isJunkFact(fact) {
     if (!fact || !fact.key || !fact.value) return true;
     const key = String(fact.key).toLowerCase();
@@ -135,8 +138,9 @@ function isJunkFact(fact) {
     for (const pat of JUNK_KEY_SUBSTRINGS) {
         if (key.includes(pat)) return true;
     }
-    // Too short to be meaningful config
-    if (value.length < 20) return true;
+    const shortValueAllowed = SHORT_VALUE_OK_KEY_PATTERNS.test(key);
+    // Too short to be meaningful config — unless key explicitly declares it's a short-value type
+    if (value.length < 20 && !shortValueAllowed) return true;
     // Pure number / single enum token
     if (/^\d+$/.test(value)) return true;
     if (/^[A-Z][A-Z0-9_-]+$/.test(value)) return true;
@@ -150,93 +154,70 @@ function isJunkFact(fact) {
     if (/^[\w\-./]+\.md$/.test(value)) return true;
     // Repo-relative segment, short
     if (/^(hooks|scripts|agents|skills)\//.test(value) && value.length < 60) return true;
-    // Single-token value without pipes/commas/colons (just a name or ID)
-    if (!/[\s,|:;—–-]/.test(value) && value.length < 40) return true;
+    // Single-token value without pipes/commas/colons (just a name or ID) — unless key allows short
+    if (!/[\s,|:;—–-]/.test(value) && value.length < 40 && !shortValueAllowed) return true;
     return false;
 }
 
-// --- Facts upsert ---
+// --- Pattern/error post-filtering ---
+// LLM sometimes returns generic advice as "patterns" despite system prompt.
+// Reject: prescriptive forms without concrete session context.
+const GENERIC_PATTERN_REJECT = [
+    /^(document|implement|use existing|leverage|consider|ensure|always|never|prioritize|avoid)\s/i,
+    /^when\s+[\w\s]+,\s*(use|offer|verify|implement|consider|check|prefer|prioritize|avoid|ensure)\b/i,  // "When X, use Y" generic-advice form
+    /^for\s+(new|better|improved)\s/i,
+    /\bdedicated (log|reference|file|directory)\b/i,  // meta-advice about structure
+];
 
-function purgeJunkFactMarkers(lines) {
-    // Self-heal: sweep existing fact markers, drop any whose key matches JUNK_KEY_SUBSTRINGS
-    const out = [];
-    let i = 0;
-    let purged = 0;
-    while (i < lines.length) {
-        const m = lines[i].match(/^<!-- fact:([a-z0-9_]+) -->$/);
-        if (m) {
-            const key = m[1].toLowerCase();
-            const junk = JUNK_KEY_SUBSTRINGS.some(p => key.includes(p));
-            if (junk) {
-                // Skip marker + blank lines + following content line
-                i++;
-                while (i < lines.length && lines[i].trim() === '') i++;
-                if (i < lines.length && lines[i].startsWith('- ')) i++;
-                purged++;
-                continue;
-            }
-        }
-        out.push(lines[i]);
-        i++;
+function isGenericPattern(entry) {
+    if (!entry || typeof entry !== 'string') return true;
+    const t = entry.trim();
+    if (t.length < 30) return true;
+    for (const re of GENERIC_PATTERN_REJECT) {
+        if (re.test(t)) return true;
     }
-    if (purged > 0) console.error(`Session audit: purged ${purged} existing junk fact(s) from MEMORY.md`);
-    return out;
+    return false;
 }
 
-function upsertFacts(filePath, facts, today) {
-    if (!facts || !facts.length) return;
+function checkAccumulatorOverflow() {
+    try {
+        const tsLines = fs.existsSync(TROUBLESHOOTING) ? fs.readFileSync(TROUBLESHOOTING, 'utf8').split('\n').length : 0;
+        const ptLines = fs.existsSync(PATTERNS) ? fs.readFileSync(PATTERNS, 'utf8').split('\n').length : 0;
+        const THRESHOLD = 100;
+        const flagPath = path.join(CLAUDE_DIR, 'hooks', '.distill-needed');
+        if (tsLines > THRESHOLD || ptLines > THRESHOLD) {
+            console.log(`[AUTO-DISTILL] Over threshold: troubleshooting=${tsLines} patterns=${ptLines} (limit=${THRESHOLD})`);
+            fs.writeFileSync(flagPath, JSON.stringify({
+                timestamp: new Date().toISOString(),
+                troubleshooting: tsLines,
+                patterns: ptLines
+            }), 'utf8');
+        } else if (fs.existsSync(flagPath)) {
+            fs.unlinkSync(flagPath);
+        }
+    } catch {}
+}
+
+// Append facts to references/project-facts.md under a dated section.
+// Never touches MEMORY.md — prevents index bloat past 200-line cap.
+function appendNicheFacts(filePath, facts, today) {
+    if (!facts?.length) return;
     let content = '';
-    try { content = fs.readFileSync(filePath, 'utf8'); } catch { content = ''; }
-
-    const SECTION = '## Facts [machine-managed]';
+    try { content = fs.readFileSync(filePath, 'utf8'); } catch {}
+    const SECTION = `## Niche Project Facts (moved from MEMORY.md 2026-04-23)`;
     if (!content.includes(SECTION)) {
-        content = content.trimEnd() + '\n\n' + SECTION + '\n<!-- managed by session-audit.js -->\n';
+        content = (content.trimEnd() || '# Project Facts') + `\n\n${SECTION}\n\n`;
     }
-
-    let lines = content.split('\n');
-    lines = purgeJunkFactMarkers(lines);
-
-    // Build set of existing fact values (normalized) for dedup
-    const existingValues = new Set();
-    for (let i = 0; i < lines.length; i++) {
-        if (lines[i].trim().startsWith('<!-- fact:')) {
-            let j = i + 1;
-            while (j < lines.length && lines[j].trim() === '') j++;
-            if (j < lines.length && lines[j].startsWith('- ')) {
-                const val = lines[j].slice(2).replace(/\s*\[verified:[^\]]+\]\s*$/, '').trim().toLowerCase();
-                if (val) existingValues.add(val);
-            }
-        }
+    const auto = `\n<!-- auto-appended ${today} -->\n`;
+    const block = auto + facts.map(f => `- ${f.value} <!-- fact:${String(f.key).slice(0,40)} verified:${today} -->`).join('\n') + '\n';
+    // Dedup: skip values already present in the file
+    const normalized = content.toLowerCase();
+    const toAppend = facts.filter(f => !normalized.includes(String(f.value).trim().toLowerCase().slice(0, 60)));
+    if (!toAppend.length) return;
+    const appendBlock = auto + toAppend.map(f => `- ${f.value} <!-- fact:${String(f.key).slice(0,40)} verified:${today} -->`).join('\n') + '\n';
+    try { fs.appendFileSync(filePath, appendBlock, 'utf8'); } catch (e) {
+        console.error(`Session audit: niche append failed — ${e.message}`);
     }
-
-    for (const fact of facts) {
-        if (!fact || typeof fact !== 'object' || !fact.key || !fact.value) continue;
-        const key = String(fact.key).replace(/[^a-z0-9_]/gi, '_').toLowerCase().slice(0, 40);
-        const tag = `<!-- fact:${key} -->`;
-        const newLine = `- ${fact.value} [verified:${today}]`;
-
-        const tagIdx = lines.findIndex(l => l.trim() === tag);
-        // Value dedup: if this value already exists under a different key, skip
-        const normVal = String(fact.value).trim().toLowerCase();
-        if (tagIdx < 0 && existingValues.has(normVal)) {
-            console.error(`Session audit: skipped duplicate value for key ${key}`);
-            continue;
-        }
-        if (tagIdx >= 0) {
-            let nextIdx = tagIdx + 1;
-            while (nextIdx < lines.length && lines[nextIdx].trim() === '') nextIdx++;
-            if (nextIdx < lines.length && lines[nextIdx].startsWith('- ')) {
-                lines[nextIdx] = newLine;
-            } else {
-                lines.splice(tagIdx + 1, 0, newLine);
-            }
-        } else {
-            lines.push(tag);
-            lines.push(newLine);
-        }
-    }
-
-    fs.writeFileSync(filePath, lines.join('\n'), 'utf8');
 }
 
 // --- State management ---
@@ -266,6 +247,10 @@ async function main() {
     const fromLine = (state.transcriptPath === transcriptPath) ? (state.lastLine || 0) : 0;
     const { text: transcriptSummary, totalLines } = extractTranscriptSummary(transcriptPath, fromLine);
 
+    // Accumulator check runs regardless of extraction — protects against silent overflow
+    // when session has <5 new lines (early return skips the LLM path but flag still needed).
+    checkAccumulatorOverflow();
+
     if (!transcriptSummary) {
         console.log('Session audit: no new content since last run');
         return;
@@ -288,7 +273,7 @@ ${transcriptSummary}
 
 Return JSON:
 {
-  "summary": "1-2 sentences in Russian: what was accomplished this session (tasks done, not process)",
+  "summary": "ONE sentence ≤120 chars in Russian: what was accomplished this session (punchy, no filler like 'в рамках сессии', 'была проведена'). Start with verb.",
   "errors": ["PROBLEM → ROOT CAUSE → SOLUTION, one line, English only"],
   "facts": [{"key": "snake_case_id", "value": "concrete fact with value", "confidence": "high|medium"}],
   "patterns": ["repeatable solutions or process improvements (steps, not vague), English only"]
@@ -343,48 +328,42 @@ Rules:
         await appendToVault(TROUBLESHOOTING, content);
     }
 
+    // Filter generic/prescriptive "patterns" that slip past the system prompt.
+    // Keep only specific, session-grounded patterns.
     if (extracted.patterns?.length) {
-        const content = extracted.patterns.map(p => `- [${today}] ${p}`).join('\n');
-        await appendToVault(PATTERNS, content);
+        const beforeCount = extracted.patterns.length;
+        extracted.patterns = extracted.patterns.filter(p => !isGenericPattern(p));
+        const dropped = beforeCount - extracted.patterns.length;
+        if (dropped > 0) console.error(`Session audit: filtered ${dropped} generic pattern(s)`);
+        counts.patterns = extracted.patterns.length;
+        if (extracted.patterns.length) {
+            const content = extracted.patterns.map(p => `- [${today}] ${p}`).join('\n');
+            await appendToVault(PATTERNS, content);
+        }
     }
 
+    // Facts are NOT written to MEMORY.md (that's an index, not a landfill).
+    // All extracted facts go to references/project-facts.md as on-demand journal.
+    // MEMORY.md grows only via deliberate one-line index entries added by the user.
     let cleanFacts = [];
     if (extracted.facts?.length) {
         const verifiedFacts = extracted.facts.filter(f => !f.confidence || f.confidence !== 'low');
         cleanFacts = verifiedFacts.filter(f => !isJunkFact(f));
         const dropped = verifiedFacts.length - cleanFacts.length;
         if (dropped > 0) console.error(`Session audit: filtered ${dropped} junk fact(s)`);
-        if (cleanFacts.length) upsertFacts(MEMORY_FILE, cleanFacts, today);
+        if (cleanFacts.length) {
+            const REFERENCES_FILE = path.join(CLAUDE_DIR, 'references', 'project-facts.md');
+            appendNicheFacts(REFERENCES_FILE, cleanFacts, today);
+            console.error(`Session audit: routed ${cleanFacts.length} fact(s) → references/project-facts.md`);
+        }
         counts.facts = cleanFacts.length;
     }
-    // Replace extracted.facts so display shows the filtered set (consistent with header count)
     extracted.facts = cleanFacts;
 
     saveState({ lastLine: totalLines, lastTimestamp: new Date().toISOString(), transcriptPath });
 
-    // P1: Auto-distillation trigger — check accumulator sizes
-    try {
-        const tsLines = fs.existsSync(TROUBLESHOOTING) ? fs.readFileSync(TROUBLESHOOTING, 'utf8').split('\n').length : 0;
-        const ptLines = fs.existsSync(PATTERNS) ? fs.readFileSync(PATTERNS, 'utf8').split('\n').length : 0;
-        const factsCount = fs.existsSync(MEMORY_FILE)
-            ? (fs.readFileSync(MEMORY_FILE, 'utf8').match(/<!-- fact:/g) || []).length
-            : 0;
-        const THRESHOLD = 100;
-        const FACTS_THRESHOLD = 60;
-        const flagPath = path.join(CLAUDE_DIR, 'hooks', '.distill-needed');
-        if (tsLines > THRESHOLD || ptLines > THRESHOLD || factsCount > FACTS_THRESHOLD) {
-            console.log(`[AUTO-DISTILL] Over threshold: troubleshooting=${tsLines} patterns=${ptLines} facts=${factsCount} (limits=${THRESHOLD}/${THRESHOLD}/${FACTS_THRESHOLD})`);
-            console.log('[AUTO-DISTILL] Run "distill" in next session to synthesize entries');
-            fs.writeFileSync(flagPath, JSON.stringify({
-                timestamp: new Date().toISOString(),
-                troubleshooting: tsLines,
-                patterns: ptLines,
-                facts: factsCount
-            }), 'utf8');
-        } else if (fs.existsSync(flagPath)) {
-            fs.unlinkSync(flagPath);
-        }
-    } catch {}
+    // Re-run accumulator check AFTER append — post-extraction may have pushed over threshold.
+    checkAccumulatorOverflow();
 
     // Formatted report
     const time = new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
