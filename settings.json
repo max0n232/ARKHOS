@@ -75,12 +75,27 @@
         "hooks": [
           {
             "type": "command",
+            "command": "bash \"C:/Users/sorte/.bun/install/global/node_modules/ghost/ghost\" prompt",
+            "timeout": 5
+          },
+          {
+            "type": "command",
             "command": "node C:/Users/sorte/.claude/hooks/user-prompt-submit/compact-report-injector.js",
             "timeout": 5
           },
           {
             "type": "command",
             "command": "node C:/Users/sorte/.claude/hooks/user-prompt-submit/auto-search.js",
+            "timeout": 3
+          },
+          {
+            "type": "command",
+            "command": "node C:/Users/sorte/.claude/hooks/user-prompt-submit/goal-tracker.js",
+            "timeout": 2
+          },
+          {
+            "type": "command",
+            "command": "node C:/Users/sorte/.claude/hooks/user-prompt-submit/pre-task-loader.js",
             "timeout": 3
           }
         ]
@@ -89,6 +104,11 @@
     "SessionStart": [
       {
         "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"C:/Users/sorte/.bun/install/global/node_modules/ghost/ghost\" session-start",
+            "timeout": 10
+          },
           {
             "type": "command",
             "command": "node C:/Users/sorte/.claude/hooks/session-start/init-memory.js",
@@ -106,6 +126,47 @@
             "command": "node C:/Users/sorte/.claude/hooks/maintenance/memory-decay.js",
             "timeout": 10,
             "statusMessage": "Memory decay scan..."
+          },
+          {
+            "type": "command",
+            "command": "node C:/Users/sorte/.claude/hooks/maintenance/vault-audit.js",
+            "timeout": 15,
+            "statusMessage": "Vault health check..."
+          },
+          {
+            "type": "command",
+            "command": "node C:/Users/sorte/.claude/hooks/maintenance/vault-graph-builder.js",
+            "timeout": 60,
+            "statusMessage": "Vault graph builder..."
+          },
+          {
+            "type": "command",
+            "command": "node C:/Users/sorte/.claude/hooks/maintenance/health-check.js",
+            "timeout": 60,
+            "statusMessage": "Health check..."
+          },
+          {
+            "type": "command",
+            "command": "node C:/Users/sorte/.claude/hooks/maintenance/memory-consolidation.js",
+            "timeout": 90,
+            "statusMessage": "Memory consolidation..."
+          },
+          {
+            "type": "command",
+            "command": "node C:/Users/sorte/.claude/hooks/maintenance/n8n-monitor.js",
+            "timeout": 20,
+            "statusMessage": "n8n failure check..."
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"C:/Users/sorte/.bun/install/global/node_modules/ghost/ghost\" session-end",
+            "timeout": 30
           }
         ]
       }
@@ -115,18 +176,28 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node C:/Users/sorte/.claude/hooks/stop/trace-collector.js",
+            "command": "bash \"C:/Users/sorte/.bun/install/global/node_modules/ghost/ghost\" stop",
+            "timeout": 5
+          },
+          {
+            "type": "command",
+            "command": "node C:/Users/sorte/.claude/hooks/stop/stop-analytics.js",
             "timeout": 15
           },
           {
             "type": "command",
-            "command": "node C:/Users/sorte/.claude/hooks/stop/pattern-detector.js",
-            "timeout": 10
+            "command": "node C:/Users/sorte/.claude/hooks/stop/inbox-extraction-check.js",
+            "timeout": 3
           },
           {
             "type": "command",
-            "command": "node C:/Users/sorte/.claude/hooks/stop/usage-tracker.js",
-            "timeout": 5
+            "command": "node C:/Users/sorte/.claude/hooks/stop/register-check.js",
+            "timeout": 3
+          },
+          {
+            "type": "command",
+            "command": "node C:/Users/sorte/.claude/hooks/stop/session-reflection.js",
+            "timeout": 10
           },
           {
             "type": "command",
@@ -136,20 +207,44 @@
           },
           {
             "type": "prompt",
-            "if": "has_tool_use",
-            "prompt": "Analyze the assistant's last response. If stop_hook_active is true, return {\"ok\": true}.\n\nCHECK 1 — GENERATION TASK:\nWas this a GENERATION task? Generation = code/script written, text content produced, AI prompt generated, JSON/config created, plan via ExitPlanMode. NOT generation = answering questions, running commands, explanations, file reads, search results, status reports, conversational replies.\nIf GENERATION task AND response does NOT contain 'CRITIC PHASE' or 'Critic pass:' → return {\"ok\": false, \"reason\": \"Generation without critic. Use Skill tool: Skill('output-critic') in the SAME response before final output — do NOT wait for Stop hook. Apply: score Completeness/Clarity/Goal alignment/Edge cases (1-5), gaps ≤3, improved v2. Mark with CRITIC PHASE header.\"}.\n\nCHECK 2 — SEARCH VAULT FIRST:\nLook at ALL tool_use calls made in this assistant turn. If ANY tools were used (other than only Read on MEMORY.md/settings.json, or only Bash for a single quick command like git status) AND the task involves project work (content, SEO, SMM, translations, WordPress, n8n, Instagram, architecture, analysis, any Studiokook or AiGeneration work) AND the first tool_use was NOT ghost-sessions deep_search, mcp__obsidian, Bash(ghost search *), or Bash(qmd *) AND the MEMORY.md context does NOT contain an AUTOSEARCH section → return {\"ok\": false, \"reason\": \"Prompt hook condition was not met: Project task without vault search. FIRST tool must be ghost-sessions deep_search or mcp__obsidian before doing any project work. Vault contains past decisions, strategies, and patterns — always check before acting.\"}.\n\nCHECK 3 — ARCHITECTURE CHANGELOG:\nLook at ALL Write/Edit tool_use calls made in this session. If ANY tool_use has file_path matching a structural ARKHOS infra change:\n- New file in ObsidianVault/10-Projects/ARKHOS/components/ or libraries/\n- New or edited file in ~/.claude/hooks/ (new hook or removed hook)\n- New file in ~/.claude/skills/*/SKILL.md\n- Edit to ~/.claude/settings.json touching hooks section\n- New top-level dir under Desktop/arkhos-* (new service)\nAND no Write/Edit in this session touched ObsidianVault/10-Projects/ARKHOS/architecture-changelog.md\nAND the assistant's last message does NOT contain the literal string '#no-changelog'\n→ return {\"ok\": false, \"reason\": \"ARKHOS infra change without changelog update. Structural change detected but architecture-changelog.md was not updated this session. Append entry now: ### <emoji> <YYYY-MM-DD> — <title> with Контекст/Решение/Результат/Статус sections at top of ## Записи. If intentional skip, include #no-changelog in your final message.\"}.\nIgnore: edits to existing component content (typos, small updates), edits to tmp/ or .backup/ or .test/ paths, edits to CLAUDE.md unless adding a new rule.\n\n\nCHECK 4 — SKILL CREATION:\nIf any Write or Edit tool_use in this session created or modified a file matching ~/.claude/skills/*/SKILL.md AND no prior tool_use in the same session invoked the Skill tool with skill='anthropic-skills:skill-creator' or similar skill-creator tool → return {\"ok\": false, \"reason\": \"Skill file created/modified without using skill-creator. Use Skill('anthropic-skills:skill-creator') before manually writing SKILL.md files — it ensures proper structure and registration.\"}.\n\nIf none of the four checks fail, return {\"ok\": true}."
+            "prompt": "Analyze the assistant's last response. If stop_hook_active is true, return {\"ok\": true}.\n\nCHECK 1 — GENERATION TASK:\nWas this a GENERATION task? Generation = code/script written, text content produced, AI prompt generated, JSON/config created, plan via ExitPlanMode, recommendation lists with proposed actions, tool/plugin selection plans, multi-step proposals presented to user. NOT generation = answering factual questions, running diagnostic commands, pure explanations of existing state, file reads, search results, status reports without action proposals, conversational replies.\nIf GENERATION task AND response does NOT contain 'CRITIC PHASE' or 'Critic pass:' → return {\"ok\": false, \"reason\": \"Generation without critic. Use Skill tool: Skill('output-critic') in the SAME response before final output — do NOT wait for Stop hook. Apply: score Completeness/Clarity/Goal alignment/Edge cases (1-5), gaps ≤3, improved v2. Mark with CRITIC PHASE header.\"}.\n\nCHECK 2 — SEARCH VAULT FIRST:\nLook at ALL tool_use calls made in this assistant turn. If ANY tools were used (other than only Read on MEMORY.md/settings.json, or only Bash for a single quick command like git status) AND the task involves project work (content, SEO, SMM, translations, WordPress, n8n, Instagram, architecture, analysis, any Studiokook or AiGeneration work) AND the first tool_use was NOT ghost-sessions deep_search, mcp__obsidian, Bash(ghost search *), or Bash(qmd *) AND the MEMORY.md context does NOT contain an AUTOSEARCH section → return {\"ok\": false, \"reason\": \"Prompt hook condition was not met: Project task without vault search. FIRST tool must be ghost-sessions deep_search or mcp__obsidian before doing any project work. Vault contains past decisions, strategies, and patterns — always check before acting.\"}.\n\nCHECK 3 — ARCHITECTURE CHANGELOG:\nLook at ALL Write/Edit tool_use calls made in this session. If ANY tool_use has file_path matching a structural ARKHOS infra change:\n- New file in ObsidianVault/10-Projects/ARKHOS/components/ or libraries/\n- New or edited file in ~/.claude/hooks/ (new hook or removed hook)\n- New file in ~/.claude/skills/*/SKILL.md\n- Edit to ~/.claude/settings.json touching hooks section\n- New top-level dir under Desktop/arkhos-* (new service)\nAND no Write/Edit in this session touched ObsidianVault/10-Projects/ARKHOS/architecture-changelog.md\nAND the assistant's last message does NOT contain the literal string '#no-changelog'\n→ return {\"ok\": false, \"reason\": \"ARKHOS infra change without changelog update. Structural change detected but architecture-changelog.md was not updated this session. Append entry now: ### <emoji> <YYYY-MM-DD> — <title> with Контекст/Решение/Результат/Статус sections at top of ## Записи. If intentional skip, include #no-changelog in your final message.\"}.\nIgnore: edits to existing component content (typos, small updates), edits to tmp/ or .backup/ or .test/ paths, edits to CLAUDE.md unless adding a new rule.\n\n\nCHECK 4 — SKILL CREATION:\nIf any Write or Edit tool_use in this session created or modified a file matching ~/.claude/skills/*/SKILL.md AND no prior tool_use in the same session invoked the Skill tool with skill='anthropic-skills:skill-creator' or similar skill-creator tool → return {\"ok\": false, \"reason\": \"Skill file created/modified without using skill-creator. Use Skill('anthropic-skills:skill-creator') before manually writing SKILL.md files — it ensures proper structure and registration.\"}.\n\nIf none of the four checks fail, return {\"ok\": true}.",
+            "if": "has_tool_use"
           }
         ]
       }
     ],
     "PreToolUse": [
       {
-        "if": "tool_name == 'Bash'",
         "hooks": [
           {
             "type": "command",
             "command": "node C:/Users/sorte/.claude/hooks/pre-tool-use/production-guard.js",
             "timeout": 3
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"C:/Users/sorte/.bun/install/global/node_modules/ghost/ghost\" post-write",
+            "timeout": 5
+          },
+          {
+            "type": "command",
+            "command": "node C:/Users/sorte/.claude/hooks/post-tool-use/vault-graph-dispatcher.js",
+            "timeout": 3
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"C:/Users/sorte/.bun/install/global/node_modules/ghost/ghost\" post-task",
+            "timeout": 5
           }
         ]
       }
@@ -173,12 +268,6 @@
             "command": "node C:/Users/sorte/.claude/hooks/pre-compact/session-audit.js",
             "timeout": 45,
             "statusMessage": "Extracting session knowledge..."
-          },
-          {
-            "type": "command",
-            "command": "node C:/Users/sorte/.claude/hooks/pre-compact/ghost-finalize.js",
-            "timeout": 90,
-            "statusMessage": "Finalizing Ghost session..."
           }
         ]
       }
@@ -187,6 +276,10 @@
   "statusLine": {
     "type": "command",
     "command": "node -e \"const d=JSON.parse(require('fs').readFileSync(0,'utf8'));const u=Math.round(d.context_window?.used_percentage||0);const r=Math.round(d.context_window?.remaining_percentage||0);const m=d.model?.display_name||'';const c=u>=80?'\\x1b[31m':u>=50?'\\x1b[33m':'\\x1b[32m';process.stdout.write(u?c+'ctx: '+u+'% | '+r+'% left\\x1b[0m  '+m:m)\""
+  },
+  "enabledPlugins": {
+    "skill-creator@claude-plugins-official": true,
+    "frontend-design@claude-plugins-official": true
   },
   "extraKnownMarketplaces": {
     "claude-plugins-official": {
