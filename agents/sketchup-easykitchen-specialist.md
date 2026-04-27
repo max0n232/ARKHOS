@@ -55,6 +55,7 @@ Before ANY DC formula change:
 
 ## Critical Gotchas (cheat-sheet)
 
+- **NEVER erase Главное меню (mm-instance) from scene.** Single source of truth для всех `mm!a1001..a1006`. При любом cleanup loop фильтровать: `next if e.definition.name =~ /^Главное меню/`. Если случайно удалён — restore: `m.entities.add_instance(m.definitions.find{|d|d.name=~/^Главное меню/}, Geom::Transformation.new([0,0,0]))`.
 - **TT_CORNER countertop only for BF1A.** All other L-corner kitchens stack two `Столешница прямая` with eurocut (мама/папа, depth 10mm, width_2 600mm) — read `countertop-eurocut.md` before any countertop work. `EkRealCompose.l_kitchen` defaults to `kind: :corner` (TT_CORNER) — override to two straights + `apply_eurocut`.
 - CT depth = **650mm** (600 cab + 50mm front overhang), not 600. Using 600 in `add_countertop` rotates overhang into the wall after `rotation 90`.
 - `redraw_with_undo(bg1)` hangs SU on 1489 defs → POINT redraw on specific instance only
