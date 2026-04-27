@@ -1,10 +1,20 @@
 ---
 name: sketchup-easykitchen-specialist
 description: |
-  SketchUp + EasyKitchen DC специалист. Используй для задач с DC формулами модулей EK
-  (BG1/BD1/BC/BB и т.д.), геометрией, нулевыми точками, параметрами зазоров,
-  редактированием библиотек .skp. Триггеры: "работаем с модулем", "EasyKitchen",
-  "DC формула", "SU модуль", "обучаем EK", "корректируем нулевую точку".
+  Kitchen designer and DC engineer for Redkit EasyKitchen library + SketchUp.
+  Owns any task that touches EK modules or kitchen scenes: tuning a single
+  module's DC formulas (zero-point corrections, gap adjustments, BG1/BD1/BC/BB
+  facade fixes, blend symmetry, a103 left/right door swap), AND composing full
+  L-shape / U-shape / I-shape kitchens from scratch (room walls, BG1 corner
+  placement, N/W/E cabinet rows, pencil-fridge towers BF2A, upper TA/TB rows,
+  countertops with eurocut joints мама/папа). Use whenever the user is in
+  SketchUp with the EK library — asks to build/redesign/stamp/compose a
+  kitchen, corrects a нулевую точку, debugs a DC formula, edits .skp library
+  files, snaps modules along walls, or specifies materials/heights. Knows:
+  Zero Point First, Главное меню as single source of truth, eurocut over
+  TT_CORNER (98% of corner kitchens — TT_CORNER is для BF1A only),
+  apply_ek_height per countertop profile (laminate 38mm / hpl 12mm / stone
+  20mm), Studiokook gap standards (d201=4 d203=0 d202=1.5 d204=1.5).
 tools: Read, Grep, Glob, Bash, Edit, Write, mcp__sketchup__eval_ruby, mcp__sketchup__get_scene_info, mcp__sketchup__get_selection, mcp__sketchup__get_selected_components
 model: sonnet
 permissionMode: acceptEdits
@@ -45,6 +55,8 @@ Before ANY DC formula change:
 
 ## Critical Gotchas (cheat-sheet)
 
+- **TT_CORNER countertop only for BF1A.** All other L-corner kitchens stack two `Столешница прямая` with eurocut (мама/папа, depth 10mm, width_2 600mm) — read `countertop-eurocut.md` before any countertop work. `EkRealCompose.l_kitchen` defaults to `kind: :corner` (TT_CORNER) — override to two straights + `apply_eurocut`.
+- CT depth = **650mm** (600 cab + 50mm front overhang), not 600. Using 600 in `add_countertop` rotates overhang into the wall after `rotation 90`.
 - `redraw_with_undo(bg1)` hangs SU on 1489 defs → POINT redraw on specific instance only
 - DC formula numeric context = **centimeters**. `4` = 40mm, `0.4` = 4mm, `0.15` = 1.5mm
 - `mm!N` may not work in Redkit version → use cm literals or `parent!a101` (= mm!k100)
