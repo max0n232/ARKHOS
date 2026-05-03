@@ -74,3 +74,6 @@ hooks/maintenance/.last-decay
 hooks/.distill-needed
 scripts/.router-state.json
 plugins/install-counts-cache.json
+hooks/maintenance/.*-state.json
+hooks/stop/.*-state.json
+hooks/.pending-report-*.txt
