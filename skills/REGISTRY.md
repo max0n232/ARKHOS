@@ -1,6 +1,6 @@
 # Global Skills Registry
 
-Updated: 2026-04-15
+Updated: 2026-05-03
 
 ## Core (~/.claude/skills/)
 
@@ -12,8 +12,6 @@ Updated: 2026-04-15
 | output-critic | P2 | ACTIVE | Universal output quality gate — auto-critic after generation tasks |
 | obsidian-router | P2 | ACTIVE | Routes vault ops between QMD (search) and Nexus/REST API (CRUD) |
 | strategic-critique | P2 | ACTIVE | Self-critique loop for strategic tasks (plans, SEO, architecture, content) |
-| legal | P2 | ACTIVE | Legal router: research (find law/case law), review (contract analysis), draft (clauses/letters) |
-| direct-response-copy | P2 | ACTIVE | Marketing/sales copy — landing pages, headlines, CTAs, emails; classical frameworks (Schwartz, Hopkins, Ogilvy) + modern techniques |
 
 ## Agents (~/.claude/agents/)
 
@@ -24,6 +22,11 @@ Updated: 2026-04-15
 | wp-auditor | P2 | ACTIVE | WordPress diagnostics, read-only (Sonnet) |
 | wp-specialist | P1 | ACTIVE | WordPress REST API modifications (Sonnet) |
 | librarian | P2 | ACTIVE | Vault librarian — distillation, routing review, maintenance (Sonnet) |
+| sketchup-easykitchen-specialist | P1 | ACTIVE | EasyKitchen DC tuning + L/U/I-shape kitchen composition (Sonnet) |
+| codex-second-opinion | P2 | ACTIVE | Cross-check via OpenAI Codex CLI (GPT-5) — independent review (Sonnet) |
+| gemini-mega-context | P2 | ACTIVE | Large-context delegate (2M ctx, Gemini 2.5 Pro) — repo audit, transcripts (Sonnet) |
+| gemini-multimodal | P2 | ACTIVE | Native multimodal — image/video/audio analysis via Gemini (Sonnet) |
+| gemini-utility | P3 | ACTIVE | Routine cost-saving delegate — Flash translations, parsing, formatting (Sonnet) |
 
 ## Studiokook (~/Desktop/Studiokook/.claude/skills/)
 
@@ -55,9 +58,11 @@ Updated: 2026-04-15
 | "критика" / "critique" | output-critic, strategic-critique | strategic-critique только для: стратегия/архитектура/контент-план. Иначе output-critic |
 | "стратегия" / "strategy" | strategic-critique, assistant | assistant для: статус/приоритеты. strategic-critique для: критика плана/архитектуры |
 | "автоматизация" | n8n-expert, update-config | n8n-expert для workflow-движка. update-config для hooks/behaviors |
-| "найди" / "поиск" | obsidian-router, legal | legal триггеры (закон/договор/VÕS) имеют приоритет. Иначе obsidian-router |
-| "copy" / "написать текст" | direct-response-copy, content-creator | direct-response-copy для: landing/CTA/email/sales. content-creator для: YouTube/Telegram серий |
+| "найди" / "поиск" | obsidian-router | используется для vault-операций |
 | "помнишь" / "last session" | auto-search hook, ghost | обрабатывается auto-search worker (deep mode), не skill |
+| "second opinion" / "cross-check" | codex-second-opinion | независимая проверка через GPT-5 Codex |
+| "проанализируй всю кодовую базу" / "большой контекст" | gemini-mega-context | 2M ctx делегат |
+| "переведи" / "tõlgi" / "format JSON" | gemini-utility | routine Flash-делегат |
 
 **При росте skills >15** — пересмотреть матрицу, искать "мёртвые" триггеры (покрываются двумя skills одинаково).
 
