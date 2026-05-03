@@ -90,11 +90,6 @@
           },
           {
             "type": "command",
-            "command": "node C:/Users/sorte/.claude/hooks/user-prompt-submit/goal-tracker.js",
-            "timeout": 2
-          },
-          {
-            "type": "command",
             "command": "node C:/Users/sorte/.claude/hooks/user-prompt-submit/pre-task-loader.js",
             "timeout": 3
           }
@@ -156,6 +151,12 @@
             "command": "node C:/Users/sorte/.claude/hooks/maintenance/n8n-monitor.js",
             "timeout": 20,
             "statusMessage": "n8n failure check..."
+          },
+          {
+            "type": "command",
+            "command": "node C:/Users/sorte/.claude/hooks/maintenance/observation-watch.js",
+            "timeout": 15,
+            "statusMessage": "Observation watch..."
           }
         ]
       }
@@ -178,21 +179,6 @@
             "type": "command",
             "command": "bash \"C:/Users/sorte/.bun/install/global/node_modules/ghost/ghost\" stop",
             "timeout": 5
-          },
-          {
-            "type": "command",
-            "command": "node C:/Users/sorte/.claude/hooks/stop/stop-analytics.js",
-            "timeout": 15
-          },
-          {
-            "type": "command",
-            "command": "node C:/Users/sorte/.claude/hooks/stop/inbox-extraction-check.js",
-            "timeout": 3
-          },
-          {
-            "type": "command",
-            "command": "node C:/Users/sorte/.claude/hooks/stop/register-check.js",
-            "timeout": 3
           },
           {
             "type": "command",
@@ -235,7 +221,7 @@
           {
             "type": "command",
             "command": "node C:/Users/sorte/.claude/hooks/post-tool-use/vault-graph-dispatcher.js",
-            "timeout": 3
+            "timeout": 5
           }
         ]
       },

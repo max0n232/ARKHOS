@@ -1,0 +1,251 @@
+#!/usr/bin/env node
+/**
+ * Vault Graph Builder — Auto-inject `## Related` wikilinks into vault notes.
+ *
+ * For notes without a `## Related` section: derive a query from title + first
+ * frontmatter tags + first 200 content chars, run `qmd search --collection vault`,
+ * append top-3 wikilinks (excluding self).
+ *
+ * Throttled: runs once per INTERVAL_DAYS. Budget per run: MAX_FILES files.
+ * Scope: 10-Projects only (skips 00-Inbox, 40-Archive, .smart-env, .obsidian).
+ *
+ * Usage: node vault-graph-builder.js [--dry-run] [--force]
+ */
+
+const fs = require('fs');
+const path = require('path');
+const { spawnSync } = require('child_process');
+const { CLAUDE_DIR, VAULT_DIR, QMD } = require('../shared/paths');
+
+const INTERVAL_DAYS = 7;
+const MAX_FILES = 20;
+const QMD_TOP_N = 3;
+const QMD_MIN_SCORE = 0.35;
+const NO_PICKS_RETRY_MS = 14 * 86400 * 1000;
+const SCOPE_DIR = path.join(VAULT_DIR, '10-Projects');
+const SKIP = new Set(['.obsidian', '.smart-env', '.trash', 'node_modules', '.git', '00-Inbox', '40-Archive']);
+const STATE_FILE = path.join(CLAUDE_DIR, 'hooks', 'maintenance', '.graph-builder-state.json');
+const LOG_FILE = path.join(CLAUDE_DIR, 'logs', 'vault-graph.log');
+
+const rawArgs = process.argv.slice(2);
+const ARGS = new Set(rawArgs);
+const DRY_RUN = ARGS.has('--dry-run');
+const FORCE = ARGS.has('--force');
+const fileFlagIdx = rawArgs.indexOf('--file');
+const SINGLE_FILE = fileFlagIdx >= 0 ? rawArgs[fileFlagIdx + 1] : null;
+const SINGLE_COOLDOWN_MS = 24 * 3600 * 1000;
+
+function loadState() {
+  try { return JSON.parse(fs.readFileSync(STATE_FILE, 'utf8')); }
+  catch { return { lastRun: 0, processed: {} }; }
+}
+
+function saveState(s) {
+  fs.mkdirSync(path.dirname(STATE_FILE), { recursive: true });
+  fs.writeFileSync(STATE_FILE, JSON.stringify(s, null, 2));
+}
+
+function log(line) {
+  try {
+    fs.mkdirSync(path.dirname(LOG_FILE), { recursive: true });
+    fs.appendFileSync(LOG_FILE, `${new Date().toISOString()} ${line}\n`);
+  } catch {}
+}
+
+function walkMarkdown(dir, out = []) {
+  let entries;
+  try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { return out; }
+  for (const e of entries) {
+    if (SKIP.has(e.name) || e.name.startsWith('.')) continue;
+    const full = path.join(dir, e.name);
+    if (e.isDirectory()) walkMarkdown(full, out);
+    else if (e.isFile() && e.name.endsWith('.md')) out.push(full);
+  }
+  return out;
+}
+
+function parseNote(filePath) {
+  const raw = fs.readFileSync(filePath, 'utf8');
+  const fmMatch = raw.match(/^---\n([\s\S]*?)\n---\n([\s\S]*)$/);
+  const frontmatter = fmMatch ? fmMatch[1] : '';
+  const body = fmMatch ? fmMatch[2] : raw;
+  const tagsMatch = frontmatter.match(/tags:\s*\[([^\]]*)\]/);
+  const tags = tagsMatch ? tagsMatch[1].split(',').map(t => t.trim().replace(/['"]/g, '')).filter(Boolean) : [];
+  const hasRelated = /^##\s+Related\b/m.test(body);
+  const title = path.basename(filePath, '.md');
+  const bodySnippet = body.replace(/<!--[\s\S]*?-->/g, '').replace(/[#*`[\]()>_\-|]/g, ' ').slice(0, 400);
+  return { raw, body, tags, title, hasRelated, bodySnippet };
+}
+
+function buildQuery(note) {
+  const parts = [note.title.replace(/-/g, ' '), ...note.tags.slice(0, 3), note.bodySnippet.split(/\s+/).slice(0, 15).join(' ')];
+  return parts.filter(Boolean).join(' ').slice(0, 200);
+}
+
+function buildFallbackQuery(note) {
+  return note.tags.slice(0, 4).join(' ').slice(0, 100);
+}
+
+function qmdSearch(query) {
+  const safe = query.replace(/"/g, ' ').replace(/\$/g, ' ').replace(/`/g, ' ');
+  const r = spawnSync('bash', ['-c', `"${QMD}" search "${safe}" --collection vault --json`], {
+    encoding: 'utf8', windowsHide: true, timeout: 15000, stdio: 'pipe'
+  });
+  const out = (r.stdout || '').trim();
+  if (!out || out.startsWith('Error') || out === 'No results found.') {
+    if (r.stderr) log(`qmd stderr: ${r.stderr.slice(0, 200)}`);
+    return [];
+  }
+  try { return JSON.parse(out); } catch { return []; }
+}
+
+function toVaultRelative(qmdPath) {
+  const m = qmdPath.match(/^qmd:\/\/vault\/(.+)$/);
+  if (!m) return null;
+  return m[1].replace(/\.md$/, '');
+}
+
+function normKey(p) {
+  return p.toLowerCase().replace(/^_/, '').replace(/[-_]+$/, '').replace(/[-_\s]+/g, '-');
+}
+
+function pickRelated(hits, selfRelative) {
+  const selfKey = normKey(selfRelative);
+  const selfBase = normKey(path.basename(selfRelative));
+  const seen = new Set();
+  const picks = [];
+  for (const h of hits) {
+    if (h.score < QMD_MIN_SCORE) continue;
+    const rel = toVaultRelative(h.file);
+    if (!rel) continue;
+    const k = normKey(rel);
+    const b = normKey(path.basename(rel));
+    if (k === selfKey || b === selfBase) continue;
+    if (k.startsWith(selfKey) || selfKey.startsWith(k)) continue;
+    if (seen.has(k)) continue;
+    seen.add(k);
+    picks.push(rel);
+    if (picks.length >= QMD_TOP_N) break;
+  }
+  return picks;
+}
+
+function appendRelated(filePath, raw, picks) {
+  const block = `\n\n## Related\n<!-- auto-generated by vault-graph-builder ${new Date().toISOString().slice(0, 10)} -->\n` +
+    picks.map(p => `- [[${p}]]`).join('\n') + '\n';
+  const needsNL = raw.endsWith('\n') ? '' : '\n';
+  fs.writeFileSync(filePath, raw + needsNL + block);
+}
+
+function processSingleFile(filePath) {
+  const abs = path.resolve(filePath).replace(/\\/g, '/');
+  const vaultNorm = VAULT_DIR.replace(/\\/g, '/');
+  if (!abs.startsWith(vaultNorm)) { log(`single: outside vault, skip ${abs}`); return; }
+  if (!abs.endsWith('.md')) return;
+  if (!fs.existsSync(abs)) return;
+  const parts = path.relative(vaultNorm, abs).split(/[\\/]/);
+  if (parts.some(p => SKIP.has(p))) { log(`single: in SKIP dir, skip ${abs}`); return; }
+  if (parts[0] && !['10-Projects', '30-Resources'].includes(parts[0])) { log(`single: out of scope ${parts[0]}, skip`); return; }
+
+  const state = loadState();
+  const vaultRel = path.relative(vaultNorm, abs).replace(/\\/g, '/').replace(/\.md$/, '');
+  const now = Date.now();
+  const entry = state.processed[vaultRel];
+  const lastProcessed = typeof entry === 'object' ? (entry?.ts || 0) : (entry || 0);
+  const wasNoPicks = typeof entry === 'object' && entry?.noPicks;
+  const cooldown = wasNoPicks ? NO_PICKS_RETRY_MS : SINGLE_COOLDOWN_MS;
+  if (now - lastProcessed < cooldown) { log(`single: cooldown ${vaultRel}`); return; }
+
+  let note;
+  try { note = parseNote(abs); } catch { return; }
+  if (note.hasRelated) { state.processed[vaultRel] = now; saveState(state); return; }
+  if (note.body.trim().length < 100) return;
+
+  const query = buildQuery(note);
+  let hits = qmdSearch(query);
+  let picks = pickRelated(hits, vaultRel);
+  if (picks.length === 0 && note.tags.length > 0) {
+    const fbQuery = buildFallbackQuery(note);
+    if (fbQuery) {
+      hits = qmdSearch(fbQuery);
+      picks = pickRelated(hits, vaultRel);
+      if (picks.length > 0) log(`single fallback hit: ${vaultRel} → ${picks.join(', ')}`);
+    }
+  }
+  if (picks.length === 0) {
+    state.processed[vaultRel] = { ts: now, noPicks: true };
+    saveState(state); log(`single: no picks ${vaultRel} (retry in 14d)`); return;
+  }
+
+  if (DRY_RUN) {
+    log(`[dry-run single] ${vaultRel} → ${picks.join(', ')}`);
+    return;
+  }
+  appendRelated(abs, note.raw, picks);
+  state.processed[vaultRel] = now;
+  saveState(state);
+  log(`single added: ${vaultRel} → ${picks.join(', ')}`);
+}
+
+function main() {
+  if (SINGLE_FILE) {
+    processSingleFile(SINGLE_FILE);
+    return;
+  }
+
+  const state = loadState();
+  const now = Date.now();
+  const daysSince = (now - state.lastRun) / 86400000;
+  if (!FORCE && daysSince < INTERVAL_DAYS) {
+    log(`skip: ${daysSince.toFixed(1)}d since last run`);
+    return;
+  }
+
+  const files = walkMarkdown(SCOPE_DIR);
+  let processed = 0, added = 0, skipped = 0;
+
+  for (const f of files) {
+    if (processed >= MAX_FILES) break;
+    const vaultRel = path.relative(VAULT_DIR, f).replace(/\\/g, '/').replace(/\.md$/, '');
+    const prev = state.processed[vaultRel];
+    if (prev) {
+      const prevTs = typeof prev === 'object' ? (prev?.ts || 0) : prev;
+      const prevNoPicks = typeof prev === 'object' && prev?.noPicks;
+      if (!prevNoPicks || (now - prevTs) < NO_PICKS_RETRY_MS) { skipped++; continue; }
+    }
+
+    let note;
+    try { note = parseNote(f); } catch { skipped++; continue; }
+    if (note.hasRelated) { state.processed[vaultRel] = now; skipped++; continue; }
+    if (note.body.trim().length < 100) { skipped++; continue; }
+
+    const query = buildQuery(note);
+    let hits = qmdSearch(query);
+    let picks = pickRelated(hits, vaultRel);
+    if (picks.length === 0 && note.tags.length > 0) {
+      const fbQuery = buildFallbackQuery(note);
+      if (fbQuery) {
+        hits = qmdSearch(fbQuery);
+        picks = pickRelated(hits, vaultRel);
+        if (picks.length > 0) log(`fallback hit: ${vaultRel} → ${picks.join(', ')}`);
+      }
+    }
+
+    if (picks.length === 0) { state.processed[vaultRel] = { ts: now, noPicks: true }; skipped++; continue; }
+    if (DRY_RUN) {
+      log(`[dry-run] ${vaultRel} → ${picks.join(', ')}`);
+    } else {
+      appendRelated(f, note.raw, picks);
+      state.processed[vaultRel] = now;
+      log(`added: ${vaultRel} → ${picks.join(', ')}`);
+    }
+    processed++;
+    added++;
+  }
+
+  state.lastRun = now;
+  if (!DRY_RUN) saveState(state);
+  log(`done: ${added} added, ${skipped} skipped, ${files.length} scanned`);
+}
+
+main();
