@@ -157,6 +157,12 @@
             "command": "node C:/Users/sorte/.claude/hooks/maintenance/observation-watch.js",
             "timeout": 15,
             "statusMessage": "Observation watch..."
+          },
+          {
+            "type": "command",
+            "command": "node C:/Users/sorte/.claude/hooks/maintenance/quirks-staleness-check.js",
+            "timeout": 5,
+            "statusMessage": "Quirks staleness check..."
           }
         ]
       }

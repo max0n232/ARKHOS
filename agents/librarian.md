@@ -36,9 +36,10 @@ Follow the Knowledge Distillation procedure from CLAUDE.md exactly:
 5. Read each destination — check for duplicates before appending
    - Grep destination for the entry's key terms (function names, error keywords, distinctive phrases). If 2+ overlap with an existing line, treat as dupe.
    - Dupes go to deletion log with `reason=dedup`, not to destination.
-6. Append via `mcp__obsidian__obsidian_patch_content`
-7. Rewrite source files as cleaned skeletons
-8. Report: N processed, destinations (per-file counts), N remaining, N skipped (dupes/outdated)
+6. **Decide `index_candidate: true|false`** — for each routed entry, judge whether it deserves a one-line pointer in `MEMORY.md` index (always-loaded). Mark `true` only if any of: live ID/credential, cross-session safety rule, repeat-incident gotcha (cited 2+ sessions), version-pinned platform fact. Default `false` (entry lives only in topic-file). NEVER auto-edit MEMORY.md — just collect candidates; user adds the index line manually.
+7. Append via `mcp__obsidian__obsidian_patch_content`
+8. Rewrite source files as cleaned skeletons
+9. Report: N processed, destinations (per-file counts), N remaining, N skipped (dupes/outdated), **list of `index_candidate=true` entries with their destination + 1-line reason** so user can update MEMORY.md index.
 
 **Deletion logging:** When removing outdated entries from source files (troubleshooting-current / global-patterns), append one line per deletion to `C:/Users/sorte/.claude/logs/librarian-deletions.log`:
 `[ISO-timestamp] <source-file>:<lineno> "<first-60-chars-of-entry>" reason=<dedup|outdated|routed>`
@@ -85,6 +86,7 @@ Three sub-tasks:
 1. Verify Obsidian REST API available: `curl -s http://localhost:27124/` — if down, warn user and switch to Read/Grep file access (read-only mode, no vault writes)
 2. Verify routing-map.md exists at expected path — if missing, ABORT with error
 3. Check troubleshooting file line counts — if >150 lines, suggest distillation first
+4. Stale-files signal — run `node ~/.claude/scripts/vault-stale-report.js 60 10` and surface the top "never read" / "oldest reads" hits in your final report. Do NOT delete or move based on this signal alone — flag for user review only. Skip silently if the script or `patterns/usage-tracker.json` is missing.
 
 ## Reporting
 
