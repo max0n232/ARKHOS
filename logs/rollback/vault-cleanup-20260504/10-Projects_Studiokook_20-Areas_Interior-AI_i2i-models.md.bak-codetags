@@ -1,0 +1,101 @@
+---
+tags: [ai, i2i, models, visual]
+project: ai-generation
+source: Desktop/AiGeneration/.claude/skills/visual-style/references/i2i-models.md
+updated: 2026-03-17
+---
+
+# Image-to-Image модели — Studiokook
+
+Протестировано 2026-02-23, 6 раундов, 6 моделей.
+
+## Рекомендуемые модели
+
+| Приоритет | Модель | API | Endpoint | Сила |
+|---|---|---|---|---|
+| **1** | **Flux Kontext Max** | fal.ai | `fal-ai/flux-pro/kontext/max` | Лучший фотореализм, сохранение layout |
+| 2 | GPT-4o Image | kie.ai | `/gpt4o-image/generate` + `filesUrl` | Лучший prompt adherence |
+| 3 | Flux Kontext Dev | fal.ai | `fal-ai/flux-kontext/dev` | Как Max, но дешевле |
+| 4 | Seedream 4.5 Edit | fal.ai | `fal-ai/bytedance/seedream/v4.5/edit` | Хорошая детализация материалов |
+| 5 | GPT Image 1.5 | kie.ai | + `model: 'gpt-image-1.5'` | Близко к GPT-4o |
+| 6 | Flux 2 Flex | fal.ai | `fal-ai/flux-2-flex` | Артефакты (двойной кран) |
+
+## API параметры
+
+```
+# fal.ai — image_url (singular) для Kontext/Flex
+POST https://queue.fal.run/fal-ai/flux-pro/kontext/max
+{ "image_url": "SOURCE_URL", "prompt": "...", "image_size": "landscape_4_3" }
+
+# fal.ai — image_urls (plural!) для Seedream
+POST https://queue.fal.run/fal-ai/bytedance/seedream/v4.5/edit
+{ "image_urls": ["SOURCE_URL"], "prompt": "...", "image_size": "landscape_4_3" }
+
+# kie.ai — filesUrl для GPT-4o / 1.5
+POST https://api.kie.ai/api/v1/gpt4o-image/generate
+{ "filesUrl": ["SOURCE_URL"], "prompt": "...", "size": "3:2", "nVariants": 1, "isEnhance": false }
+# для GPT 1.5: добавить "model": "gpt-image-1.5"
+```
+
+## Промпт-правила i2i
+
+1. **"Inspired by" вместо "Same kitchen"** — даёт творческую свободу, сохраняя архетип
+2. **Явно указывать handleless** — иначе модели добавят ручки
+3. **Светлый промпт для светлых кухонь** — "bright natural daylight, fresh morning atmosphere"
+4. **Тёмный промпт** — только для navy/антрацит, добавлять "warm ambient lighting"
+
+## Известные баги моделей
+
+- **Flux 2 Flex**: двойной кран — стабильно воспроизводится
+- **Flux (все)**: рисует боковину пенала от пола (даже когда в оригинале начинается от столешницы)
+- **Kontext Max**: может проигнорировать отдельные элементы промпта в пользу layout оригинала
+- **Seedream**: иногда кадрирует слишком близко (теряет общий план)
+
+---
+
+## Text-to-Image модели
+
+| Приоритет | Модель | API | Endpoint | Сила |
+|---|---|---|---|---|
+| **1** | **Nano Banana 2** (Gemini 3.1 Flash Image) | kie.ai | `POST /api/v1/jobs/createTask` | Отличный фотореализм, хороший prompt adherence |
+| 2 | **Nano Banana Pro** | kie.ai | `POST /api/v1/jobs/createTask` | Специализирован на инфографике, исследовательский контент |
+
+### API параметры (t2i)
+
+```
+# Nano Banana 2 — text-to-image
+POST https://api.kie.ai/api/v1/jobs/createTask
+Header: Authorization: Bearer $KIEAI_API_KEY
+{
+  "model": "nano-banana-2",
+  "task_type": "text-to-image",
+  "input": {
+    "prompt": "...",
+    "aspect_ratio": "9:16",   // 1:1, 4:3, 3:4, 16:9, 9:16
+    "resolution": "2K",       // 1K ($0.04), 2K ($0.06), 4K ($0.09)
+    "output_format": "jpg"    // jpg, png, webp
+  }
+}
+
+# Polling (асинхронный)
+GET https://api.kie.ai/api/v1/jobs/recordInfo?taskId={taskId}
+# States: waiting → queuing → generating → success | fail
+# Результат: response.data.resultJson.resultUrls[0]
+```
+
+### Известные баги (t2i)
+
+- **Nano Banana 2**: галлюцинирует бренды техники (бессмысленный текст на панелях) — НЕ указывать бренды в промпте
+- **Nano Banana 2**: может нарисовать боковину пенала до пола — добавлять в negative prompt
+- **Nano Banana 2**: LED-подсветка может прерываться на вытяжке — уточнять `continuous LED strip behind hood` в промпте
+
+
+---
+
+## Distilled 2026-04-13
+
+### nano-banana-pro — инфографика через n8n
+
+- **nano-banana-pro** — модель kie.ai, специализированная на инфографике. API идентичен nano-banana-2: `POST /api/v1/jobs/createTask` с `"model": "nano-banana-pro"`. Используется в связке: GPT-4 (web search) генерирует оптимизированный промпт → kie.ai рисует → доставка на email.
+- **Polling параметры для n8n**: опрос каждые 15 секунд, максимум 20 попыток (~5 минут до таймаута). При success → скачать и отправить. При fail/timeout → отправить error email с деталями.
+- **Источник**: [TG 77520](https://t.me/c/2019152955/62657/77520)

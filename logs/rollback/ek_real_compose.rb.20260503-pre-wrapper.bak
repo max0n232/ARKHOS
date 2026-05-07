@@ -1,0 +1,1125 @@
+# ek_real_compose.rb — Phase 6.4 EK-convention composer for real modules.
+#
+# CONVENTION (extracted from Sven's production project, 2026-04-26):
+#
+#   • Walls = axes. North wall at Y=0, West wall at X=0.
+#     Cabinets occupy the -Y/+X half-plane (inside the corner).
+#   • Cabinet BACKS touch walls. Cabinet FRONTS face room interior:
+#     - North row (along Y=0 wall): rot=0, bbox Y=[-D, 0], door faces -Y
+#     - West row (along X=0 wall):  rot=+90 CCW, bbox X=[0, +D], door faces +X
+#   • Cabinet height = 862mm (with plinth) — NOT 820 (carcass only).
+#   • Countertop Z=[862, 900] (38mm thick, sits on top of cabinets).
+#
+# Layout helpers:
+#   • EkRealCompose.add_room_walls(width_mm:, depth_mm:) — N+W walls + floor faces
+#   • EkRealCompose.place_in_north_row(key, x_start:, depth_mm:) — auto-compute at_mm
+#   • EkRealCompose.place_in_west_row(key, y_start:, depth_mm:) — same for west wall
+#   • EkRealCompose.l_kitchen(model) — full demo with walls + L-shape modules + countertops
+
+module EkRealCompose
+  module_function
+
+  EK_ROOT = 'C:/Users/sorte/Desktop/Новая папка/EasyKitchen/EasyKitchen/EasyKitchen'.freeze
+
+  CATALOG = {
+    'BD1'  => '2 Нижние шкафы/BD1.skp',
+    'BD2'  => '2 Нижние шкафы/BD2.skp',
+    'BC'   => '2 Нижние шкафы/BC.skp',
+    'BB1'  => '2 Нижние шкафы/BB1.skp',
+    'BA'   => '2 Нижние шкафы/BA.skp',
+    'BG1'  => '2 Нижние шкафы/BG1.skp',
+    'BG2'  => '2 Нижние шкафы/BG2.skp',
+    'BF2A' => '2 Нижние шкафы/BF2A.skp',
+    'BF3A' => '2 Нижние шкафы/BF3A.skp',
+    'TA'   => '1 Верхние шкафы/TA.skp',
+    'TB1'  => '1 Верхние шкафы/TB1.skp',
+    'TB2'  => '1 Верхние шкафы/TB2.skp',
+    'TC1'  => '1 Верхние шкафы/TC1.skp',
+    'TT_STRAIGHT' => '4 Столешницы/3 Столешницы/straight_tabletop.skp',
+    'TT_CORNER'   => '4 Столешницы/3 Столешницы/corner_table top.skp',
+    'PANEL_FACADE'      => '6 Панели/Панели для проектирования/9 Секции/panel_facade_section.skp',
+    'PANEL_FACADE_FRES' => '../Shablony 5.0.2/Нижние/Fres/panel_facade_section.skp',
+    'PANEL_FACADE_GOLA' => '../Shablony 5.0.2/Нижние/Gola/panel_facade_section.skp',
+  }.freeze
+
+  COUNTERTOP_KEYS      = %w[TT_STRAIGHT TT_CORNER].freeze
+  COUNTERTOP_DEF_NAMES = ['Столешница прямая', 'Столешница угловая'].freeze
+
+  # EK DESIGN INVARIANTS (per user's spec):
+  #   Total work height (floor → countertop top) = 900mm  ← FIXED standard
+  #   Carcass height = 770mm                               ← FIXED across all bottom modules
+  #   Plinth/legs height = 900 - carcass - countertop_thickness (varies by countertop type)
+  #
+  # Countertop type → plinth height calculation:
+  #   Stone 20mm   → legs = 900 - 770 - 20 = 110mm
+  #   Laminate 38mm → legs = 900 - 770 - 38 =  92mm
+  #   HPL 12mm     → legs = 900 - 770 - 12 = 118mm
+  TOTAL_WORK_HEIGHT_MM = 900     # floor → countertop top (invariant)
+  CARCASS_HEIGHT_MM    = 770     # carcass body height (invariant across all bottom cabs)
+  COUNTERTOP_DEPTH_MM  = 600     # EK design rule
+
+  # Countertop catalog with thickness per type. Default = laminate 38mm.
+  COUNTERTOP_PROFILES = {
+    laminate: { thickness_mm: 38, def_key: 'TT_STRAIGHT' },
+    stone:    { thickness_mm: 20, def_key: 'TT_STRAIGHT' },
+    hpl:      { thickness_mm: 12, def_key: 'TT_STRAIGHT' },
+  }.freeze
+  DEFAULT_COUNTERTOP_PROFILE = :laminate
+
+  # Plinth/legs height = target_top - countertop_thickness - 770 (carcass fixed).
+  # target_top defaults to 900 (standard) but can be overridden for windowsill alignment etc.
+  def plinth_height_for(countertop_thickness_mm, target_top_mm: TOTAL_WORK_HEIGHT_MM)
+    target_top_mm - CARCASS_HEIGHT_MM - countertop_thickness_mm
+  end
+
+  # Total cabinet bbox height (without countertop) = target_top - countertop_thickness.
+  def total_cabinet_height_for(countertop_thickness_mm, target_top_mm: TOTAL_WORK_HEIGHT_MM)
+    target_top_mm - countertop_thickness_mm
+  end
+
+  # EK lengthunits = CENTIMETERS — formulas in cm, not mm.
+  # Use mm_to_cm for set_attribute_formula values.
+  def mm_to_cm(v); (v.to_f / 10.0).to_s; end
+
+  def mm_to_in(v); v.to_f / 25.4; end
+
+  ORIGIN_PT = Geom::Point3d.new(0, 0, 0).freeze
+
+  def load_module(module_key, model = Sketchup.active_model)
+    rel = CATALOG[module_key] or raise "unknown module '#{module_key}'. Known: #{CATALOG.keys.inspect}"
+    path = "#{EK_ROOT}/#{rel}"
+    raise "file missing: #{path}" unless File.exist?(path)
+    existing = model.definitions.find { |d| d.name == module_key || d.name.start_with?("#{module_key}#") }
+    return existing if existing
+    model.definitions.load(path)
+  end
+
+  # Generic placer with optional rotation (CCW positive) around the at_mm pivot.
+  # IMPORTANT: triggers DC redraw so EK plugin populates instance AD (b201/b202
+  # edge bands, d101..d110 dims, etc.) and renders correct internal geometry.
+  # Without redraw, panels stay at native def defaults (e.g. TB1 = 300x420x720).
+  def place(module_key, at_mm:, rotation_deg: 0, redraw: true, model: Sketchup.active_model)
+    defn = load_module(module_key, model)
+    origin = Geom::Point3d.new(mm_to_in(at_mm[0]), mm_to_in(at_mm[1]), mm_to_in(at_mm[2]))
+    if rotation_deg != 0
+      angle_rad = rotation_deg * Math::PI / 180.0
+      tr = Geom::Transformation.rotation(origin, Geom::Vector3d.new(0, 0, 1), angle_rad) *
+           Geom::Transformation.translation(origin - ORIGIN_PT)
+    else
+      tr = Geom::Transformation.translation(origin - ORIGIN_PT)
+    end
+    inst = model.entities.add_instance(defn, tr)
+    if redraw
+      dc = $dc_observers.get_latest_class
+      dc.redraw_with_undo(inst) if dc
+    end
+    inst
+  end
+
+  # Redraw all real EK instances in the model — useful after bulk placement
+  # or when models are loaded from saved .skp without DC redraw applied.
+  def redraw_all(model = Sketchup.active_model)
+    dc = $dc_observers.get_latest_class
+    return { ok: false, error: 'DC observer not available' } unless dc
+    real_cabs = model.entities.grep(Sketchup::ComponentInstance).select { |c|
+      CATALOG.keys.any? { |k| c.definition.name == k || c.definition.name.start_with?("#{k}#") }
+    }
+    redrawn = 0; errors = []
+    real_cabs.each do |c|
+      begin
+        dc.redraw_with_undo(c)
+        redrawn += 1
+      rescue => e
+        errors << { def: c.definition.name, error: e.message }
+      end
+    end
+    { ok: errors.empty?, redrawn: redrawn, total: real_cabs.size, errors: errors }
+  end
+
+  # NATIVE EK module dimensions (verified — these match real BD1/BD2/etc):
+  #   Bottom cabinet: 600x670x820 (lenx × leny × lenz)
+  #   Native carcass = 728mm (820 - 92 native legs).
+  # User spec: carcass = 770mm (fixed). For laminate 38mm countertop:
+  #   total = 770 + 92 = 862 = lenz override.
+  NATIVE_BOTTOM_DEPTH_MM  = 670
+  NATIVE_BOTTOM_HEIGHT_MM = 820
+
+  # Apply EK design rules: total cab height depends on countertop type + target_top.
+  # target_top_mm overrides the default 900mm (e.g., 920 for windowsill alignment).
+  # Carcass stays fixed at 770; legs absorb the variation.
+  def apply_ek_height(inst, countertop_profile: DEFAULT_COUNTERTOP_PROFILE, target_top_mm: TOTAL_WORK_HEIGHT_MM)
+    dc = $dc_observers.get_latest_class
+    return unless dc
+    profile = COUNTERTOP_PROFILES[countertop_profile] or raise "unknown profile: #{countertop_profile}"
+    target_total_mm = total_cabinet_height_for(profile[:thickness_mm], target_top_mm: target_top_mm)
+    legs_mm = plinth_height_for(profile[:thickness_mm], target_top_mm: target_top_mm)
+    dc.set_attribute_formula(inst, 'lenz', mm_to_cm(target_total_mm))
+    dc.set_attribute_formula(inst, 'e102', mm_to_cm(legs_mm))
+    dc.redraw_with_undo(inst)
+    inst
+  end
+
+  # Re-translate an instance so its bbox satisfies the given anchor constraints.
+  # anchors: {x_min: mm, x_max: mm, y_min: mm, y_max: mm, z_min: mm, z_max: mm}
+  # Provide ONE of x_min/x_max, ONE of y_min/y_max, ONE of z_min/z_max.
+  def anchor_to(inst, anchors)
+    bb = inst.bounds
+    dx = if anchors[:x_min]; mm_to_in(anchors[:x_min]) - bb.min.x
+         elsif anchors[:x_max]; mm_to_in(anchors[:x_max]) - bb.max.x
+         else 0 end
+    dy = if anchors[:y_min]; mm_to_in(anchors[:y_min]) - bb.min.y
+         elsif anchors[:y_max]; mm_to_in(anchors[:y_max]) - bb.max.y
+         else 0 end
+    dz = if anchors[:z_min]; mm_to_in(anchors[:z_min]) - bb.min.z
+         elsif anchors[:z_max]; mm_to_in(anchors[:z_max]) - bb.max.z
+         else 0 end
+    inst.transform!(Geom::Transformation.translation(Geom::Vector3d.new(dx, dy, dz))) if dx != 0 || dy != 0 || dz != 0
+    inst
+  end
+
+  # EK blend corner modules have two different mating axes:
+  # - the continuing row uses the corner bbox/main frame edge;
+  # - the perpendicular row uses dynamic attribute `bind_front`.
+  # Do not use bounds.height for the perpendicular row: that mates to Main
+  # Frame and leaves the adjacent rotated cabinet on the wrong axis.
+  def corner_perpendicular_mate_y_mm(corner_inst)
+    ad = corner_inst.attribute_dictionary('dynamic_attributes')
+    bind_front = ad && ad['bind_front']
+    return (corner_inst.bounds.max.y.to_mm - bind_front.to_f * 25.4).round if bind_front
+
+    axis_y = child_axis_y_mm(corner_inst, /^bind_front$/i)
+    return axis_y if axis_y
+
+    corner_inst.bounds.min.y.to_mm.round
+  end
+
+  alias corner_bind_front_y_mm corner_perpendicular_mate_y_mm
+
+  def child_axis_y_mm(parent_inst, definition_name_pattern, parent_tr = nil)
+    parent_tr ||= parent_inst.transformation
+    parent_inst.definition.entities.grep(Sketchup::ComponentInstance).each do |child|
+      child_tr = parent_tr * child.transformation
+      return child_tr.origin.y.to_mm.round if child.name.to_s.match?(definition_name_pattern) ||
+                                             child.definition.name.to_s.match?(definition_name_pattern)
+
+      nested = child_axis_y_mm(child, definition_name_pattern, child_tr)
+      return nested if nested
+    end
+    nil
+  end
+
+  # Place a cabinet in the NORTH row (along Y=0 wall) — apply EK height + back-flush.
+  def place_in_north_row(module_key, x_start_mm:, z_mm: 0, countertop_profile: DEFAULT_COUNTERTOP_PROFILE, target_top_mm: TOTAL_WORK_HEIGHT_MM, model: Sketchup.active_model)
+    inst = place(module_key, at_mm: [0, -10000, z_mm], rotation_deg: 0, redraw: true, model: model)
+    apply_ek_height(inst, countertop_profile: countertop_profile, target_top_mm: target_top_mm)
+    anchor_to(inst, x_min: x_start_mm, y_max: 0, z_min: z_mm)
+  end
+
+  # Place a cabinet in the WEST row (along X=0 wall, rotated +90 CCW) — apply EK height + back-flush.
+  def place_in_west_row(module_key, y_top_mm:, z_mm: 0, countertop_profile: DEFAULT_COUNTERTOP_PROFILE, target_top_mm: TOTAL_WORK_HEIGHT_MM, model: Sketchup.active_model)
+    inst = place(module_key, at_mm: [10000, 0, z_mm], rotation_deg: 90, redraw: true, model: model)
+    apply_ek_height(inst, countertop_profile: countertop_profile, target_top_mm: target_top_mm)
+    anchor_to(inst, x_min: 0, y_max: y_top_mm, z_min: z_mm)
+  end
+
+  # Place a top wall cabinet — back at Y=0, x_start positions left edge, z_min sets bottom Z.
+  def place_in_top_row(module_key, x_start_mm:, z_min_mm: 1500, model: Sketchup.active_model)
+    inst = place(module_key, at_mm: [0, -10000, z_min_mm], rotation_deg: 0, redraw: true, model: model)
+    anchor_to(inst, x_min: x_start_mm, y_max: 0, z_min: z_min_mm)
+  end
+
+  # Canonical PANEL_FACADE / panel_facade_section placer.
+  #
+  # ALWAYS use this for: wall-end fillers, pencil outer/inner cladding, side panels,
+  # toe-kicks, upper-row end caps, mezzanine wall termination. NEVER use raw
+  # Sketchup::Group + add_face + pushpull (anti-pattern: no DC, no BOM article,
+  # no facade material).
+  #
+  # Resize is via DC attrs (set_attribute_formula + redraw_with_undo), NOT bbox
+  # scaling. Naive bbox-scale on a PANEL_FACADE def AFTER its DC redraw
+  # propagates lenx/leny/lenz cascades into edge bands, facade plates, etc., and
+  # blows up the bbox by ~2x. The DC engine is the only safe resize path.
+  #
+  # Orientation:
+  #   :n_wall      — panel runs along X (against N wall), thickness in Y (toward room)
+  #   :w_wall      — panel runs along Y (against W wall), thickness in X (toward room)
+  #   :pencil_n    — pencil side cladding on N row (vertical, thin in X, runs Y depth × Z height)
+  #   :pencil_w    — pencil side cladding on W row (vertical, thin in Y, runs X depth × Z height)
+  #
+  # role: :filler | :cladding | :side_panel — sets `e200=1` to suppress handle/screw
+  #   children that otherwise inflate the bbox of narrow panels (verified incident
+  #   2026-05-03: 19mm filler with handles → 363mm bbox).
+  # anchors: {x_min:|x_max:, y_min:|y_max:, z_min:|z_max:} — usual anchor_to format.
+  def place_panel_facade_section(width_mm:, height_mm:, anchors:,
+                                 thickness_mm: 19, orientation: :n_wall,
+                                 style: :default, role: :filler, model: Sketchup.active_model)
+    # Pre-validate DC plugin BEFORE staging an instance; otherwise a raise leaves
+    # an orphaned phantom at [0, -10000, 0] in the model.
+    dc = $dc_observers && $dc_observers.get_latest_class
+    raise 'place_panel_facade_section: $dc_observers unavailable — DC plugin not loaded, cannot resize PANEL_FACADE without breaking attrs' unless dc
+
+    key = case style
+          when :fres then 'PANEL_FACADE_FRES'
+          when :gola then 'PANEL_FACADE_GOLA'
+          else 'PANEL_FACADE'
+          end
+    rotation_deg = case orientation
+                   when :n_wall, :pencil_n then 0
+                   when :w_wall, :pencil_w then 90
+                   else raise "unknown panel orientation: #{orientation.inspect}"
+                   end
+    suppress_handles = case role
+                       when :filler, :cladding, :side_panel then true
+                       when :facade then false
+                       else raise "unknown panel role: #{role.inspect}"
+                       end
+
+    model.start_operation('place_panel_facade_section', true)
+    inst = nil
+    begin
+      inst = place(key, at_mm: [0, -10000, 0], rotation_deg: rotation_deg, redraw: false, model: model)
+      # Pass strings (not Floats) to set_attribute_formula — vault canonical pattern.
+      # Float coercion is undocumented for PANEL_FACADE variants and may silently no-op on Fres/Gola.
+      dc.set_attribute_formula(inst, 'lenx', mm_to_cm(width_mm).to_s)
+      dc.set_attribute_formula(inst, 'leny', mm_to_cm(thickness_mm).to_s)
+      dc.set_attribute_formula(inst, 'lenz', mm_to_cm(height_mm).to_s)
+      dc.set_attribute_formula(inst, 'e200', '1') if suppress_handles
+      dc.redraw_with_undo(inst)
+      anchor_to(inst, anchors)
+      model.commit_operation
+    rescue => e
+      inst.erase! if inst && inst.valid?
+      model.abort_operation
+      raise e
+    end
+
+    bb = inst.bounds
+    actual = { x: (bb.max.x - bb.min.x).to_mm.round, y: (bb.max.y - bb.min.y).to_mm.round, z: (bb.max.z - bb.min.z).to_mm.round }
+    expected = case orientation
+               when :n_wall    then { x: width_mm, y: thickness_mm, z: height_mm }
+               when :w_wall    then { x: thickness_mm, y: width_mm, z: height_mm }
+               when :pencil_n  then { x: width_mm, y: thickness_mm, z: height_mm }
+               when :pencil_w  then { x: thickness_mm, y: width_mm, z: height_mm }
+               end
+    drift = expected.map { |k, v| [k, (actual[k] - v).abs] }.to_h
+    if drift.values.any? { |d| d > 5 }
+      Kernel.warn("place_panel_facade_section bbox drift: expected #{expected.inspect} got #{actual.inspect} drift=#{drift.inspect} (likely missing e200 handle suppression OR Fres/Gola variant has different DC attr names — dump inst.attribute_dictionary('dynamic_attributes').keys to verify)")
+    end
+    { inst: inst, bbox_mm: actual, expected_mm: expected, drift_mm: drift, style: style, role: role }
+  end
+
+  # One-shot live verification of PANEL_FACADE def variants — dumps DC attr keys
+  # for default / fres / gola .skp files. Run ONCE after library load to confirm
+  # `lenx/leny/lenz/e200` exist; if a variant uses different names, place_panel_facade_section
+  # needs a per-style attr-name table.
+  def verify_panel_facade_variants(model: Sketchup.active_model)
+    out = {}
+    [:default, :fres, :gola].each do |style|
+      key = case style
+            when :fres then 'PANEL_FACADE_FRES'
+            when :gola then 'PANEL_FACADE_GOLA'
+            else 'PANEL_FACADE'
+            end
+      begin
+        defn = load_module(key, model)
+        ad = defn.attribute_dictionary('dynamic_attributes')
+        keys = ad ? ad.keys.sort : []
+        out[style] = { def_name: defn.name, attr_keys: keys, has_lenx: keys.include?('lenx'), has_leny: keys.include?('leny'), has_lenz: keys.include?('lenz'), has_e200: keys.include?('e200') }
+      rescue => e
+        out[style] = { error: e.message }
+      end
+    end
+    out
+  end
+
+  # Place L-corner at NW intersection: back-left flush with both walls,
+  # door diagonal facing into the room (-Y/+X). Returns the instance.
+  #
+  # BG1 (default, 90% of Sven's projects): bbox 950×670 — asymmetric, blind left
+  # half (PANEL_V_L mating) + diagonal door on right half (X=[492, 950]).
+  # BF2A (square 900×900) is the alternative for symmetric corner needs.
+  #
+  # After placement+EK cascade, query inst.bounds for actual width/depth to
+  # position perpendicular row starts.
+  def place_l_corner(module_key: 'BG1', countertop_profile: DEFAULT_COUNTERTOP_PROFILE, target_top_mm: TOTAL_WORK_HEIGHT_MM, mating_depth_mm: nil, model: Sketchup.active_model)
+    inst = place(module_key, at_mm: [-10000, -10000, 0], rotation_deg: 0, redraw: true, model: model)
+    apply_ek_height(inst, countertop_profile: countertop_profile, target_top_mm: target_top_mm)
+    apply_blend_gap_fix(inst) if module_key == 'BG1'
+    apply_corner_mating(inst, depth_mm: mating_depth_mm) if mating_depth_mm
+    anchor_to(inst, x_min: 0, y_max: 0, z_min: 0)
+    inst
+  end
+
+  def list_loaded(model = Sketchup.active_model)
+    model.entities.grep(Sketchup::ComponentInstance)
+         .select { |c| CATALOG.keys.any? { |k| c.definition.name == k || c.definition.name.start_with?("#{k}#") } }
+         .map { |c|
+           bb = c.bounds
+           {
+             def: c.definition.name,
+             at_mm: c.transformation.origin.to_a.map { |v| (v.to_mm).round(1) },
+             bbox_min_mm: [bb.min.x.to_mm.round(1), bb.min.y.to_mm.round(1), bb.min.z.to_mm.round(1)],
+             bbox_max_mm: [bb.max.x.to_mm.round(1), bb.max.y.to_mm.round(1), bb.max.z.to_mm.round(1)],
+           }
+         }
+  end
+
+  def clear_instances(model = Sketchup.active_model)
+    model.entities.grep(Sketchup::ComponentInstance)
+         .select { |c| CATALOG.keys.any? { |k| c.definition.name == k || c.definition.name.start_with?("#{k}#") } }
+         .each(&:erase!)
+  end
+
+  def clear_walls(model = Sketchup.active_model)
+    model.entities.grep(Sketchup::Face).each(&:erase!)
+    model.entities.grep(Sketchup::Edge).each(&:erase!)
+  end
+
+  # Add room walls + floor.
+  # North wall at Y=0 (in XZ plane, going +X from origin)
+  # West wall at X=0 (in YZ plane, going -Y from origin)
+  # Floor at Z=0 (in XY plane, in -Y/+X quadrant)
+  def add_room_walls(model: Sketchup.active_model, width_mm: 3500, depth_mm: 3000, height_mm: 2700)
+    in_w = mm_to_in(width_mm)
+    in_d = mm_to_in(depth_mm)
+    in_h = mm_to_in(height_mm)
+    ents = model.entities
+
+    # Floor (XY plane at Z=0, in -Y/+X quadrant)
+    floor_pts = [[0,0,0], [in_w,0,0], [in_w,-in_d,0], [0,-in_d,0]]
+    floor = ents.add_face(*floor_pts)
+    floor.reverse! if floor.normal.z < 0  # face up
+
+    # North wall (XZ plane at Y=0, height in +Z)
+    north_pts = [[0,0,0], [in_w,0,0], [in_w,0,in_h], [0,0,in_h]]
+    north = ents.add_face(*north_pts)
+
+    # West wall (YZ plane at X=0, height in +Z, length in -Y)
+    west_pts = [[0,0,0], [0,-in_d,0], [0,-in_d,in_h], [0,0,in_h]]
+    west = ents.add_face(*west_pts)
+
+    {
+      ok: true,
+      walls: { floor: !floor.nil?, north: !north.nil?, west: !west.nil? },
+      room_mm: { width: width_mm, depth: depth_mm, height: height_mm },
+    }
+  end
+
+  # Apply еврозапил (papa/mama) to a straight countertop instance.
+  # mode: :papa (выступ, eurocut on left=2 or right=2) or :mama (паз, =3)
+  # side: :left or :right — which torец of the CT
+  # depth_mm: глубина еврозапила (стандарт 10mm)
+  # width_2_mm: длина стыка (= ширина CT, default 600mm)
+  #
+  # NOTE: на def могут быть формульные связки right_width = left_width — тогда
+  # достаточно установить left_width, right_width подтянется автоматически.
+  # Установка через set_attribute с числовыми значениями в inches (NOT '10mm' string).
+  def apply_eurocut(inst, mode:, side:, depth_mm: 10, width_2_mm: 600, degree: 45)
+    dc = $dc_observers.get_latest_class
+    return unless dc
+    raise "mode must be :papa or :mama" unless [:papa, :mama].include?(mode)
+    raise "side must be :left or :right" unless [:left, :right].include?(side)
+
+    mode_val = (mode == :papa) ? '2' : '3'
+    if side == :left
+      dc.set_attribute(inst, 'l0_component_500_eurocut_left', mode_val)
+      dc.set_attribute(inst, 'l0_component_501_eurocut_left_degree', degree.to_s)
+      dc.set_attribute(inst, 'l0_component_502_eurocut_left_width', mm_to_in(depth_mm))
+      dc.set_attribute(inst, 'l0_component_503_eurocut_left_width_2', mm_to_in(width_2_mm))
+    else
+      dc.set_attribute(inst, 'l0_component_510_eurocut_right', mode_val)
+      dc.set_attribute(inst, 'l0_component_511_eurocut_right_degree', degree.to_s)
+      # right_width часто связан формулой с left_width — устанавливаем оба
+      dc.set_attribute(inst, 'l0_component_502_eurocut_left_width', mm_to_in(depth_mm))
+      dc.set_attribute(inst, 'l0_component_512_eurocut_right_width', mm_to_in(depth_mm))
+      dc.set_attribute(inst, 'l0_component_513_eurocut_right_width_2', mm_to_in(width_2_mm))
+    end
+    dc.redraw_with_undo(inst)
+    inst
+  end
+
+  # Canonical TT_STRAIGHT placer with verified DC attr names.
+  #
+  # WHY: live AD dump (verified 2026-05-03 from existing E-arm CT 1751×650×20):
+  #   length_mm    sits in `var_l0_lenz`  (def-local Z axis = row long direction)
+  #   depth_mm     sits in `var_l0_leny`  (def-local Y axis = front-to-back)
+  #   thickness_mm sits in `var_l0_lenx`  (def-local X axis = vertical thickness)
+  # TT_STRAIGHT def-local axes do NOT match world XYZ. Setting var_l0_lenx=length
+  # gave 0..2000 actual bbox X = native (no resize), because var_l0_lenx controls
+  # thickness, not row length.
+  #
+  # Probe existing instance to confirm:
+  #   ad = inst.attribute_dictionary('dynamic_attributes')
+  #   ['var_l0_lenx', 'var_l0_leny', 'var_l0_lenz'].each { |k| puts "#{k}=#{ad[k]}in (#{(ad[k].to_f*25.4).round}mm)" }
+  #
+  # length_mm: row-direction length (e.g. 2697 for N-arm CT)
+  # depth_mm:  front-to-back depth (e.g. 600 standard Studiokook)
+  # thickness_mm: 20 stone / 12 HPL / 38 laminate
+  # rotation_deg: 0 (row along world X / N-row) or 90 (row along world Y / E-/W-row)
+  def place_countertop(length_mm:, depth_mm:, thickness_mm:, anchors:, rotation_deg: 0, mapping: nil, model: Sketchup.active_model)
+    dc = $dc_observers && $dc_observers.get_latest_class
+    raise 'place_countertop: $dc_observers unavailable' unless dc
+
+    model.start_operation('place_countertop', true)
+    inst = nil
+    attr_for = nil
+    begin
+      inst = place('TT_STRAIGHT', at_mm: [0, -10000, 0], rotation_deg: rotation_deg, redraw: false, model: model)
+      dc.redraw_with_undo(inst)
+
+      # Verified TT_STRAIGHT resize protocol (live test 2026-05-03 21:30):
+      #
+      #   API:    dc.set_attribute(inst, key, value_in_inches)   ← plain value, NOT _formula
+      #   Length: l8_axe_203_lenx_fix       (overrides LenX cascade in var_l0_lenz formula)
+      #   Depth:  l0_100_LenY               (source of _leny_formula)
+      #   Thick:  l0_component_100_thickness (source of _lenz_formula)
+      #   Units:  INCHES (SU internal storage, regardless of _<key>_units flag)
+      #
+      # Why NOT set_attribute_formula: it writes _<key>_formula key, breaks the existing
+      # formula chain (e.g. _leny_formula = "l0_100_LenY + indent_front + indent_back"),
+      # which in turn doesn't drive bbox.
+      # Why NOT lenx directly: writing lenx does not propagate to bbox X (verified —
+      # lenx=269.7in stored in AD but bbox X stayed at native 2000mm). l8_axe_203_lenx_fix
+      # is the canonical length-driver for TT_STRAIGHT.
+      # Why force indents to 0: bbox_y = l0_100_LenY + indent_front + indent_back. We want
+      # bbox_y == depth_mm exactly, so all 4 indents go to 0.
+      length_in    = mm_to_in(length_mm)
+      depth_in     = mm_to_in(depth_mm)
+      thickness_in = mm_to_in(thickness_mm)
+
+      writes_attempted = {
+        length:    { attr: 'l8_axe_203_lenx_fix',         value_in: length_in,    target_mm: length_mm },
+        depth:     { attr: 'l0_100_LenY',                 value_in: depth_in,     target_mm: depth_mm },
+        thickness: { attr: 'l0_component_100_thickness',  value_in: thickness_in, target_mm: thickness_mm },
+        indent_front:  { attr: 'l8_axe_302_indent_front',  value_in: 0.0 },
+        indent_back:   { attr: 'l8_axe_301_indent_back',   value_in: 0.0 },
+        indent_top:    { attr: 'l8_axe_102_indent_top',    value_in: 0.0 },
+        indent_bottom: { attr: 'l8_axe_101_indent_bottom', value_in: 0.0 },
+      }
+      writes_attempted.each_value { |w| dc.set_attribute(inst, w[:attr], w[:value_in]) }
+
+      mapping_used = writes_attempted.transform_values { |w| w[:attr] }
+
+      dc.redraw_with_undo(inst)
+      anchor_to(inst, anchors)
+      model.commit_operation
+      @last_place_countertop_writes = writes_attempted
+      @last_place_countertop_mapping = mapping_used
+      @last_place_countertop_def_extents = nil
+    rescue => e
+      inst.erase! if inst && inst.valid?
+      model.abort_operation
+      raise e
+    end
+
+    # Bbox check: world dims depend on rotation_deg.
+    # rotation_deg=0  → row-length along world X, depth along world Y, thickness along world Z
+    # rotation_deg=90 → row-length along world Y, depth along world X, thickness along world Z
+    bb = inst.bounds
+    actual_x = (bb.max.x - bb.min.x).to_mm.round
+    actual_y = (bb.max.y - bb.min.y).to_mm.round
+    actual_z = (bb.max.z - bb.min.z).to_mm.round
+    expected_x = (rotation_deg == 90) ? depth_mm : length_mm
+    expected_y = (rotation_deg == 90) ? length_mm : depth_mm
+    drift = { x: (actual_x - expected_x).abs, y: (actual_y - expected_y).abs, z: (actual_z - thickness_mm).abs }
+    diag_ad = nil
+    if drift.values.any? { |d| d > 5 }
+      ad_post = inst.attribute_dictionary('dynamic_attributes')
+      diag_ad = {}
+      if ad_post
+        ['lenx','leny','lenz','var_l0_lenx','var_l0_leny','var_l0_lenz',
+         '_lenx_formula','_leny_formula','_lenz_formula',
+         '_var_l0_lenx_formula','_var_l0_leny_formula','_var_l0_lenz_formula',
+         '_lenx_units','_leny_units','_lenz_units',
+         '_var_l0_lenx_units','_var_l0_leny_units','_var_l0_lenz_units'].each do |k|
+          diag_ad[k] = ad_post[k] if ad_post.keys.include?(k)
+        end
+      end
+      Kernel.warn("place_countertop bbox drift: expected world (#{expected_x}×#{expected_y}×#{thickness_mm}) got (#{actual_x}×#{actual_y}×#{actual_z}) mapping=#{@last_place_countertop_mapping.inspect} writes=#{@last_place_countertop_writes.inspect} diag_ad=#{diag_ad.inspect}")
+    end
+    { inst: inst, bbox_mm: { x: actual_x, y: actual_y, z: actual_z }, drift_mm: drift, def_extents: @last_place_countertop_def_extents, mapping_used: @last_place_countertop_mapping, writes: @last_place_countertop_writes, diag_ad: diag_ad }
+  end
+
+  # One-shot mapping inference helper. Reads an existing TT_STRAIGHT instance and
+  # returns the dimension→attr mapping that matches its current bbox. Use to verify
+  # place_countertop's hardcoded mapping before bulk run, or if def changed.
+  #   EkRealCompose.infer_tt_straight_mapping(existing_e_arm_ct)
+  #   # => { length: 'var_l0_lenz', depth: 'var_l0_leny', thickness: 'var_l0_lenx' }
+  def infer_tt_straight_mapping(inst)
+    raise 'infer_tt_straight_mapping: inst nil' unless inst && inst.valid?
+    ad = inst.attribute_dictionary('dynamic_attributes')
+    # Fallback: fresh instances may not have instance-level AD until DC touches them.
+    # Read from definition-level AD which is always populated for DC components.
+    ad ||= inst.definition.attribute_dictionary('dynamic_attributes')
+    raise 'no dynamic_attributes on instance OR definition (not a DC component?)' unless ad
+    bb = inst.bounds
+    bbox_dims_mm = [(bb.max.x - bb.min.x).to_mm, (bb.max.y - bb.min.y).to_mm, (bb.max.z - bb.min.z).to_mm].map(&:round).sort
+    longest, mid, shortest = bbox_dims_mm.reverse  # [length, depth, thickness] heuristic by magnitude
+
+    candidates = ['var_l0_lenx', 'var_l0_leny', 'var_l0_lenz', 'lenx', 'leny', 'lenz']
+    attr_values = candidates.map { |k| [k, ad[k] ? (ad[k].to_f * 25.4).round : nil] }.to_h
+    used = []
+
+    find_attr = lambda do |target_mm|
+      hit = candidates.find { |k| !used.include?(k) && attr_values[k] && (attr_values[k] - target_mm).abs <= 5 }
+      used << hit if hit
+      hit
+    end
+
+    # Resolve thickness first (smallest, least ambiguous) so it doesn't get
+    # consumed by length/depth lookups when bbox happens to share values.
+    thickness = find_attr.call(shortest)
+    length    = find_attr.call(longest)
+    depth     = find_attr.call(mid)
+
+    {
+      length:    length,
+      depth:     depth,
+      thickness: thickness,
+      bbox_mm:   { longest: longest, mid: mid, shortest: shortest },
+      attr_values_mm: attr_values,
+    }
+  end
+
+  # Standard cutout dimensions for canonical Studiokook appliances + sinks.
+  # Source: Tellimus order specs + Franke/Electrolux datasheets. Width × Depth (mm).
+  # `corner_radius_mm` informs CNC; visual marker uses straight rectangle.
+  CUTOUT_PROFILES = {
+    sink_franke_maris_mrx_110_45: { dim_x: 860, dim_y: 500, corner_radius_mm: 12, kind: :sink },
+    sink_default_500_400:         { dim_x: 500, dim_y: 400, corner_radius_mm: 10, kind: :sink },
+    cooktop_electrolux_eis82453:  { dim_x: 750, dim_y: 490, corner_radius_mm: 8,  kind: :cooktop },
+    cooktop_default_600_490:      { dim_x: 600, dim_y: 490, corner_radius_mm: 8,  kind: :cooktop },
+  }.freeze
+
+  # Add a countertop cutout (выпил под мойку / варочную поверхность).
+  #
+  # WHY: rule cooktop_and_sink_require_countertop_cutout — sink + cooktop positions
+  # MUST have a corresponding cutout in the countertop, otherwise BOM/CNC ships
+  # solid worktop and install fails.
+  #
+  # WHAT THIS DOES:
+  # 1. Validates host_inst is a countertop (def name in COUNTERTOP_DEF_NAMES or
+  #    matches "Столешница" / "tabletop").
+  # 2. Records cutout intent as instance attribute dictionary 'studiokook_cutout'
+  #    — the source of truth for BOM/CNC pipeline (NOT the visual marker).
+  # 3. Adds a thin visual marker group (named "cutout_<kind>_<n>") at center_xy
+  #    on the countertop top face — not destructive, doesn't modify the
+  #    countertop def. Marker is a recognized exception to the
+  #    no_custom_geometry_replaces_library_module rule (it's a manufacturing
+  #    annotation, not a furniture element).
+  #
+  # Args:
+  #   host_inst   — countertop ComponentInstance (TT_STRAIGHT etc.)
+  #   profile_key — symbol from CUTOUT_PROFILES, OR
+  #   profile     — explicit hash {dim_x:, dim_y:, kind:, corner_radius_mm:}
+  #   center_xy_mm — [x_mm, y_mm] world coords of cutout center on top face
+  #
+  # orientation: :n_row (default) — appliance long-side runs along X (W↔E), short along Y.
+  #              :e_row | :w_row — perpendicular row, long-side runs along Y, short along X.
+  #   Profile dim_x/dim_y are appliance-frame coordinates: dim_x = long side, dim_y = short side.
+  #   Helper swaps them into world axes per orientation. Without this, perpendicular row
+  #   cooktops (e.g. BD3 in E-row) overflow the countertop X-extent because dim_x=750
+  #   tries to go along world-X where CT is only 650mm wide.
+  # Returns: { ok:, marker:, attrs:, host: }
+  def add_countertop_cutout(host_inst:, center_xy_mm:, profile: nil, profile_key: nil, orientation: :n_row, model: Sketchup.active_model)
+    raise 'add_countertop_cutout: host_inst is nil' unless host_inst && host_inst.valid?
+    def_name = host_inst.definition.name.to_s
+    is_ct = COUNTERTOP_DEF_NAMES.any? { |n| def_name.include?(n) } ||
+            def_name.match?(/tabletop|Столешница|Worktop/i)
+    raise "add_countertop_cutout: host_inst def '#{def_name}' is not a countertop" unless is_ct
+
+    spec = profile || (profile_key && CUTOUT_PROFILES[profile_key])
+    raise 'add_countertop_cutout: provide either profile or profile_key' unless spec
+    raise "add_countertop_cutout: profile must include dim_x, dim_y, kind" unless spec[:dim_x] && spec[:dim_y] && spec[:kind]
+    raise "add_countertop_cutout: kind must be :sink or :cooktop" unless [:sink, :cooktop].include?(spec[:kind])
+    raise "add_countertop_cutout: unknown orientation #{orientation.inspect}" unless [:n_row, :e_row, :w_row].include?(orientation)
+
+    # Map appliance-frame dims → world-frame dims based on row orientation.
+    world_dim_x, world_dim_y = case orientation
+                                when :n_row         then [spec[:dim_x], spec[:dim_y]]  # long along X, short along Y
+                                when :e_row, :w_row then [spec[:dim_y], spec[:dim_x]]  # long along Y, short along X
+                                end
+
+    bb = host_inst.bounds
+    top_z_mm = bb.max.z.to_mm
+    cx_mm, cy_mm = center_xy_mm
+    halfx = world_dim_x / 2.0
+    halfy = world_dim_y / 2.0
+    x_min, x_max = cx_mm - halfx, cx_mm + halfx
+    y_min, y_max = cy_mm - halfy, cy_mm + halfy
+
+    # Bbox containment check — cutout must lie inside countertop footprint.
+    ct_x_min, ct_x_max = bb.min.x.to_mm, bb.max.x.to_mm
+    ct_y_min, ct_y_max = bb.min.y.to_mm, bb.max.y.to_mm
+    if x_min < ct_x_min - 1 || x_max > ct_x_max + 1 || y_min < ct_y_min - 1 || y_max > ct_y_max + 1
+      raise "add_countertop_cutout: cutout #{spec[:dim_x]}x#{spec[:dim_y]} at [#{cx_mm}, #{cy_mm}] does not fit inside CT bbox [#{ct_x_min.round}..#{ct_x_max.round}, #{ct_y_min.round}..#{ct_y_max.round}]"
+    end
+
+    model.start_operation('add_countertop_cutout', true)
+    marker = nil
+    begin
+      ents = model.entities
+      pts = [
+        [mm_to_in(x_min), mm_to_in(y_min), mm_to_in(top_z_mm + 1)],
+        [mm_to_in(x_max), mm_to_in(y_min), mm_to_in(top_z_mm + 1)],
+        [mm_to_in(x_max), mm_to_in(y_max), mm_to_in(top_z_mm + 1)],
+        [mm_to_in(x_min), mm_to_in(y_max), mm_to_in(top_z_mm + 1)],
+      ]
+      marker = ents.add_group
+      face = marker.entities.add_face(*pts)
+      face.reverse! if face.normal.z < 0
+      idx = ents.grep(Sketchup::Group).count { |g| g.name.to_s.start_with?("cutout_#{spec[:kind]}_") }
+      marker.name = "cutout_#{spec[:kind]}_#{idx + 1}"
+      marker.set_attribute('studiokook_cutout', 'kind',              spec[:kind].to_s)
+      marker.set_attribute('studiokook_cutout', 'dim_long_mm',       spec[:dim_x])  # appliance-frame long side
+      marker.set_attribute('studiokook_cutout', 'dim_short_mm',      spec[:dim_y])  # appliance-frame short side
+      marker.set_attribute('studiokook_cutout', 'world_dim_x_mm',    world_dim_x)
+      marker.set_attribute('studiokook_cutout', 'world_dim_y_mm',    world_dim_y)
+      marker.set_attribute('studiokook_cutout', 'orientation',       orientation.to_s)
+      marker.set_attribute('studiokook_cutout', 'center_x_mm',       cx_mm)
+      marker.set_attribute('studiokook_cutout', 'center_y_mm',       cy_mm)
+      marker.set_attribute('studiokook_cutout', 'corner_radius_mm',  spec[:corner_radius_mm] || 0)
+      marker.set_attribute('studiokook_cutout', 'host_def_name',     def_name)
+      marker.set_attribute('studiokook_cutout', 'top_z_mm',          top_z_mm.round)
+      # Mirror metadata onto host countertop instance for easy host->cutout lookup.
+      host_attrs = host_inst.attribute_dictionary('studiokook_cutouts', true)
+      host_list  = host_attrs['list'] || []
+      host_list << { kind: spec[:kind].to_s, marker_name: marker.name, dim_long_mm: spec[:dim_x], dim_short_mm: spec[:dim_y], orientation: orientation.to_s, center_xy_mm: [cx_mm, cy_mm] }
+      host_inst.set_attribute('studiokook_cutouts', 'list', host_list)
+      model.commit_operation
+    rescue => e
+      marker.erase! if marker && marker.valid?
+      model.abort_operation
+      raise e
+    end
+
+    {
+      ok: true,
+      marker: marker,
+      host: host_inst,
+      kind: spec[:kind],
+      dims_mm: [spec[:dim_x], spec[:dim_y]],
+      center_xy_mm: [cx_mm, cy_mm],
+      top_z_mm: top_z_mm.round,
+    }
+  end
+
+  # Audit helper: scan model for sink/cooktop cabinets and report which have a
+  # corresponding cutout marker positioned above them.
+  # Returns { ok:, total:, with_cutout:, missing: [{def, bbox, kind}, ...] }
+  def audit_countertop_cutouts(model: Sketchup.active_model)
+    sink_or_cooktop = []
+    model.entities.grep(Sketchup::ComponentInstance).each do |inst|
+      def_name = inst.definition.name.to_s
+      kind = if def_name =~ /^BD1(\b|#)/    then :sink
+             elsif def_name =~ /^BD3(\b|#)/  then :cooktop
+             else nil end
+      next unless kind
+      sink_or_cooktop << { inst: inst, def: def_name, kind: kind, bbox: inst.bounds }
+    end
+
+    cutout_markers = model.entities.grep(Sketchup::Group).select { |g| g.name.to_s.start_with?('cutout_') && g.attribute_dictionary('studiokook_cutout', false) }
+
+    missing = []
+    with_cutout = []
+    sink_or_cooktop.each do |s|
+      bb = s[:bbox]
+      hit = cutout_markers.find do |m|
+        cm_kind = m.get_attribute('studiokook_cutout', 'kind').to_s
+        next false unless cm_kind == s[:kind].to_s
+        cx = m.get_attribute('studiokook_cutout', 'center_x_mm').to_f.mm
+        cy = m.get_attribute('studiokook_cutout', 'center_y_mm').to_f.mm
+        cx >= bb.min.x && cx <= bb.max.x && cy >= bb.min.y && cy <= bb.max.y
+      end
+      if hit
+        with_cutout << { def: s[:def], kind: s[:kind], marker: hit.name }
+      else
+        missing << { def: s[:def], kind: s[:kind], bbox_mm: { x: [bb.min.x.to_mm.round, bb.max.x.to_mm.round], y: [bb.min.y.to_mm.round, bb.max.y.to_mm.round], z: [bb.min.z.to_mm.round, bb.max.z.to_mm.round] } }
+      end
+    end
+
+    { ok: missing.empty?, total: sink_or_cooktop.size, with_cutout: with_cutout, missing: missing }
+  end
+
+  # Apply blend↔carcass d106-gap fix to BG1 corner.
+  # EK BG1 def lacks parameterized gap propagation to BLEND1/BLEND1#1
+  # (only FACADE1 has internal x202=d106 handling). This injects
+  # `- parent!d106` into the _y_formula of each blend's INSTANCE AD.
+  # The fix is permanent if BG1.skp is then defn.save_as'd.
+  def apply_blend_gap_fix(inst)
+    dc = $dc_observers.get_latest_class
+    return unless dc
+    ['BLEND1', 'BLEND1#1'].each do |def_name|
+      child = inst.definition.entities.grep(Sketchup::ComponentInstance).find { |c| c.definition.name == def_name }
+      next unless child
+      ad = child.attribute_dictionary('dynamic_attributes', false)
+      next unless ad
+      old = ad['_y_formula']
+      next if old.include?('parent!d106') # already fixed
+      new_f = old.sub(/,CURRENT\("Y"\)/, '-parent!d106,CURRENT("Y")')
+      dc.set_attribute_formula(child, 'y', new_f)
+    end
+    dc.redraw_with_undo(inst)
+    inst
+  end
+
+  # Configure BG1 corner mating zone to match adjacent row depth.
+  # k143 = total mating zone width (must equal adjacent row cabinet depth)
+  # k144 = panel width (= k143 unless extended blend desired)
+  # k147 = position: :external (1) | :internal (2)
+  def apply_corner_mating(inst, depth_mm:, panel_mm: nil, position: :external)
+    dc = $dc_observers.get_latest_class
+    return unless dc
+    raise "position must be :external or :internal" unless [:external, :internal].include?(position)
+    panel_mm ||= depth_mm
+    pos_val = (position == :external) ? '1' : '2'
+    dc.set_attribute(inst, 'k143', mm_to_in(depth_mm))
+    dc.set_attribute(inst, 'k144', mm_to_in(panel_mm))
+    dc.set_attribute(inst, 'k147', pos_val)
+    dc.redraw_with_undo(inst)
+    inst
+  end
+
+  # Place a countertop. Supports parametric scaling for length/depth.
+  def add_countertop(at_mm:, length_mm: nil, depth_mm: COUNTERTOP_DEPTH_MM, rotation_deg: 0, kind: :straight, model: Sketchup.active_model)
+    key = case kind
+          when :straight then 'TT_STRAIGHT'
+          when :corner   then 'TT_CORNER'
+          else raise "kind must be :straight or :corner"
+          end
+    defn = load_module(key, model)
+    bb = defn.bounds
+    native_length = bb.width.to_mm
+    native_depth  = bb.height.to_mm.abs  # absolute (corner has negative Y range)
+
+    sx = (kind == :corner || length_mm.nil?) ? 1.0 : (length_mm.to_f / native_length)
+    sy = (kind == :corner) ? 1.0 : (depth_mm.to_f / native_depth)
+    sz = 1.0
+
+    origin_in = Geom::Point3d.new(mm_to_in(at_mm[0]), mm_to_in(at_mm[1]), mm_to_in(at_mm[2]))
+    scale = Geom::Transformation.scaling(ORIGIN_PT, sx, sy, sz)
+    trans = Geom::Transformation.translation(origin_in - ORIGIN_PT)
+    if rotation_deg != 0
+      angle = rotation_deg * Math::PI / 180.0
+      rot = Geom::Transformation.rotation(origin_in, Geom::Vector3d.new(0, 0, 1), angle)
+      tr = rot * trans * scale
+    else
+      tr = trans * scale
+    end
+    inst = model.entities.add_instance(defn, tr)
+    dc = $dc_observers.get_latest_class
+    dc.redraw_with_undo(inst) if dc
+    inst
+  end
+
+  # Demo L-shape kitchen following Sven's conventions:
+  #   • Walls at X=0 and Y=0
+  #   • L-corner (default BG1, 950×670 asymmetric — Sven's standard)
+  #   • North row from corner +X: BD1, BD2, BD2 stacked
+  #   • West row from corner -Y: BB1, BA stacked
+  #   • Top wall cabinets above north row at Z=1500 (just above countertop+150mm gap)
+  #   • Countertops over bottom row, all back-flush with walls
+  def l_kitchen(model = Sketchup.active_model, with_walls: true, countertop_profile: DEFAULT_COUNTERTOP_PROFILE, target_top_mm: TOTAL_WORK_HEIGHT_MM, corner_key: 'BG1')
+    model.start_operation('real_l_kitchen', true)
+    placed = []
+    walls_result = nil
+    begin
+      clear_instances(model)
+      clear_walls(model) if with_walls
+      walls_result = add_room_walls(model: model, width_mm: 3500, depth_mm: 3000, height_mm: 2700) if with_walls
+
+      profile = COUNTERTOP_PROFILES[countertop_profile]
+      cab_height_mm = total_cabinet_height_for(profile[:thickness_mm], target_top_mm: target_top_mm)
+      ct_z = cab_height_mm  # countertop sits on top of bottom cabinets
+
+      # 1. NW corner via place_l_corner (BG1 default, BF2A optional)
+      corner = place_l_corner(module_key: corner_key, countertop_profile: countertop_profile, target_top_mm: target_top_mm, model: model)
+      placed << corner
+
+      # Read corner's actual width after redraw. Perpendicular row mates to
+      # `bind_front`, not to the corner bbox/main-frame depth.
+      corner_w_mm = corner.bounds.width.to_mm.round
+      corner_bind_y_mm = corner_perpendicular_mate_y_mm(corner)
+
+      common = { countertop_profile: countertop_profile, target_top_mm: target_top_mm, model: model }
+      # 2. North row continues +X from corner's right edge — auto back-flush at Y=0
+      placed << place_in_north_row('BD1', x_start_mm: corner_w_mm,            **common)
+      placed << place_in_north_row('BD2', x_start_mm: corner_w_mm + 600,      **common)
+      placed << place_in_north_row('BD2', x_start_mm: corner_w_mm + 1200,     **common)
+
+      # 3. West row from corner bind_front axis — auto back-flush at X=0.
+      west_y_top_mm = corner_bind_y_mm
+      placed << place_in_west_row('BB1', y_top_mm: west_y_top_mm,             **common)
+      placed << place_in_west_row('BA',  y_top_mm: west_y_top_mm - 400,       **common)
+
+      # 4. Top wall cabinets — auto back-flush at Y=0 (top cabinets back too!)
+      placed << place_in_top_row('TA',  x_start_mm: corner_w_mm,              model: model)
+      placed << place_in_top_row('TB2', x_start_mm: corner_w_mm + 300,        model: model)
+      placed << place_in_top_row('TB1', x_start_mm: corner_w_mm + 900,        model: model)
+      placed << place_in_top_row('TB1', x_start_mm: corner_w_mm + 1200,       model: model)
+      placed << place_in_top_row('TB1', x_start_mm: corner_w_mm + 1500,       model: model)
+
+      # 5. Countertops at Z=cab_height_mm (= target_top - thickness), e.g. 862 for laminate
+      # 5a. North row countertop — back-flush at Y=0 via anchor_to
+      n_ct = add_countertop(
+        at_mm: [corner_w_mm, -COUNTERTOP_DEPTH_MM, ct_z],
+        length_mm: 1800, depth_mm: COUNTERTOP_DEPTH_MM,
+        rotation_deg: 0, kind: :straight, model: model
+      )
+      anchor_to(n_ct, x_min: corner_w_mm, y_max: 0, z_min: ct_z)
+      placed << n_ct
+
+      # 5b. Corner countertop — back-flush at Y=0 and X=0
+      c_ct = add_countertop(at_mm: [0, 0, ct_z], rotation_deg: 0, kind: :corner, model: model)
+      anchor_to(c_ct, x_min: 0, y_max: 0, z_min: ct_z)
+      placed << c_ct
+
+      # 5c. West row countertop — back-flush at X=0 via anchor_to
+      w_ct = add_countertop(
+        at_mm: [COUNTERTOP_DEPTH_MM, west_y_top_mm - 800, ct_z],
+        length_mm: 800, depth_mm: COUNTERTOP_DEPTH_MM,
+        rotation_deg: 90, kind: :straight, model: model
+      )
+      anchor_to(w_ct, x_min: 0, y_max: west_y_top_mm, z_min: ct_z)
+      placed << w_ct
+
+      model.commit_operation
+      {
+        ok: true,
+        placed_count: placed.size,
+        walls: walls_result,
+        cabinets: placed.map { |c|
+          bb = c.bounds
+          {
+            def: c.definition.name,
+            bbox_min_mm: [bb.min.x.to_mm.round, bb.min.y.to_mm.round, bb.min.z.to_mm.round],
+            bbox_max_mm: [bb.max.x.to_mm.round, bb.max.y.to_mm.round, bb.max.z.to_mm.round],
+          }
+        },
+      }
+    rescue => e
+      model.abort_operation
+      { ok: false, error: "#{e.class}: #{e.message}", backtrace: e.backtrace.first(10) }
+    end
+  end
+
+  # =========================================================================
+  # Verification helpers (added 2026-05-01, closes failure-2026-04-30 root cause #4)
+  # =========================================================================
+
+  # Per-module expected health (verified via probe 2026-05-01).
+  # min_faces_3lvl: minimum face count via 3-level recursion (deep enough for EK)
+  # facades: expected count of FACADE* children at def-direct level
+  # facade_y_mm_def_local: expected def-local Y range for FACADE midpoint (sanity)
+  EXPECTED_HEALTH = {
+    'BG1'  => { min_faces_3lvl: 1600, facades: 1, facade_y_def_local: [38, 120] },
+    'TG1'  => { min_faces_3lvl: 1500, facades: 1, facade_y_def_local: [38, 120] },
+    'BD1'  => { min_faces_3lvl: 1300, facades: 1, facade_y_def_local: [38, 597] },
+    'BD2'  => { min_faces_3lvl: 1300, facades: 2, facade_y_def_local: [38, 597] },
+    'BD3'  => { min_faces_3lvl: 1300, facades: 3, facade_y_def_local: [38, 597] },
+    'BB1'  => { min_faces_3lvl: 1300, facades: 1, facade_y_def_local: [38, 164] },
+    'BB2'  => { min_faces_3lvl: 1300, facades: 2, facade_y_def_local: [38, 164] },
+    'BC'   => { min_faces_3lvl: 1300, facades: 1, facade_y_def_local: [38, 597] },
+    'BA'   => { min_faces_3lvl: 1200, facades: 0, facade_y_def_local: nil },
+    'BF2A' => { min_faces_3lvl: 1600, facades: 1, facade_y_def_local: [0, 281] },
+    'PA'   => { min_faces_3lvl: 1300, facades: 0, facade_y_def_local: nil },
+    'PB1F' => { min_faces_3lvl: 1900, facades: 1, facade_y_def_local: [38, 164] },
+    'PB2F' => { min_faces_3lvl: 1900, facades: 2, facade_y_def_local: [38, 164] },
+    'TA'   => { min_faces_3lvl: 200,  facades: 0, facade_y_def_local: nil },
+    'TB1'  => { min_faces_3lvl: 250,  facades: 1, facade_y_def_local: [38, 164] },
+    'TB2'  => { min_faces_3lvl: 270,  facades: 2, facade_y_def_local: [38, 164] },
+    'TB3'  => { min_faces_3lvl: 300,  facades: 3, facade_y_def_local: [38, 164] },
+  }.freeze
+
+  # Recursive face count down to max_depth levels.
+  # 2-level recursion was insufficient (failure-2026-04-30, found ~43 faces vs real ~2000).
+  def deep_face_count(definition, depth = 0, max_depth = 3)
+    return 0 if depth > max_depth
+    total = definition.entities.grep(Sketchup::Face).size
+    definition.entities.grep(Sketchup::ComponentInstance).each do |ch|
+      total += deep_face_count(ch.definition, depth + 1, max_depth)
+    end
+    total
+  end
+
+  # Verify single module instance against expected health.
+  # Returns hash with :ok plus any failed checks. Does not raise.
+  # Pass module_key to lookup expected ranges from EXPECTED_HEALTH.
+  def verify_module_health(inst, module_key: nil, expected: nil)
+    module_key ||= inst.definition.name.split('#').first
+    expected   ||= EXPECTED_HEALTH[module_key]
+    unless expected
+      return { ok: false, module_key: module_key, error: "no expected ranges defined" }
+    end
+
+    d = inst.definition
+    facades = d.entities.grep(Sketchup::ComponentInstance).select { |c| c.definition.name =~ /^FACADE/i }
+    faces_3lvl = deep_face_count(d, 0, 3)
+
+    failures = []
+    failures << "faces_3lvl=#{faces_3lvl} < min_faces_3lvl=#{expected[:min_faces_3lvl]}" if faces_3lvl < expected[:min_faces_3lvl]
+    failures << "facade_count=#{facades.size} != expected=#{expected[:facades]}" if facades.size != expected[:facades]
+
+    if expected[:facade_y_def_local] && !facades.empty?
+      ey_min, ey_max = expected[:facade_y_def_local]
+      facades.each do |f|
+        bb = f.bounds
+        y_min = (bb.min.y * 25.4).round
+        y_max = (bb.max.y * 25.4).round
+        if y_min < ey_min - 5 || y_max > ey_max + 5
+          failures << "facade #{f.definition.name} y=[#{y_min},#{y_max}] outside expected [#{ey_min},#{ey_max}]"
+        end
+      end
+    end
+
+    {
+      ok: failures.empty?,
+      module_key: module_key,
+      faces_3lvl: faces_3lvl,
+      facade_count: facades.size,
+      failures: failures,
+    }
+  end
+
+  # Verify all module instances at top level of model.entities.
+  # Returns array of per-instance verification results.
+  def verify_all_modules(model = Sketchup.active_model)
+    insts = model.entities.grep(Sketchup::ComponentInstance).select { |i|
+      EXPECTED_HEALTH.key?(i.definition.name.split('#').first)
+    }
+    insts.map { |i| verify_module_health(i) }
+  end
+
+  # =========================================================================
+  # MM mutation protocol (closes failure-2026-04-30 root cause #5)
+  # =========================================================================
+
+  # Check if instance attribute override would break the mm!/parent! cascade.
+  # Returns hash: { safe: bool, reason: String|nil, def_formula: String|nil }
+  # USE BEFORE every dc.set_attribute_formula(inst, key, value) call.
+  def cascade_check(inst, key)
+    def_dict = inst.definition.attribute_dictionary('dynamic_attributes')
+    return { safe: true, reason: 'no def AD' } unless def_dict
+
+    formula = def_dict["_#{key}_formula"]
+    return { safe: true, reason: 'no def-formula' } if formula.nil? || formula.to_s.empty?
+
+    f = formula.to_s
+    if f =~ /mm!|parent!/
+      { safe: false, reason: 'def-formula references cascade (mm!/parent!) — instance override breaks it', def_formula: f }
+    else
+      { safe: true, reason: 'def-formula has no cascade refs', def_formula: f }
+    end
+  end
+
+  # Safe wrapper. Mode: :warn (log + apply) | :abort (raise) | :force (apply silently).
+  # Returns the value applied OR raises in :abort mode on cascade conflict.
+  def safe_set_attribute_formula(inst, key, value, mode: :warn)
+    check = cascade_check(inst, key)
+    if !check[:safe]
+      msg = "EK MM mutation guard: setting '#{key}' on instance breaks cascade. " \
+            "def-formula: '#{check[:def_formula]}'. " \
+            "Per facade-gap-standards, change cascade source via Главное меню (mm!key), " \
+            "not on the instance. Module: #{inst.definition.name}."
+      case mode
+      when :abort
+        raise msg
+      when :warn
+        puts "[WARN] #{msg}"
+      when :force
+        # silent — used only when caller knows what they're doing
+      end
+    end
+    dc = $dc_observers.get_latest_class
+    dc.set_attribute_formula(inst, key, value.to_s)
+    value
+  end
+
+  # Cascade keys typical for EK modules — preset to abort overrides on these.
+  # NOT a full list, but covers the common foot-guns from past sessions.
+  CASCADE_PROTECTED_KEYS = %w[a100 a101 a102 d101 d106 d201 d202 d203 d204 k100 k143 k144 k146 k147 leny lenz e102].freeze
+
+  # =========================================================================
+  # Safe wrappers — composition + verification gates inline.
+  # Use these in compose-kitchen workflows. Original methods stay for cases
+  # where verification is intentionally deferred (e.g. tuning a single attr).
+  # =========================================================================
+
+  # Place in N-row + verify health + verify facade world position.
+  # Raises on any failure. Returns the placed instance on success.
+  def place_in_north_row_safe(module_key, x_start_mm:, z_mm: 0, countertop_profile: DEFAULT_COUNTERTOP_PROFILE, target_top_mm: TOTAL_WORK_HEIGHT_MM, model: Sketchup.active_model)
+    inst = place_in_north_row(module_key, x_start_mm: x_start_mm, z_mm: z_mm,
+                              countertop_profile: countertop_profile, target_top_mm: target_top_mm, model: model)
+    h = verify_module_health(inst, module_key: module_key)
+    raise "place_in_north_row_safe: #{module_key} health failed: #{h[:failures].join('; ')}" unless h[:ok]
+    if EXPECTED_HEALTH[module_key] && EXPECTED_HEALTH[module_key][:facades] > 0
+      w = verify_facade_world(inst, role: :n_row, wall_coord_mm: 0)
+      raise "place_in_north_row_safe: #{module_key} facade not in room (world Y=#{w[:facade_world_coord_mm]})" unless w[:ok]
+    end
+    inst
+  end
+
+  def place_in_west_row_safe(module_key, y_top_mm:, z_mm: 0, countertop_profile: DEFAULT_COUNTERTOP_PROFILE, target_top_mm: TOTAL_WORK_HEIGHT_MM, model: Sketchup.active_model)
+    inst = place_in_west_row(module_key, y_top_mm: y_top_mm, z_mm: z_mm,
+                             countertop_profile: countertop_profile, target_top_mm: target_top_mm, model: model)
+    h = verify_module_health(inst, module_key: module_key)
+    raise "place_in_west_row_safe: #{module_key} health failed: #{h[:failures].join('; ')}" unless h[:ok]
+    if EXPECTED_HEALTH[module_key] && EXPECTED_HEALTH[module_key][:facades] > 0
+      w = verify_facade_world(inst, role: :w_row, wall_coord_mm: 0)
+      raise "place_in_west_row_safe: #{module_key} facade not in room (world X=#{w[:facade_world_coord_mm]})" unless w[:ok]
+    end
+    inst
+  end
+
+  def place_l_corner_safe(module_key: 'BG1', countertop_profile: DEFAULT_COUNTERTOP_PROFILE, target_top_mm: TOTAL_WORK_HEIGHT_MM, mating_depth_mm: nil, model: Sketchup.active_model)
+    inst = place_l_corner(module_key: module_key, countertop_profile: countertop_profile, target_top_mm: target_top_mm, mating_depth_mm: mating_depth_mm, model: model)
+    h = verify_module_health(inst, module_key: module_key)
+    raise "place_l_corner_safe: #{module_key} health failed: #{h[:failures].join('; ')}" unless h[:ok]
+    inst
+  end
+
+  # Phase-gate report — call after each composition phase (matches kitchen-build-checklist).
+  # Returns hash with :ok, :phase, :findings.
+  def phase_gate(phase_name, model: Sketchup.active_model)
+    findings = verify_all_modules(model)
+    failed = findings.reject { |f| f[:ok] }
+    { ok: failed.empty?, phase: phase_name, modules_checked: findings.size, failures: failed }
+  end
+
+  # Verify world-position of FACADE for a placed instance.
+  # role: :n_row | :s_row | :w_row | :e_row
+  # wall_coord_mm: coord of wall in perpendicular axis (Y for N/S, X for W/E)
+  # Returns ok=true if facade world position is on room-side of wall.
+  def verify_facade_world(inst, role:, wall_coord_mm: 0)
+    facades = inst.definition.entities.grep(Sketchup::ComponentInstance).select { |c|
+      c.definition.name =~ /^FACADE/i
+    }
+    return { ok: false, error: 'no facade children' } if facades.empty?
+    f = facades.first
+    fb = f.bounds
+    mid_local = Geom::Point3d.new(
+      (fb.min.x + fb.max.x) / 2.0,
+      (fb.min.y + fb.max.y) / 2.0,
+      (fb.min.z + fb.max.z) / 2.0
+    )
+    world = inst.transformation * mid_local
+    coord_mm = case role
+               when :n_row then (world.y * 25.4).round
+               when :s_row then (world.y * 25.4).round
+               when :w_row then (world.x * 25.4).round
+               when :e_row then (world.x * 25.4).round
+               end
+    expected_in_room = case role
+                       when :n_row then coord_mm < wall_coord_mm
+                       when :s_row then coord_mm > wall_coord_mm
+                       when :w_row then coord_mm > wall_coord_mm
+                       when :e_row then coord_mm < wall_coord_mm
+                       end
+    {
+      ok: expected_in_room,
+      role: role,
+      facade_world_coord_mm: coord_mm,
+      wall_coord_mm: wall_coord_mm,
+    }
+  end
+end

@@ -42,8 +42,9 @@
 - NEVER create SKILL, command, or agent without explicit user approval
 - EVERY new file → justify: what reads it, how often, why not inline?
 - If nothing reads it programmatically AND it's not in session context → DON'T CREATE
-- Data homes: MEMORY.md (facts), SKILL.md (procedures), patterns/ (hook data), logs/ (history)
+- Data homes: MEMORY.md (index ≤200 строк), references/project-facts.md (fact details, auto-appended by session-audit), SKILL.md (procedures), patterns/ (hook data), logs/ (history), auto-memory feedback_*.md (always-on behavioral rules)
 - SKILL.md ≤200 lines → overflow to references/ (≤5 files per skill)
+- Auto-memory exception: consumer = Claude context loader (always loaded). Justify by cross-session frequency, not programmatic read.
 - All else → inline or don't store (dead weight)
 
 ## Escalation

@@ -1,0 +1,499 @@
+---
+tags: [studiokook, web-development, seo, ux, content-strategy, playbook]
+created: 2026-04-11
+updated: 2026-04-11
+project: studiokook
+description: "Comprehensive web development playbook for kitchen manufacturer: SEO, UX, WP performance, content strategy"
+---
+
+# Web Development Playbook — Studiokook
+
+> Собранные best practices для веб-разработки кухонного бизнеса.
+> 4 направления: SEO, UX/Дизайн, Техническая оптимизация WP, Контент-стратегия.
+> Источники: анализ Poggenpohl, SieMatic, Bulthaup, Nolte, Haecker + индустриальный ресёрч.
+
+---
+
+## 1. SEO для кухонного производства
+
+### 1.1 Структура Landing Page (заказные кухни, не e-commerce)
+
+**Hero Section:**
+- Headline: outcome-focused — "Кухня вашей мечты за 4 недели" > "Мы делаем кухни"
+- Sub-headline: одно предложение с измеримым результатом (срок, гарантия, качество)
+- CTA above fold: "Получить бесплатный расчёт" / "Tasuta hinnapakkumine"
+- Hero image: реальный проект или качественный рендер, НЕ stock
+
+**Trust Block (сразу после hero):**
+- Лет в бизнесе, количество проектов, срок гарантии
+- Google Reviews виджет или отзывы с именами
+- Лого партнёров: Egger, Blum, Fenix
+
+**Process Section:**
+- 3-5 шагов: Консультация → Дизайн → Производство → Установка → Гарантия
+- Визуальная timeline — снижает неопределённость (главный барьер конверсии)
+
+**Lead Capture Form:**
+- Минимум полей: Имя + Телефон + Размер кухни (dropdown)
+- Опционально: upload планировки
+- CTA: глагол действия — "Рассчитать стоимость", НЕ "Отправить"
+
+### 1.2 URL-структура
+
+```
+/                               # homepage
+/koogi-moobel/                  # ET landing
+/ru/kuhni-na-zakaz/             # RU landing
+/en/custom-kitchens-tallinn/    # EN landing
+/portfolio/                     # gallery grid
+/portfolio/modern-kitchens/     # category
+/portfolio/project-name/        # individual project
+/materials/                     # overview
+/materials/fenix-ntm/           # deep-dive
+/how-we-work/                   # process
+/pricing/                       # price ranges (not exact)
+```
+
+### 1.3 Meta Tag паттерн
+
+```
+Title: Köögimööbel tellimuse järgi Tallinnas | [Brand] (<=60 chars)
+Description: Köögimööbel teie mõõtude järgi. Tasuta 3D-projekt, paigaldus 4 nädalaga. Küsi pakkumist → [Brand] (<=155 chars)
+```
+
+### 1.4 Local SEO (Эстония, multi-language)
+
+**Google Business Profile:**
+- Primary category: "Kitchen Furniture Store" / "Custom Furniture Store"
+- Secondary: "Kitchen Remodeler", "Interior Designer"
+- Фото: 5+ реальных проектов ежемесячно, с геотегами
+- Q&A: seed частые вопросы
+- Review strategy: просить каждого клиента, отвечать на его языке
+
+**Hreflang:**
+```html
+<link rel="alternate" hreflang="et" href="https://studiokook.ee/" />
+<link rel="alternate" hreflang="ru" href="https://studiokook.ee/ru/" />
+<link rel="alternate" hreflang="en" href="https://studiokook.ee/en/" />
+<link rel="alternate" hreflang="fi" href="https://studiokook.ee/fi/" />
+<link rel="alternate" hreflang="x-default" href="https://studiokook.ee/" />
+```
+
+**Приоритет языков по размеру рынка:**
+1. ET — primary, все страницы, полный контент
+2. RU — ~25% населения Эстонии, полный контент на ключевых страницах
+3. EN — expats, международные лиды, сокращённый контент допустим
+4. FI — финские туристы/удалённые покупатели, MVP (homepage + portfolio + контакт)
+
+**Keyword-кластеры:**
+
+| Intent | ET | RU | EN |
+|--------|----|----|-----|
+| Main service | köögimööbel tellimuse järgi | кухни на заказ таллинн | custom kitchen Tallinn |
+| Material | köögimööbel tamm / MDF | кухня из массива дерева | solid wood kitchen Estonia |
+| Style | modernne köök | современная кухня | modern kitchen design |
+| Local | köögimööbel Tallinnas | мебель для кухни эстония | kitchen furniture Estonia |
+
+### 1.5 Schema Markup
+
+**LocalBusiness (на каждой странице):**
+```json
+{
+  "@context": "https://schema.org",
+  "@type": "FurnitureStore",
+  "name": "Studiokook",
+  "url": "https://studiokook.ee",
+  "telephone": "+372XXXXXXX",
+  "address": {
+    "@type": "PostalAddress",
+    "addressLocality": "Tallinn",
+    "addressRegion": "Harju",
+    "addressCountry": "EE"
+  },
+  "priceRange": "€€",
+  "areaServed": {"@type": "Country", "name": "Estonia"},
+  "sameAs": ["https://instagram.com/_studiokook", "https://facebook.com/studiokook"]
+}
+```
+
+**Дополнительные типы:**
+- `Product` — на страницах портфолио (без цен, с `Review`)
+- `Service` — "Custom Kitchen Design and Installation"
+- `FAQPage` — на страницах процесса/цен (rich snippets)
+- `BreadcrumbList` — site-wide
+- `ImageObject` — на страницах портфолио с детальными фото
+
+### 1.6 Internal Linking — Hub-and-Spoke
+
+```
+Homepage
+├── /portfolio/ (hub)
+│   ├── /portfolio/modern/ → ссылки на 2-3 проекта + материалы + цены
+│   ├── /portfolio/classic/
+│   └── /portfolio/compact/
+├── /materials/ (hub)
+│   ├── /materials/fenix-ntm/ → ссылки на проекты с этим материалом
+│   └── /materials/countertops/
+├── /how-we-work/
+└── /pricing/
+```
+
+**Правила:**
+- Каждая страница проекта → категория + 2-3 похожих проекта + материалы + цены
+- Якорный текст: описательный — "посмотрите проект кухни из Fenix NTM", НЕ "нажмите здесь"
+- "Похожие проекты" блок внизу каждой страницы портфолио (3-4 thumbnail)
+
+### 1.7 Image SEO
+
+**Именование файлов:**
+```
+# Плохо: DSC_8472.jpg, kitchen-1.jpg
+# Хорошо: modern-white-kitchen-fenix-ntm-tallinn.jpg
+```
+
+**Alt text паттерн:**
+```
+"[Style] [material] kitchen [feature] in [location] — [Brand]"
+"Modernne valge Fenix NTM köök L-kujuline Mustamäe korteris — Studiokook"
+```
+
+**Технические требования:**
+- WebP primary, JPEG fallback, target <200KB
+- Max 1920px wide, responsive через `srcset`
+- `loading="lazy"` на всех кроме hero
+- Явные `width` и `height` для предотвращения CLS
+- Image sitemap с `<image:loc>` и `<image:caption>`
+
+---
+
+## 2. UX/Дизайн кухонных сайтов
+
+### 2.1 Паттерны галереи/портфолио
+
+| Паттерн | Когда | Реализация |
+|---------|-------|------------|
+| **Masonry grid** | Главная страница портфолио | 2-3 колонки desktop, 1 mobile |
+| **Horizontal slider** | Homepage hero, Featured projects | Swiper.js, 1 slide mobile |
+| **Filter by style** | Portfolio >15 проектов | Tabs: Modern / Classic / Scandinavian |
+| **Filter by material** | Разнообразие материалов | Tags: Matt lacquer / Wood / Fenix / Stone |
+| **Story format** | Отдельные проекты | Hero → brief → solution → photo grid → CTA |
+
+**Ключевой инсайт от SieMatic:** story-driven case studies вместо простых галерей — каждый проект привязан к нарративу ("Кухня в Каламая"). Продаём lifestyle, не шкафы.
+
+**Избегать:** lightbox-only (убивает mobile UX), auto-play слайдеры, thumbnail grids без контекста.
+
+### 2.2 Mobile-First (приоритет)
+
+1. **Tap-to-call** в sticky header — главный конверсионный элемент
+2. **Быстрая загрузка галереи** — hero <200KB, остальное lazy-load
+3. **Single primary CTA** без скролла — "Запросить расчёт"
+4. **Thumb-friendly** навигация — min 48x48px tap targets
+5. **Короткие формы** — имя, телефон, 1-2 селектора
+
+### 2.3 CTA паттерны для "запрос цены"
+
+| Тип CTA | Размещение | Пример |
+|---------|-----------|--------|
+| Primary: Записаться на консультацию | Sticky header + hero + каждая 2-я секция | "Start planning" |
+| Secondary: Скачать каталог | Mid-page, footer | "Order a Catalog" |
+| Tertiary: Найти шоурум | Footer, отдельная страница | Showroom locator |
+| Contextual: "Узнать подробнее" | Под каждым элементом галереи | "Jetzt entdecken" |
+
+**Принципы:**
+- Никогда "Купить" — язык консультативный: "plan", "discover", "book"
+- Primary CTA дублируется минимум 3 раза на странице
+- WhatsApp/Telegram кнопка рядом с телефоном — конверсия 3-5x выше email-форм
+- Two-step формы: шаг 1 = контакт, шаг 2 = детали кухни
+
+### 2.4 Trust Signals (по убыванию импакта)
+
+| Сигнал | Импакт | Как |
+|--------|--------|-----|
+| Heritage / years | High | "Изготавливаем с 20XX года" |
+| Сертификаты | High | ISO, RAL, climate-neutral — footer + отдельная страница |
+| "Made in Estonia" | High | Все немецкие бренды подчёркивают страну |
+| Команда / основатель | Medium-High | Фото с именами и ролями |
+| Process transparency | Medium-High | Фото/видео: консультация → рендер → производство → установка |
+| Партнёры | Medium | Лого: Egger, Blum, Hettich |
+
+### 2.5 Страницы материалов
+
+**Структура:**
+```
+/materials/
+  Hero: full-width macro-фото текстуры
+  Section 1: Категории (карточки с hover zoom)
+    - Фасады (Matt lacquer, Gloss, Wood veneer, Fenix, HPL)
+    - Столешницы (Quartz, Granite, Egger laminate, Solid surface)
+    - Фурнитура (Blum, Hettich)
+  Section 2: Цветовая палитра — swatches с названиями
+  Section 3: Сравнительная таблица (прочность, тепло, царапины, ценовой tier)
+  CTA: "Заказать бесплатные образцы" / "Посмотреть в шоуруме"
+```
+
+**Ключевое:** ссылка "Смотреть этот материал в кухне" от каждого swatch к проекту в портфолио.
+
+### 2.6 Before/After и интерактивные инструменты
+
+| Инструмент | Effort | ROI | Рекомендация |
+|-----------|--------|-----|--------------|
+| **Before/after slider** | Low | High | ДЕЛАТЬ. `img-comparison-slider` web component |
+| **Process photo gallery** | Low | High | ДЕЛАТЬ. 4-6 фото на проект |
+| **3D kitchen planner** | High ($500-2000/mo) | Low | ПРОПУСТИТЬ. Overkill для малого бизнеса |
+| **360 showroom tour** | Medium (Matterport ~$300) | Medium | РАССМОТРЕТЬ если есть шоурум |
+
+### 2.7 Навигация multi-language
+
+- URL: subdirectory `/et/`, `/ru/`, `/en/` (лучше для SEO чем субдомены)
+- Language switcher: коды `ET | RU | EN` в header (НЕ флаги — проблемно для RU)
+- Auto-detect: `Accept-Language` для первого визита, потом cookie. Никогда force-redirect
+- ET + RU — полный перевод. EN — сокращённый допустим
+
+---
+
+## 3. Техническая оптимизация WordPress
+
+### 3.1 Core Web Vitals для Elementor
+
+**LCP (target < 2.5s):**
+- `fetchpriority="high"` на hero image, `loading="eager"` (не lazy)
+- Preload hero: `<link rel="preload" as="image" href="hero.webp">`
+- Inline critical CSS через Elementor > Settings > Performance
+- "Improved Asset Loading" — CSS/JS per widget, не глобально
+
+**CLS (target < 0.1):**
+- `aspect-ratio: 4/3` на gallery items + `background: #f0f0f0` placeholder
+- Явные `width` и `height` на всех `<img>`
+- Web fonts: `font-display: swap` + preload critical fonts
+
+**INP (target < 200ms):**
+- Defer non-critical JS: `wp_script_add_data($handle, 'strategy', 'defer')`
+- Gallery lightbox init через `requestIdleCallback`
+- Минимизировать виджеты Elementor на странице
+
+### 3.2 Image Pipeline
+
+| Слой | Инструмент | Config |
+|------|-----------|--------|
+| Конвертация | ShortPixel или Imagify | WebP primary, AVIF если сервер поддерживает |
+| Доставка | `<picture>` с `<source type="image/avif">` | Через плагин или тему |
+| Lazy loading | Native `loading="lazy"` (WP 5.5+) | Первые 2-3 images: `loading="eager"` |
+| Responsive | `srcset` + `sizes="(max-width:768px) 100vw, 50vw"` | Match Elementor column layout |
+| CDN | Cloudflare (free) или BunnyCDN | Polish + WebP auto-conversion |
+
+### 3.3 Кеширование — три слоя
+
+```
+Browser Cache (static assets, 1 year)
+  └─ CDN / Cloudflare (HTML TTL 4h, static 1y)
+      └─ Page Cache — Seraphinite (per-language variant)
+          └─ Object Cache — Redis/APCu
+```
+
+**Seraphinite config:**
+- Page cache: ON (exclude /cart/, /checkout/)
+- CSS combine: OFF (использовать per-widget loading Elementor)
+- JS defer: ON (exclude elementor-frontend critical bundle)
+- Per-language cache: ENABLE (отдельный кеш per locale)
+
+### 3.4 Elementor Performance
+
+- Target: < 1500 DOM elements на страницу
+- Container (Flexbox) вместо Section > Column > Widget
+- Gallery widget (1 DOM node, lazy thumbnails) вместо 10 Image widgets
+- "Optimized DOM Output" — уменьшает wrapper divs
+- Выключить неиспользуемые виджеты в Settings > Features
+
+### 3.5 TranslatePress Performance
+
+- Object cache критичен для TRP
+- Отдельный кеш per URL variant (`/ru/`, `/et/`, `/en/`)
+- DB index: `ALTER TABLE wp_trp_dictionary_et_ru_ru ADD INDEX idx_original (original(100))`
+- Server-side rendering (не JS-based gettext)
+- Exclude: `script, style, .no-translate`
+
+### 3.6 NextGEN Gallery для 1500+ фото
+
+- DB index: `ADD INDEX idx_galleryid_sortorder (galleryid, sortorder)`
+- Pagination: 24-36 images per page (не infinite scroll)
+- Pre-generate thumbnails (не on-the-fly)
+- Image quality: 82% JPEG/WebP
+- Native `loading="lazy"` + `decoding="async"`
+
+### 3.7 Security Headers
+
+```apache
+Header set X-Frame-Options "SAMEORIGIN"
+Header set X-Content-Type-Options "nosniff"
+Header set Referrer-Policy "strict-origin-when-cross-origin"
+Header set Permissions-Policy "geolocation=(), microphone=(), camera=()"
+Header set Strict-Transport-Security "max-age=31536000; includeSubDomains"
+```
+
+CSP для Elementor требует `unsafe-inline` и `unsafe-eval`. Начинать с report-only mode.
+
+---
+
+## 4. Контент-стратегия
+
+### 4.1 Блог-темы (SEO lead generation)
+
+**Материалы (Awareness Level 3):**
+- "Tamm vs pähkel: kuidas valida köögi materjali"
+- "Mis on Fenix-pind ja miks see sobib kööki"
+- "Graniit, kvarts või keraamiline plaat — tööpinna valik"
+
+**Процесс (Problem Aware — level 2):**
+- "Köogi planeerimine algusest lõpuni: 7 sammu"
+- "Eritellimusköök vs valmisköök: aus võrdlus"
+- "Kui kaua aega võtab köögi projekt?"
+
+**Локальные (эстонский рынок):**
+- "Köögitrendid Eestis 2026"
+- "Väike köök Tallinna korteris: lahendused alla 8 m2"
+- "Skandinaavia köök Eesti kliimas"
+
+**Формат:** 1200-1800 слов, 1 hero image + 3-5 in-body, internal links на портфолио + материалы.
+
+### 4.2 Instagram (@_studiokook)
+
+| Pillar | Доля | Формат |
+|--------|------|--------|
+| AI Renders (aspirational) | 30% | Carousel, Reels |
+| Real Projects (evidence) | 25% | Carousel, Single |
+| Process/Craft | 20% | Reels, Stories |
+| Materials Education | 15% | Carousel |
+| Behind the Scenes | 10% | Stories |
+
+**Reels (30-60s):** slow pan, dramatic lighting, no voiceover. 3-4/month.
+**Carousels (5-7 slides):** hook → story → soft CTA. 2-3/week.
+**Stories:** ежедневно — материалы, polls, Q&A.
+
+**Caption rules:** max 3 строки. No emoji. No "order via DM". Первая строка = материал или пропорция.
+
+### 4.3 FAQ Content (для страницы + schema)
+
+**Timeline:** "Kui kaua võtab eritellimusköök?" — Несколько месяцев. Начинать за 4-6 мес до заезда.
+**Pricing:** Диапазоны по категориям, не точные цены. "Investment depends on materials and scope."
+**Materials:** Сравнения дуб/орех/ясень, гранит/кварц/керамика.
+**Process:** Шаги сотрудничества, что клиент должен подготовить.
+**Warranty:** Условия + "Мы приходим через 3 месяца проверить."
+
+### 4.4 Email Nurture Sequence (6 писем / 4 недели)
+
+| # | День | Тема | Содержание |
+|---|------|------|------------|
+| 1 | 0 | "Спасибо за обращение" | Личное от основателя. Подтвердить встречу. Без продаж |
+| 2 | 3 | "Как мы работаем" | Обзор процесса. Одно фото проекта |
+| 3 | 7 | "Выбор материала" | Гайд: дуб, орех, гранит, латунь. Close-up фото |
+| 4 | 14 | Featured project | Один проект, editorial style |
+| 5 | 21 | "5 вопросов при планировке" | Полезный чеклист |
+| 6 | 28 | "Есть вопросы?" | Мягкий follow-up. Без urgency |
+
+**Monthly newsletter:** один проект + один материал + одна сезонная заметка. Без скидок.
+
+### 4.5 Pinterest
+
+| Board | Контент | Частота |
+|-------|---------|---------|
+| Kitchen Inspiration | AI renders + real projects | 5-8/week |
+| Materials & Textures | Close-ups: дуб, латунь, гранит | 3-5/week |
+| Small Kitchen Solutions | Компактные планировки | 2-3/week |
+| Nordic Kitchen Design | Скандинавский стиль | 3-5/week |
+
+Pin format: 1000x1500px (2:3), keyword-rich title + description (ET+EN). Link на блог/портфолио.
+Автоматизация: n8n workflow new render → auto-pin (App ID 1544128).
+
+### 4.6 Video Content (по приоритету)
+
+**Tier 1 (low effort, high impact):**
+- Material close-ups с ambient sound (15-30s Reels)
+- Slow pan по готовой кухне (30s)
+
+**Tier 2 (medium effort, high trust):**
+- Installation timelapse (1-2 min)
+- "From sketch to kitchen" montage
+
+**Tier 3 (high effort, max authority):**
+- Workshop tour (2-3 min, YouTube)
+- Material sourcing story (documentary)
+
+**Правила:** no talking heads (кроме основателя), no music с lyrics, no "Order now!" overlay.
+
+### 4.7 Сезонный календарь
+
+| Месяц | Фокус контента | Почему |
+|-------|---------------|--------|
+| Jan-Feb | "Начните планировать сейчас" | Решения о ремонте принимаются зимой |
+| Mar-Apr | Гайды по материалам, процесс | Строительный сезон начинается |
+| May-Jun | Портфолио, видео установки | Пик поисковых запросов "köögimööbel" |
+| Jul-Aug | Inspiration контент, Pinterest | Люди browseят, меньше активных запросов |
+| Sep-Oct | FAQ, сравнительные гайды | Вторая волна: "до зимы" |
+| Nov-Dec | Year-in-review, тренды | Закрытие сделок с недвижимостью |
+
+**Black Friday — НЕ участвовать** (анти-скидка = премиум сигнал).
+
+### 4.8 UGC Strategy
+
+**Подход:** editorial, НЕ testimonials.
+- Post-project фотосессия каждого проекта
+- "Как живётся" follow-up через 3 месяца: "Kalamaja, 6 kuud hiljem"
+- Google Reviews cultivation: мягкая просьба после 3-month visit
+- НЕ виджеты отзывов на homepage, НЕ incentivized reviews
+
+### 4.9 Локализация контента
+
+**Переводить (одинаковый контент):**
+- Portfolio/product страницы, FAQ, process, email sequences
+
+**Создавать нативно (разный контент):**
+- Blog posts под разные ключевые слова per language
+- Instagram captions: ET primary, отдельные RU посты (не переводы)
+- Google Ads copy: полностью отдельный per language
+
+**FI (минимум усилий):** перевод ключевых страниц + 1-2 blog posts "keittiö Virossa".
+
+---
+
+## Priority Matrix
+
+### P0 — Immediate (this week)
+
+| Action | Effort | Impact |
+|--------|--------|--------|
+| Sticky header: phone tap-to-call + primary CTA | 2h | Conversion lift |
+| WebP conversion + hero preload | 4h | LCP 30-50% improvement |
+| FAQ page с schema markup | Low | SEO + trust |
+
+### P1 — This month
+
+| Action | Effort | Impact |
+|--------|--------|--------|
+| Portfolio как story-driven project pages | 1-2 days | Trust + engagement |
+| Materials page с swatch grid | 1 day | Lead gen |
+| Before/after sliders | 2h | Visual proof |
+| 2 blog posts/month (ET, material guides) | Medium | Organic traffic |
+| Structured data (LocalBusiness + Product) | 4h | Rich results 2-4 weeks |
+
+### P2 — This quarter
+
+| Action | Effort | Impact |
+|--------|--------|--------|
+| Instagram: carousel-first + Reels | Low | Engagement |
+| Pinterest boards + n8n auto-pin | Medium | Long-term traffic |
+| Email nurture sequence (6 emails) | Medium | Lead conversion |
+| Security headers | 2h | Baseline hardening |
+| NextGEN pagination + pre-generated thumbs | 4h | Gallery page load |
+
+### P3 — When free
+
+| Action | Effort | Impact |
+|--------|--------|--------|
+| Monthly newsletter | Low | Retention |
+| FI localization key pages | Low | Niche high-value leads |
+| 360 showroom tour (Matterport) | $300 | Nice-to-have |
+| Moodboard/favorites feature | 1-2 days | Engagement |
+
+---
+
+*Compiled: 2026-04-11. Sources: Poggenpohl, SieMatic, Bulthaup, Nolte, Haecker analysis + industry research (MarketKeep, BrightLocal, Schema.org, Semrush, Crazy Egg, Request Metrics).*

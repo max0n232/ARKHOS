@@ -1,0 +1,35 @@
+﻿---
+type: observation
+subject: trading-telegram-contract-20260502
+host: vps
+component: "[[n8n-workflows]]"
+created: 2026-05-02
+observe_until: 2026-05-09
+success_criteria: WF14 daily scheduled runs and WF15 weekly scheduled run complete without Gemini JSON-body or Telegram Markdown errors; Telegram messages contain actionable BUY/SELL/HOLD/NO_TRADE decisions with reasoning, risk, and next action instead of empty/raw data.
+status: watching
+---
+
+# Trading Telegram Decision Contract
+
+## Change
+Codex patched Trading n8n workflows on 2026-05-02:
+
+- WF14 `Trading: Decision Engine` (`o4GyBrp2rs4jZ2Y0`)
+- WF15 `Trading: Weekly Macro Report` (`KocNlcasW6hsJPVz`)
+
+Rollback snapshots:
+
+- `C:/tmp/o4GyBrp2rs4jZ2Y0-codex-before-20260502.json`
+- `C:/tmp/KocNlcasW6hsJPVz-codex-before-20260502.json`
+
+## Why Watching
+Webhook smoke tests passed, but WF15 previously failed in scheduled mode at `2026-05-02T00:00:00Z` (`45276`). Need next real scheduled runs before closing.
+
+## Verification So Far
+
+- WF14 webhook smoke test execution `47348`: success
+- WF15 webhook smoke test execution `47347`: success
+- New WF14 recommendations inserted at `2026-05-02 18:22 UTC` with non-empty reasoning and risk fields
+
+## Review
+On/after 2026-05-09, check latest executions for both workflows and inspect Telegram output quality. Close only if scheduled runs are clean and messages are actionable.

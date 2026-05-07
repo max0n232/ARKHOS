@@ -1,0 +1,420 @@
+# ek_standards.rb - executable EasyKitchen standards manifest.
+#
+# Keep this file small and explicit. Vault markdown remains the human source of
+# truth; this module is the machine-readable contract that build/audit scripts
+# must include in reports before claiming project validity.
+
+module EkStandards
+  module_function
+
+  VERSION = 'ek.standards.v1'.freeze
+  VAULT_ROOT = 'C:/Users/sorte/ObsidianVault/10-Projects/3D-Configurators/easykitchen'.freeze
+
+  LIBRARY_ROOT = 'C:/Users/sorte/Desktop/Новая папка/EasyKitchen/EasyKitchen/EasyKitchen'.freeze
+  LIBRARY_ALT  = 'C:/Users/sorte/Desktop/Новая папка/EasyKitchen/EasyKitchen/Shablony 5.0.2'.freeze
+
+  APPLIANCE_PATHS = {
+    cooktop: {
+      dir: "#{LIBRARY_ROOT}/5 Техника/Варочные поверхности",
+      canonical: ['Miele KM 6322 PowerFlex.skp', 'BOSCH PIB675N24E.skp', 'Electrolux GK69TSIO.skp', 'Teka EG604G.skp'],
+    },
+    oven: {
+      dir: "#{LIBRARY_ROOT}/5 Техника/Духовые печи",
+      canonical: ['SIEMENS HB23AB520E.skp'],
+      observed_in_finished_projects: ['SIEMENS HB23AB520E.skp'],
+    },
+    microwave: {
+      dir: "#{LIBRARY_ROOT}/5 Техника/Микроволновые печи",
+      canonical: ['Bosch.skp', 'Bosch_1.skp', 'Samsung.skp'],
+    },
+    integrated_fridge: { dir: "#{LIBRARY_ROOT}/5 Техника/Встроенный холодильник" },
+    hood: { dir: "#{LIBRARY_ROOT}/5 Техника/Вытяжки" },
+    sink: { dir: "#{LIBRARY_ROOT}/5 Техника/Мойки" },
+  }.freeze
+
+  ENTRYPOINT_DOCS = [
+    '_index.md',
+    'agent-playbook.md',
+  ].freeze
+
+  COMPOSE_DOCS = [
+    'kitchen-build-checklist.md',
+    'module-orientation-conventions.md',
+    'row-composition-formulas.md',
+    'session-failure-2026-04-30.md',
+  ].freeze
+
+  STANDARD_DOCS = [
+    'facade-gap-standards.md',
+    'countertop-eurocut.md',
+    'backsplash.md',
+    'pencil-cladding.md',
+    'appliances-taxonomy.md',
+    'modules-catalog.md',
+    'bg1-architecture.md',
+    'tg1-architecture.md',
+    'finished-project-patterns.md',
+  ].freeze
+
+  MODULE_SEMANTICS = {
+    'BG1_R' => {
+      role: 'lower_l_corner',
+      style: 'Gola',
+      door_side: 'adjacent_to_north_row',
+      wall_side_variant: false,
+      required_audit_rules: ['lower_corner_door_faces_adjacent_row', 'wall_adjacency_n_row'],
+      source_docs: ['module-orientation-conventions.md', 'bg1-architecture.md'],
+    },
+    'BG1_L' => {
+      role: 'lower_l_corner',
+      style: 'Gola',
+      door_side: 'wall_side_for_current_nw_layout',
+      wall_side_variant: true,
+      forbidden_when: ['nw_l_kitchen_north_row_continues_right'],
+      source_docs: ['module-orientation-conventions.md', 'bg1-architecture.md'],
+    },
+    'TG1' => {
+      role: 'upper_l_corner',
+      required_when: ['lower_l_corner_present'],
+      source_docs: ['tg1-architecture.md', 'row-composition-formulas.md'],
+    },
+    'PB2F' => {
+      role: 'integrated_fridge_pencil',
+      width_mm: 600,
+      edge_only: true,
+      source_docs: ['appliances-taxonomy.md', 'row-composition-formulas.md'],
+    },
+    'PD1_6' => {
+      role: 'oven_micro_pencil',
+      width_mm: 600,
+      edge_only: true,
+      source_docs: ['appliances-taxonomy.md', 'row-composition-formulas.md'],
+    },
+    'BI' => {
+      role: 'dishwasher_module',
+      width_mm: 600,
+      source_docs: ['appliances-taxonomy.md', 'row-composition-formulas.md'],
+    },
+    'BD1' => {
+      role: 'sink_base',
+      width_mm: 600,
+      source_docs: ['appliances-taxonomy.md', 'row-composition-formulas.md'],
+    },
+    'BD3' => {
+      role: 'cooktop_base_when_oven_in_pencil',
+      width_mm: 600,
+      source_docs: ['appliances-taxonomy.md', 'row-composition-formulas.md'],
+    },
+    'PANEL-FACADE' => {
+      role: 'facade_panel_blend_cladding_or_toe_kick',
+      canonical_for: ['blend', 'side_panel', 'pencil_cladding', 'toe_kick', 'wall_end_panel', 'upper_end_panel'],
+      observed_patterns: ['full_height_pencil_outer_cladding', 'low_toekick_or_plinth_run', 'upper_side_end_panel'],
+      source_docs: ['pencil-cladding.md', 'appliances-taxonomy.md', 'facade-gap-standards.md', 'finished-project-patterns.md'],
+    },
+    'BF2BI' => {
+      role: 'lower_inside_corner_with_integrated_mechanism',
+      width_mm: 900,
+      depth_mm: 900,
+      observed_in: ['Margit Mannikmaa finished scene'],
+      requirements: ['must_use_real_corner_module', 'mechanism_insert_must_match_corner_variant'],
+      source_docs: ['module-orientation-conventions.md', 'finished-project-patterns.md'],
+    },
+    'WIZARD_LEFT_CORNER' => {
+      role: 'lower_corner_pullout_mechanism',
+      display_name: 'Volshebnyi ugolok levyi',
+      required_when: ['BG1_or_similar_blind_corner_uses_magic_corner_solution'],
+      source_docs: ['finished-project-patterns.md', 'appliances-taxonomy.md'],
+    },
+    'SIEMENS_HB23AB520E' => {
+      role: 'built_in_oven_or_micro_appliance',
+      host_module: 'PD1_6',
+      width_mm: 600,
+      observed_stack_z_mm: [[652, 1240], [1243, 1711]],
+      source_docs: ['finished-project-patterns.md', 'appliances-taxonomy.md'],
+    },
+    'STANDS' => {
+      role: 'oven_micro_pencil_internal_stands',
+      host_module: 'PD1_6',
+      observed_bbox_mm: [479, 568, 520],
+      source_docs: ['finished-project-patterns.md'],
+    },
+    'STANDALONE_FRIDGE_COMPONENT' => {
+      role: 'standalone_fridge_scene_component',
+      use_existing_component: true,
+      keep_in_scene: true,
+      not_kitchen_module: true,
+      default_width_mm: 650,
+      default_height_mm: 1900,
+      required_for: ['standalone_fridge_opening_verification'],
+      verifies: ['opening_size', 'side_boxing_or_fillers', 'top_antresol_clearance'],
+      source_docs: ['appliances-taxonomy.md', 'generated-project-verification-template.md'],
+    },
+  }.freeze
+
+  RULES = [
+    {
+      id: 'standards_entrypoint_loaded',
+      severity: 'error',
+      summary: 'Compose scripts must load EasyKitchen MOC/playbook/checklist before claiming validity.',
+      source_docs: ENTRYPOINT_DOCS + COMPOSE_DOCS,
+    },
+    {
+      id: 'lower_corner_door_faces_adjacent_row',
+      severity: 'error',
+      summary: 'NW L-kitchen lower corner door must face the adjacent continuing row, not the wall side.',
+      source_docs: ['module-orientation-conventions.md', 'bg1-architecture.md'],
+    },
+    {
+      id: 'upper_corner_required',
+      severity: 'error',
+      summary: 'L-layout with lower corner requires TG1 upper corner treatment.',
+      source_docs: ['tg1-architecture.md'],
+    },
+    {
+      id: 'wall_adjacency',
+      severity: 'error',
+      summary: 'Cabinet backs must be flush to wall axes: N row Y=0, W row X=0.',
+      source_docs: ['module-orientation-conventions.md'],
+    },
+    {
+      id: 'row_termination',
+      severity: 'error',
+      summary: 'Rows terminate either on pencil with zero-gap or on wall with filler/blend treatment.',
+      source_docs: ['row-composition-formulas.md', 'facade-gap-standards.md'],
+    },
+    {
+      id: 'pencil_cladding_required',
+      severity: 'error',
+      summary: 'Visible pencil sides require facade panel cladding; countertop abuts panel, not raw carcass.',
+      source_docs: ['pencil-cladding.md'],
+    },
+    {
+      id: 'panel_facade_section_canonical',
+      severity: 'error',
+      summary: 'Use panel_facade_section/PANEL-FACADE for blends, side panels, cladding, and toe-kicks.',
+      source_docs: ['pencil-cladding.md', 'appliances-taxonomy.md'],
+    },
+    {
+      id: 'countertop_eurocut_two_straights',
+      severity: 'error',
+      summary: 'L-countertops use two straight_tabletop instances with papa/mama eurocut, not TT_CORNER by default.',
+      source_docs: ['countertop-eurocut.md'],
+    },
+    {
+      id: 'backsplash_work_zone',
+      severity: 'warning',
+      summary: 'Backsplash follows work zone, starts at countertop top, and uses make_unique before resizing.',
+      source_docs: ['backsplash.md'],
+    },
+    {
+      id: 'appliance_semantics',
+      severity: 'error',
+      summary: 'Appliances must be represented by correct modules: fridge as PB*F, dishwasher as BI, cooktop over BD2_1/BD3 when oven is in pencil.',
+      source_docs: ['appliances-taxonomy.md'],
+    },
+    {
+      id: 'style_consistency',
+      severity: 'warning',
+      summary: 'Do not mix Default, Fres, and Gola modules without an explicit source/style decision in the report.',
+      source_docs: ['modules-catalog.md'],
+    },
+    {
+      id: 'corner_joinery_internal_parts',
+      severity: 'error',
+      summary: 'Corner cabinets must keep their internal blend and connection panels; a facade-only corner is incomplete.',
+      source_docs: ['finished-project-patterns.md', 'bg1-architecture.md', 'facade-gap-standards.md'],
+    },
+    {
+      id: 'blend_corner_perpendicular_row_uses_bind_front',
+      severity: 'error',
+      summary: 'Blend-corner perpendicular rows must mate to the corner bind_front axis; the continuing row uses Main Frame/bbox and the adjacent perpendicular module uses its own Main Frame.',
+      source_docs: ['finished-project-patterns.md', 'bg1-architecture.md', 'dc-mechanics.md'],
+    },
+    {
+      id: 'corner_mechanism_matches_module',
+      severity: 'warning',
+      summary: 'Magic-corner or blind-corner mechanisms must match the selected corner module orientation and free opening side.',
+      source_docs: ['finished-project-patterns.md', 'appliances-taxonomy.md'],
+    },
+    {
+      id: 'oven_micro_stack_bind_points',
+      severity: 'error',
+      summary: 'Built-in oven and microwave in PD1_6 use module bind points; appliances are placed as separate 600mm front objects, not arbitrary free solids.',
+      source_docs: ['finished-project-patterns.md', 'appliances-taxonomy.md'],
+    },
+    {
+      id: 'communication_fixture_in_sink_base',
+      severity: 'warning',
+      summary: 'Visible water/communication fixtures should resolve to the sink-base zone, not behind dishwasher or random base cabinets.',
+      source_docs: ['finished-project-patterns.md', 'appliances-taxonomy.md'],
+    },
+    {
+      id: 'standalone_fridge_component_required',
+      severity: 'error',
+      summary: 'Standalone refrigerator openings require an existing fridge component from the available component library to verify opening, boxing, and top antresol; do not create separate measurement geometry.',
+      source_docs: ['appliances-taxonomy.md', 'generated-project-verification-template.md'],
+    },
+    {
+      id: 'fridge_type_matches_sketch',
+      severity: 'error',
+      summary: 'Fridge component must match sketch topology: SbS sketch -> SbS component with 950mm niche, single-door sketch -> 600mm integrated PB*F or single standalone, two-door sketch -> 600mm two-door fridge. Do not substitute single-door 600mm when sketch shows SbS.',
+      source_docs: ['appliances-taxonomy.md'],
+    },
+    {
+      id: 'over_fridge_mezzanine_required',
+      severity: 'error',
+      summary: 'When standalone or SbS fridge sits under a ceiling line, an antresol/mezzanine module is required above it. Mezzanine height = (ceiling - 30) - fridge_top, not zero.',
+      source_docs: ['appliances-taxonomy.md'],
+    },
+    {
+      id: 'sink_must_be_in_BD1',
+      severity: 'error',
+      summary: 'Sink must be hosted by BD1 base cabinet (default 600x570x862, optional widening when other modules absorb residue). Do not place sink as loose component or in non-sink module.',
+      source_docs: ['appliances-taxonomy.md'],
+    },
+    {
+      id: 'built_in_dishwasher_aligned_to_neighbors',
+      severity: 'error',
+      summary: 'BI dishwasher front face (Y_min) must align with neighboring lower cabinets front face. No back-shift relative to row, no stand-out. Failure visually shows BI sticking out or recessed.',
+      source_docs: ['appliances-taxonomy.md', 'row-composition-formulas.md'],
+    },
+    {
+      id: 'upper_row_top_z_equals_ceiling_minus_30',
+      severity: 'error',
+      summary: 'Upper row top Z must equal ceiling - 30mm. Default ceiling 2400 -> upper top 2370. Pencil top, mezzanine top, and upper-row top must all align at this Z.',
+      source_docs: ['tg1-architecture.md', 'appliances-taxonomy.md'],
+    },
+    {
+      id: 'pencil_top_aligned_with_uppers',
+      severity: 'error',
+      summary: 'Pencil top Z must equal upper row top Z (= ceiling - 30). Pencil sticking above or below upper row breaks visual continuity and BOM cladding logic.',
+      source_docs: ['tg1-architecture.md', 'appliances-taxonomy.md'],
+    },
+    {
+      id: 'upper_corner_orientation_matches_door_swing',
+      severity: 'error',
+      summary: 'TG1 upper corner orientation (left-door vs right-door variant) must match the perpendicular row direction in the sketch. Wrong-handed corner has door opening into a wall or pencil instead of into the room.',
+      source_docs: ['tg1-architecture.md', 'module-orientation-conventions.md'],
+    },
+    {
+      id: 'wall_end_filler_applies_to_uppers_and_mezzanine',
+      severity: 'error',
+      summary: 'Wall-end filler+3mm rule applies identically to lower rows, upper rows, mezzanine over fridge, and standalone-fridge niche side termination. Direct cab-to-wall contact without 19mm PANEL_FACADE filler + 3mm tech gap is invalid for any row type.',
+      source_docs: ['facade-gap-standards.md'],
+    },
+    {
+      id: 'perpendicular_upper_row_uses_corner_bind_axis',
+      severity: 'error',
+      summary: 'Upper perpendicular row attaches to TG1 via the corner bind axis (analog of BG1 bind_front for uppers). Direct bbox-to-bbox attach mis-aligns the perpendicular row by ~3-19mm and exposes a visible gap or overlap.',
+      source_docs: ['tg1-architecture.md', 'bg1-architecture.md'],
+    },
+    {
+      id: 'wall_panel_orientation_in_wall_plane',
+      severity: 'error',
+      summary: 'Backsplash / wall panel must be modeled in the wall plane (N wall: thin in Y, X-Z extent; W wall: thin in X, Y-Z extent), not as a horizontal countertop-like slab. Use wall_panel DC, not flipped countertop.',
+      source_docs: ['backsplash.md'],
+    },
+    {
+      id: 'no_raw_groups_for_filler_or_cladding',
+      severity: 'error',
+      summary: 'Wall-end fillers, side panels, pencil outer/inner cladding, and any visible MDF cap MUST be PANEL_FACADE/PANEL-FACADE definition instances via add_instance, NEVER raw Sketchup::Group with add_face+pushpull. Raw groups have no DC, no BOM article, no facade material, and break BOM export.',
+      source_docs: ['pencil-cladding.md', 'facade-gap-standards.md', 'appliances-taxonomy.md'],
+    },
+    {
+      id: 'panel_facade_via_def_instance',
+      severity: 'error',
+      summary: 'Instantiate PANEL_FACADE via model.definitions.find { |d| d.name =~ /^PANEL[-_]FACADE/ } + entities.add_instance(def, tr). If def is not in model, load from library .skp. Set width/height via DC attrs or scaling along the def-local axes (verify with axes_dump first), not naive world-Z scale.',
+      source_docs: ['pencil-cladding.md', 'facade-gap-standards.md', 'dc-mechanics.md'],
+    },
+    {
+      id: 'no_duplicate_appliance_modules',
+      severity: 'error',
+      summary: 'Anti-pattern: two sink modules, two cutlery-tray inserts, two ovens, two cooktops in the same kitchen. Each appliance is unique unless the sketch explicitly shows two zones. Audit must count instances by role, not just by def name.',
+      source_docs: ['appliances-taxonomy.md'],
+    },
+    {
+      id: 'cooktop_and_sink_require_countertop_cutout',
+      severity: 'error',
+      summary: 'Cooktop/hob and sink positions MUST have a corresponding cutout marker on the countertop top face. Use EkRealCompose.add_countertop_cutout(host_inst:, center_xy_mm:, profile_key:) — writes studiokook_cutout AD on a marker group + studiokook_cutouts list on the host countertop instance for BOM extraction. Audit via EkRealCompose.audit_countertop_cutouts. Without cutout BOM/CNC ships solid worktop and install fails.',
+      source_docs: ['countertop-eurocut.md', 'appliances-taxonomy.md'],
+    },
+    {
+      id: 'eurocut_mama_papa_assignment',
+      severity: 'error',
+      summary: 'Mama (groove, eurocut_*=3) vs Папа (tongue, eurocut_*=2) assignment follows two rules. (1) BALANCE: сокращать разницу в длинах между двумя CT после реза + минимизировать самую длинную. Mama = shortest wall (не режется), папа = longest wall − joint width (~590mm). Цель: оба куска ближе к среднему, легче заносить, балансирует вес. (2) WATER: sink/cooktop CT must be mama — tongue от папы перекрывает joint, защищая стык от воды/разбухания. Conflict resolution: rule 2 (water) > rule 1 (balance), НО если правило 2 даёт mama-CT > 3000mm — переключаемся на rule 1. См. countertop-eurocut.md.',
+      source_docs: ['countertop-eurocut.md'],
+    },
+    {
+      id: 'cutout_markers_exempt_from_custom_geometry_ban',
+      severity: 'warning',
+      summary: 'Sketchup::Group is allowed for: room walls/floor/ceiling, AND for cutout markers (groups named cutout_sink_* / cutout_cooktop_* with studiokook_cutout AD). These are manufacturing annotations, not furniture. Any other Sketchup::Group is still anti-pattern (no_raw_groups_for_filler_or_cladding, no_custom_geometry_replaces_library_module).',
+      source_docs: ['agent-playbook.md'],
+    },
+    {
+      id: 'wall_panel_width_optimized_to_row_span',
+      severity: 'error',
+      summary: 'Backsplash / wall panel X-extent must equal active row work-zone span (cooktop+sink+work cabinets), not entire wall width. Z-extent = countertop top to upper bottom (default 600mm). Panel that runs floor-to-ceiling or wall-to-wall is incorrect.',
+      source_docs: ['backsplash.md'],
+    },
+    {
+      id: 'module_widths_min_350_max_600_with_symmetry',
+      severity: 'error',
+      summary: 'Lower/upper row module widths follow Studiokook distribution rule: target range 350-600mm, residue distributed for symmetry across the row. Modules below 350mm or above 600mm without explicit fixed-width reason (sink BD1 widening, fridge 600, cargo 150) are invalid. Symmetry: visually balanced facade widths along the row, not random sizes.',
+      source_docs: ['row-composition-formulas.md'],
+    },
+    {
+      id: 'pencil_appliances_required_when_host',
+      severity: 'error',
+      summary: 'When a pencil hosts appliances (PD1_6 = oven+micro stack, PB*F = fridge), the actual appliance components must be present in the scene at the bind points (oven_bind, m_oven_bind, fridge_bind). Empty pencil with bind points but no appliances is incomplete; do not substitute with a faux facade.',
+      source_docs: ['appliances-taxonomy.md', 'finished-project-patterns.md'],
+    },
+    {
+      id: 'no_custom_geometry_replaces_library_module',
+      severity: 'error',
+      summary: 'Strategic invariant: any visible kitchen element MUST come from the EK library (cabinet, panel, pencil, appliance def). Hand-built Sketchup::Group / add_face geometry is allowed ONLY for non-furniture (room walls, floor, ceiling). If the right library def cannot be located, stop and report -- do not substitute custom geometry.',
+      source_docs: ['agent-playbook.md', 'pencil-cladding.md', 'facade-gap-standards.md'],
+    },
+  ].freeze
+
+  def required_docs_for(trigger)
+    case trigger.to_sym
+    when :compose_kitchen
+      (ENTRYPOINT_DOCS + COMPOSE_DOCS + STANDARD_DOCS).uniq
+    else
+      ENTRYPOINT_DOCS
+    end
+  end
+
+  def module_semantics(module_key)
+    MODULE_SEMANTICS[module_key.to_s] || {}
+  end
+
+  def rule(id)
+    RULES.find { |r| r[:id] == id.to_s }
+  end
+
+  def manifest(trigger: :compose_kitchen)
+    docs = required_docs_for(trigger)
+    {
+      schema_version: VERSION,
+      trigger: trigger.to_s,
+      vault_root: VAULT_ROOT,
+      library_root: LIBRARY_ROOT,
+      library_alt: LIBRARY_ALT,
+      appliance_paths: APPLIANCE_PATHS,
+      required_docs: docs,
+      rule_ids: RULES.map { |r| r[:id] },
+      rules: RULES,
+      module_semantics: MODULE_SEMANTICS,
+    }
+  end
+
+  def appliance_path(kind, filename = nil)
+    entry = APPLIANCE_PATHS[kind.to_sym]
+    return nil unless entry
+    return entry[:dir] unless filename
+    File.join(entry[:dir], filename)
+  end
+end
+
+

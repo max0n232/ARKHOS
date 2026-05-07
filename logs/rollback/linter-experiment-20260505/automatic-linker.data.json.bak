@@ -1,0 +1,20 @@
+{
+  "formatOnSave": true,
+  "formatDelay": 500,
+  "includeAliases": true,
+  "proximityBasedLinking": true,
+  "ignoreCase": true,
+  "preventSelfLinking": true,
+  "ignoreDateFormats": true,
+  "formatGitHubUrls": false,
+  "formatJiraUrls": false,
+  "formatLinearUrls": false,
+  "replaceUrlsWithTitles": false,
+  "excludeDirectories": [
+    "youtube-notes",
+    "40-Archive",
+    "90-System",
+    ".obsidian",
+    ".smart-env"
+  ]
+}

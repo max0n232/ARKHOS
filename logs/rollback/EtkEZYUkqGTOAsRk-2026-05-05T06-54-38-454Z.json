@@ -1,0 +1,1110 @@
+{
+  "updatedAt": "2026-04-25T10:19:23.367Z",
+  "createdAt": "2026-04-22T18:10:47.883Z",
+  "id": "EtkEZYUkqGTOAsRk",
+  "name": "Trading: PositioningAgent (Phase 2)",
+  "description": null,
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "id": "schedule",
+      "name": "Every 5 min",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 5
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "claim",
+      "name": "Claim pending positioning events",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        220,
+        0
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "TradingPostgres1",
+          "name": "Trading Postgres"
+        }
+      },
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE events SET status='processing'\n                WHERE id IN (\n                    SELECT id FROM events\n                    WHERE type='positioning' AND status='pending'\n                    ORDER BY ts ASC\n                    LIMIT 1\n                    FOR UPDATE SKIP LOCKED\n                )\n                RETURNING id AS event_id, ts, source, instrument, payload;",
+        "options": {}
+      }
+    },
+    {
+      "id": "has-events",
+      "name": "Has events?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        440,
+        0
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "version": 2,
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "hev",
+              "leftValue": "={{ $json.event_id }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      }
+    },
+    {
+      "id": "build-query",
+      "name": "Build RAG query",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        660,
+        -100
+      ],
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "\nconst ev = $json;\nconst p = ev.payload || {};\nconst parts = [\n  'commitment of traders COT positioning',\n  p.signal || '',\n  p.signal === 'extreme_long' || p.signal === 'bullish' ? 'smart money accumulation commercials buying' : '',\n  p.signal === 'extreme_short' || p.signal === 'bearish' ? 'distribution commercials selling crowded long' : '',\n  ev.instrument || p.commodity || '',\n  p.large_spec_pct_rank != null ? 'pct rank ' + p.large_spec_pct_rank : '',\n  'speculators commercials net position'\n];\nconst q = parts.filter(Boolean).join(' ').trim();\nreturn { json: { ...ev, rag_query: q.slice(0, 500) } };\n"
+      }
+    },
+    {
+      "id": "stale-check",
+      "name": "Annotate age",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        880,
+        -100
+      ],
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "\nconst ev = $('Build RAG query').first().json;\nconst p = ev.payload || {};\nconst reportDate = p.report_date;\nlet ageDays = null;\nif (reportDate) {\n  ageDays = Math.floor((Date.now() - new Date(reportDate).getTime()) / 86400000);\n}\nreturn { json: { ...ev, payload: { ...p, _report_age_days: ageDays } } };\n"
+      }
+    },
+    {
+      "id": "embed",
+      "name": "Gemini Embed",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1100,
+        -100
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-001:embedContent",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "key",
+              "value": "={{ $env.GEMINI_API_KEY }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={ \"model\": \"models/gemini-embedding-001\", \"content\": {\"parts\":[{\"text\": {{ JSON.stringify($json.rag_query) }} }]}, \"outputDimensionality\": 768, \"taskType\": \"RETRIEVAL_QUERY\" }",
+        "options": {
+          "timeout": 20000
+        }
+      }
+    },
+    {
+      "id": "vec-search",
+      "name": "Vector Search Knowledge",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        1320,
+        -100
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "TradingPostgres1",
+          "name": "Trading Postgres"
+        }
+      },
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT event_id, event_instrument, event_payload, book_slug, chunk_idx, title, content, score FROM (\n                    SELECT '{{ $('Annotate age').first().json.event_id }}'::uuid AS event_id,\n                           '{{ $('Annotate age').first().json.instrument || '' }}' AS event_instrument,\n                           '{{ JSON.stringify($('Annotate age').first().json.payload) }}'::jsonb AS event_payload\n                ) ev\n                CROSS JOIN LATERAL search_knowledge(('[' || '{{ $json.embedding.values.join(',') }}' || ']')::vector, 3);",
+        "options": {}
+      }
+    },
+    {
+      "id": "build-prompt",
+      "name": "Build Gemini Prompt",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1540,
+        -100
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "\nconst event = $('Annotate age').first().json;\nconst chunks = items.map(i => i.json).filter(c => c.content);\n\nconst contextBlocks = chunks.slice(0, 3).map((c, i) =>\n  `[${i + 1}] ${c.book_slug}/${c.chunk_idx} (score=${Number(c.score).toFixed(2)})\\n${c.content}`\n).join('\\n\\n---\\n\\n');\n\nconst systemPrompt = `You are PositioningAgent, a specialist analyst focused on Commitment of Traders (COT) and institutional positioning. Input: a positioning event (weekly COT report snapshot for a commodity/index). Output: ONE structured trade signal JSON — or {\"skip\": true, \"reason\": \"...\"} if no actionable setup.\n\nMANDATORY CHECKS (in order):\n1. If payload._report_age_days == null OR payload._report_age_days > 21 → skip with reason \"stale COT report: age \" + payload._report_age_days + \" days\"\n2. If payload.signal == \"neutral\" AND Math.abs(payload.large_spec_pct_rank - 50) < 15 → skip with reason \"no positioning extreme\"\n3. Otherwise analyze positioning divergence vs price implication\n\nFramework (apply in order of priority):\n- Contrarian extremes: large specs at pct_rank >= 90 = crowded long (bearish contrarian); <= 10 = crowded short (bullish contrarian)\n- Commercials are smart money: their net position divergence from specs signals reversal zones\n- Signal tiers:\n  * extreme_long (specs >= 90 pct) + commercials net short → HIGH conviction FADE (short setup)\n  * extreme_short (specs <= 10 pct) + commercials net long → HIGH conviction FADE (long setup)\n  * bullish (specs >= 75) WITHOUT commercial confirmation → WEAK setup, lean skip\n  * weekly_change sign flip + pct_rank crossing 50 → momentum shift, moderate conviction\n- Timeframe: COT is weekly → bias is swing/position (1W-1M horizon), never intraday\n- Van Tharp R-multiple: positioning trades need wider stops (2-3 ATR), target 2-4R\n- NO fixed entry/SL/TP numbers (no live price available) — set entry/sl/tp to null; describe levels qualitatively in rationale\n\nSignal schema — return ONLY this JSON, no commentary:\n{\n  \"instrument\": \"string\",\n  \"timeframe\": \"1W|1M\",\n  \"bias\": \"long|short|flat\",\n  \"confidence\": 0.0-1.0,\n  \"entry\": null,\n  \"sl\": null,\n  \"tp\": null,\n  \"r_multiple\": null,\n  \"rationale\": \"one sentence: positioning state + divergence + implication\",\n  \"knowledge_refs\": [\"book_slug/chunk_idx\", ...],\n  \"strategy_tag\": \"cot-extreme-fade|cot-commercials-divergence|cot-momentum-shift|...\"\n}\nOr: {\"skip\": true, \"reason\": \"stale COT report...\" | \"no positioning extreme\" | \"no setup\"}`;\n\nconst userPrompt = `POSITIONING EVENT\nsource: ${event.source}\ninstrument: ${event.instrument || 'n/a'}\npayload: ${JSON.stringify(event.payload)}\n\nRETRIEVED KNOWLEDGE\n${contextBlocks}\n\nOutput the signal JSON now.`;\n\nreturn [{\n  json: {\n    event_id: event.event_id,\n    event_instrument: event.instrument,\n    event_payload: event.payload,\n    systemPrompt,\n    userPrompt,\n    knowledge_refs: chunks.slice(0, 3).map(c => `${c.book_slug}/${c.chunk_idx}`)\n  }\n}];\n"
+      }
+    },
+    {
+      "id": "generate",
+      "name": "Gemini Generate Signal",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1760,
+        -100
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "key",
+              "value": "={{ $env.GEMINI_API_KEY }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={ \"contents\": [{\"role\":\"user\",\"parts\":[{\"text\": {{ JSON.stringify($json.userPrompt) }} }]}], \"systemInstruction\": {\"parts\":[{\"text\": {{ JSON.stringify($json.systemPrompt) }} }]}, \"generationConfig\": {\"temperature\": 0.3, \"maxOutputTokens\": 1500, \"responseMimeType\": \"application/json\", \"thinkingConfig\": {\"thinkingBudget\": 0}} }",
+        "options": {
+          "timeout": 30000
+        }
+      }
+    },
+    {
+      "id": "attach-ctx",
+      "name": "Attach context",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1980,
+        -100
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "\nconst ctx = $('Build Gemini Prompt').first().json;\nconst resp = items[0].json;\nreturn [{ json: { ...resp, event_id: ctx.event_id, event_payload: ctx.event_payload, knowledge_refs: ctx.knowledge_refs } }];\n"
+      }
+    },
+    {
+      "id": "parse",
+      "name": "Parse Signal",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2200,
+        -100
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "\nconst resp = items[0].json;\nlet text = '';\ntry { text = resp.candidates[0].content.parts[0].text; }\ncatch (e) { return [{ json: { skip: true, reason: 'no candidates', event_id: resp.event_id } }]; }\n\ntext = text.replace(/```json\\s*/gi, '').replace(/```/g, '').trim();\n\nlet signal;\ntry { signal = JSON.parse(text); }\ncatch (e) { return [{ json: { skip: true, reason: 'parse fail: ' + text.slice(0,100), event_id: resp.event_id } }]; }\n\nif (signal.skip) {\n  return [{ json: { skip: true, reason: signal.reason, event_id: resp.event_id } }];\n}\n\nconst required = ['instrument', 'timeframe', 'bias', 'confidence'];\nfor (const k of required) {\n  if (!(k in signal)) return [{ json: { skip: true, reason: 'missing ' + k, event_id: resp.event_id } }];\n}\n\nconst effective_refs = (signal.knowledge_refs && signal.knowledge_refs.length ? signal.knowledge_refs : (resp.knowledge_refs || []));\n\n\nreturn [{\n    json: {\n      skip: false,\n    event_id: resp.event_id,\n    instrument: signal.instrument,\n    timeframe: signal.timeframe,\n    bias: signal.bias,\n    confidence: Number(signal.confidence),\n    entry: signal.entry ?? null,\n    sl: signal.sl ?? null,\n    tp: signal.tp || null,\n    r_multiple: signal.r_multiple ?? null,\n    rationale: { positioning: signal.rationale || '' },\n    knowledge_refs: effective_refs,\n    strategy_tag: signal.strategy_tag || 'cot-positioning',\n    telegram_text: `[POS] ${signal.bias === 'long' ? 'LONG' : signal.bias === 'short' ? 'SHORT' : 'FLAT'} ${signal.instrument} ${signal.timeframe}\nconfidence: ${Number(signal.confidence).toFixed(2)}\nstrategy: ${signal.strategy_tag || 'cot-positioning'}\nwhy: ${signal.rationale || ''}\nrefs: ${effective_refs.join(', ')}`\n  }\n}];\n"
+      }
+    },
+    {
+      "id": "if-signal",
+      "name": "Is signal?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        2420,
+        -100
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "version": 2,
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "c1",
+              "leftValue": "={{ $json.skip }}",
+              "rightValue": false,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      }
+    },
+    {
+      "id": "insert-signal",
+      "name": "Insert signals_v2",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        2640,
+        -200
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "TradingPostgres1",
+          "name": "Trading Postgres"
+        }
+      },
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO signals_v2 (instrument, timeframe, bias, confidence, entry, sl, tp, r_multiple, agents_fired, rationale, knowledge_refs, strategy_tag)\n                VALUES ('{{ $json.instrument }}',\n                        '{{ $json.timeframe }}',\n                        '{{ $json.bias }}',\n                        {{ $json.confidence }},\n                        {{ $json.entry === null ? 'NULL' : $json.entry }},\n                        {{ $json.sl === null ? 'NULL' : $json.sl }},\n                        {{ $json.tp === null ? 'NULL' : \"ARRAY[\" + $json.tp.join(',') + \"]::numeric[]\" }},\n                        {{ $json.r_multiple === null ? 'NULL' : $json.r_multiple }},\n                        ARRAY['PositioningAgent']::text[],\n                        '{{ JSON.stringify($json.rationale).replace(/'/g, \"''\") }}'::jsonb,\n                        ARRAY[{{ ($json.knowledge_refs || []).map(r => \"'\" + r.replace(/'/g, \"''\") + \"'\").join(',') }}]::text[],\n                        '{{ $json.strategy_tag }}')\n                RETURNING id, ts;",
+        "options": {}
+      }
+    },
+    {
+      "id": "alert",
+      "name": "Telegram Alert",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        2860,
+        -200
+      ],
+      "credentials": {
+        "telegramApi": {
+          "id": "TradingTelegramBot",
+          "name": "Trading Bot"
+        }
+      },
+      "parameters": {
+        "chatId": "804465999",
+        "text": "={{ $('Parse Signal').first().json.telegram_text }}",
+        "additionalFields": {}
+      },
+      "webhookId": "a79f4182-60e2-4210-933a-53a36693415a"
+    },
+    {
+      "id": "mark-processed",
+      "name": "Mark event processed",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        3080,
+        -100
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "TradingPostgres1",
+          "name": "Trading Postgres"
+        }
+      },
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE events SET status='processed', processed_at=now()\n                WHERE id='{{ $('Parse Signal').first().json.event_id }}';",
+        "options": {}
+      }
+    },
+    {
+      "id": "mark-skipped",
+      "name": "Mark event skipped",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        2640,
+        0
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "TradingPostgres1",
+          "name": "Trading Postgres"
+        }
+      },
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE events SET status='processed', processed_at=now(),\n                       error='skipped: {{ $json.reason.replace(/'/g, \"''\") }}'\n                WHERE id='{{ $json.event_id }}';",
+        "options": {}
+      }
+    }
+  ],
+  "connections": {
+    "Every 5 min": {
+      "main": [
+        [
+          {
+            "node": "Claim pending positioning events",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Claim pending positioning events": {
+      "main": [
+        [
+          {
+            "node": "Has events?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has events?": {
+      "main": [
+        [
+          {
+            "node": "Build RAG query",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Build RAG query": {
+      "main": [
+        [
+          {
+            "node": "Annotate age",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Annotate age": {
+      "main": [
+        [
+          {
+            "node": "Gemini Embed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gemini Embed": {
+      "main": [
+        [
+          {
+            "node": "Vector Search Knowledge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Vector Search Knowledge": {
+      "main": [
+        [
+          {
+            "node": "Build Gemini Prompt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Gemini Prompt": {
+      "main": [
+        [
+          {
+            "node": "Gemini Generate Signal",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gemini Generate Signal": {
+      "main": [
+        [
+          {
+            "node": "Attach context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Attach context": {
+      "main": [
+        [
+          {
+            "node": "Parse Signal",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Signal": {
+      "main": [
+        [
+          {
+            "node": "Is signal?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is signal?": {
+      "main": [
+        [
+          {
+            "node": "Insert signals_v2",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Mark event skipped",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Insert signals_v2": {
+      "main": [
+        [
+          {
+            "node": "Telegram Alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Telegram Alert": {
+      "main": [
+        [
+          {
+            "node": "Mark event processed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "errorWorkflow": "mzrUOgpYW8OVSWGl"
+  },
+  "staticData": {
+    "node:Every 5 min": {
+      "recurrenceRules": []
+    }
+  },
+  "meta": null,
+  "pinData": null,
+  "versionId": "19ebdc31-d738-4427-b215-ee94399e731a",
+  "activeVersionId": "19ebdc31-d738-4427-b215-ee94399e731a",
+  "versionCounter": 32,
+  "triggerCount": 1,
+  "shared": [
+    {
+      "updatedAt": "2026-04-22T18:10:47.883Z",
+      "createdAt": "2026-04-22T18:10:47.883Z",
+      "role": "workflow:owner",
+      "workflowId": "EtkEZYUkqGTOAsRk",
+      "projectId": "PufDuNtXpreUjA3o",
+      "project": {
+        "updatedAt": "2025-12-05T21:25:37.247Z",
+        "createdAt": "2025-11-04T19:43:55.674Z",
+        "id": "PufDuNtXpreUjA3o",
+        "name": "Maksim Parve <maksim@studiokook.ee>",
+        "type": "personal",
+        "icon": null,
+        "description": null,
+        "creatorId": "3462e3d2-f46b-4d98-acea-93ac07713bf5"
+      }
+    }
+  ],
+  "tags": [],
+  "activeVersion": {
+    "updatedAt": "2026-04-22T18:37:41.583Z",
+    "createdAt": "2026-04-22T18:37:41.583Z",
+    "versionId": "19ebdc31-d738-4427-b215-ee94399e731a",
+    "workflowId": "EtkEZYUkqGTOAsRk",
+    "nodes": [
+      {
+        "id": "schedule",
+        "name": "Every 5 min",
+        "type": "n8n-nodes-base.scheduleTrigger",
+        "typeVersion": 1.2,
+        "position": [
+          0,
+          0
+        ],
+        "parameters": {
+          "rule": {
+            "interval": [
+              {
+                "field": "minutes",
+                "minutesInterval": 5
+              }
+            ]
+          }
+        }
+      },
+      {
+        "id": "claim",
+        "name": "Claim pending positioning events",
+        "type": "n8n-nodes-base.postgres",
+        "typeVersion": 2.5,
+        "position": [
+          220,
+          0
+        ],
+        "credentials": {
+          "postgres": {
+            "id": "TradingPostgres1",
+            "name": "Trading Postgres"
+          }
+        },
+        "parameters": {
+          "operation": "executeQuery",
+          "query": "UPDATE events SET status='processing'\n                WHERE id IN (\n                    SELECT id FROM events\n                    WHERE type='positioning' AND status='pending'\n                    ORDER BY ts ASC\n                    LIMIT 1\n                    FOR UPDATE SKIP LOCKED\n                )\n                RETURNING id AS event_id, ts, source, instrument, payload;",
+          "options": {}
+        }
+      },
+      {
+        "id": "has-events",
+        "name": "Has events?",
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 2,
+        "position": [
+          440,
+          0
+        ],
+        "parameters": {
+          "conditions": {
+            "options": {
+              "version": 2,
+              "caseSensitive": true,
+              "typeValidation": "strict"
+            },
+            "conditions": [
+              {
+                "id": "hev",
+                "leftValue": "={{ $json.event_id }}",
+                "rightValue": "",
+                "operator": {
+                  "type": "string",
+                  "operation": "notEmpty"
+                }
+              }
+            ],
+            "combinator": "and"
+          }
+        }
+      },
+      {
+        "id": "build-query",
+        "name": "Build RAG query",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          660,
+          -100
+        ],
+        "parameters": {
+          "mode": "runOnceForEachItem",
+          "jsCode": "\nconst ev = $json;\nconst p = ev.payload || {};\nconst parts = [\n  'commitment of traders COT positioning',\n  p.signal || '',\n  p.signal === 'extreme_long' || p.signal === 'bullish' ? 'smart money accumulation commercials buying' : '',\n  p.signal === 'extreme_short' || p.signal === 'bearish' ? 'distribution commercials selling crowded long' : '',\n  ev.instrument || p.commodity || '',\n  p.large_spec_pct_rank != null ? 'pct rank ' + p.large_spec_pct_rank : '',\n  'speculators commercials net position'\n];\nconst q = parts.filter(Boolean).join(' ').trim();\nreturn { json: { ...ev, rag_query: q.slice(0, 500) } };\n"
+        }
+      },
+      {
+        "id": "stale-check",
+        "name": "Annotate age",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          880,
+          -100
+        ],
+        "parameters": {
+          "mode": "runOnceForEachItem",
+          "jsCode": "\nconst ev = $('Build RAG query').first().json;\nconst p = ev.payload || {};\nconst reportDate = p.report_date;\nlet ageDays = null;\nif (reportDate) {\n  ageDays = Math.floor((Date.now() - new Date(reportDate).getTime()) / 86400000);\n}\nreturn { json: { ...ev, payload: { ...p, _report_age_days: ageDays } } };\n"
+        }
+      },
+      {
+        "id": "embed",
+        "name": "Gemini Embed",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          1100,
+          -100
+        ],
+        "parameters": {
+          "method": "POST",
+          "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-001:embedContent",
+          "sendQuery": true,
+          "queryParameters": {
+            "parameters": [
+              {
+                "name": "key",
+                "value": "={{ $env.GEMINI_API_KEY }}"
+              }
+            ]
+          },
+          "sendBody": true,
+          "specifyBody": "json",
+          "jsonBody": "={ \"model\": \"models/gemini-embedding-001\", \"content\": {\"parts\":[{\"text\": {{ JSON.stringify($json.rag_query) }} }]}, \"outputDimensionality\": 768, \"taskType\": \"RETRIEVAL_QUERY\" }",
+          "options": {
+            "timeout": 20000
+          }
+        }
+      },
+      {
+        "id": "vec-search",
+        "name": "Vector Search Knowledge",
+        "type": "n8n-nodes-base.postgres",
+        "typeVersion": 2.5,
+        "position": [
+          1320,
+          -100
+        ],
+        "credentials": {
+          "postgres": {
+            "id": "TradingPostgres1",
+            "name": "Trading Postgres"
+          }
+        },
+        "parameters": {
+          "operation": "executeQuery",
+          "query": "SELECT event_id, event_instrument, event_payload, book_slug, chunk_idx, title, content, score FROM (\n                    SELECT '{{ $('Annotate age').first().json.event_id }}'::uuid AS event_id,\n                           '{{ $('Annotate age').first().json.instrument || '' }}' AS event_instrument,\n                           '{{ JSON.stringify($('Annotate age').first().json.payload) }}'::jsonb AS event_payload\n                ) ev\n                CROSS JOIN LATERAL search_knowledge(('[' || '{{ $json.embedding.values.join(',') }}' || ']')::vector, 3);",
+          "options": {}
+        }
+      },
+      {
+        "id": "build-prompt",
+        "name": "Build Gemini Prompt",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          1540,
+          -100
+        ],
+        "parameters": {
+          "mode": "runOnceForAllItems",
+          "jsCode": "\nconst event = $('Annotate age').first().json;\nconst chunks = items.map(i => i.json).filter(c => c.content);\n\nconst contextBlocks = chunks.slice(0, 3).map((c, i) =>\n  `[${i + 1}] ${c.book_slug}/${c.chunk_idx} (score=${Number(c.score).toFixed(2)})\\n${c.content}`\n).join('\\n\\n---\\n\\n');\n\nconst systemPrompt = `You are PositioningAgent, a specialist analyst focused on Commitment of Traders (COT) and institutional positioning. Input: a positioning event (weekly COT report snapshot for a commodity/index). Output: ONE structured trade signal JSON — or {\"skip\": true, \"reason\": \"...\"} if no actionable setup.\n\nMANDATORY CHECKS (in order):\n1. If payload._report_age_days == null OR payload._report_age_days > 21 → skip with reason \"stale COT report: age \" + payload._report_age_days + \" days\"\n2. If payload.signal == \"neutral\" AND Math.abs(payload.large_spec_pct_rank - 50) < 15 → skip with reason \"no positioning extreme\"\n3. Otherwise analyze positioning divergence vs price implication\n\nFramework (apply in order of priority):\n- Contrarian extremes: large specs at pct_rank >= 90 = crowded long (bearish contrarian); <= 10 = crowded short (bullish contrarian)\n- Commercials are smart money: their net position divergence from specs signals reversal zones\n- Signal tiers:\n  * extreme_long (specs >= 90 pct) + commercials net short → HIGH conviction FADE (short setup)\n  * extreme_short (specs <= 10 pct) + commercials net long → HIGH conviction FADE (long setup)\n  * bullish (specs >= 75) WITHOUT commercial confirmation → WEAK setup, lean skip\n  * weekly_change sign flip + pct_rank crossing 50 → momentum shift, moderate conviction\n- Timeframe: COT is weekly → bias is swing/position (1W-1M horizon), never intraday\n- Van Tharp R-multiple: positioning trades need wider stops (2-3 ATR), target 2-4R\n- NO fixed entry/SL/TP numbers (no live price available) — set entry/sl/tp to null; describe levels qualitatively in rationale\n\nSignal schema — return ONLY this JSON, no commentary:\n{\n  \"instrument\": \"string\",\n  \"timeframe\": \"1W|1M\",\n  \"bias\": \"long|short|flat\",\n  \"confidence\": 0.0-1.0,\n  \"entry\": null,\n  \"sl\": null,\n  \"tp\": null,\n  \"r_multiple\": null,\n  \"rationale\": \"one sentence: positioning state + divergence + implication\",\n  \"knowledge_refs\": [\"book_slug/chunk_idx\", ...],\n  \"strategy_tag\": \"cot-extreme-fade|cot-commercials-divergence|cot-momentum-shift|...\"\n}\nOr: {\"skip\": true, \"reason\": \"stale COT report...\" | \"no positioning extreme\" | \"no setup\"}`;\n\nconst userPrompt = `POSITIONING EVENT\nsource: ${event.source}\ninstrument: ${event.instrument || 'n/a'}\npayload: ${JSON.stringify(event.payload)}\n\nRETRIEVED KNOWLEDGE\n${contextBlocks}\n\nOutput the signal JSON now.`;\n\nreturn [{\n  json: {\n    event_id: event.event_id,\n    event_instrument: event.instrument,\n    event_payload: event.payload,\n    systemPrompt,\n    userPrompt,\n    knowledge_refs: chunks.slice(0, 3).map(c => `${c.book_slug}/${c.chunk_idx}`)\n  }\n}];\n"
+        }
+      },
+      {
+        "id": "generate",
+        "name": "Gemini Generate Signal",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          1760,
+          -100
+        ],
+        "parameters": {
+          "method": "POST",
+          "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent",
+          "sendQuery": true,
+          "queryParameters": {
+            "parameters": [
+              {
+                "name": "key",
+                "value": "={{ $env.GEMINI_API_KEY }}"
+              }
+            ]
+          },
+          "sendBody": true,
+          "specifyBody": "json",
+          "jsonBody": "={ \"contents\": [{\"role\":\"user\",\"parts\":[{\"text\": {{ JSON.stringify($json.userPrompt) }} }]}], \"systemInstruction\": {\"parts\":[{\"text\": {{ JSON.stringify($json.systemPrompt) }} }]}, \"generationConfig\": {\"temperature\": 0.3, \"maxOutputTokens\": 1500, \"responseMimeType\": \"application/json\", \"thinkingConfig\": {\"thinkingBudget\": 0}} }",
+          "options": {
+            "timeout": 30000
+          }
+        }
+      },
+      {
+        "id": "attach-ctx",
+        "name": "Attach context",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          1980,
+          -100
+        ],
+        "parameters": {
+          "mode": "runOnceForAllItems",
+          "jsCode": "\nconst ctx = $('Build Gemini Prompt').first().json;\nconst resp = items[0].json;\nreturn [{ json: { ...resp, event_id: ctx.event_id, event_payload: ctx.event_payload, knowledge_refs: ctx.knowledge_refs } }];\n"
+        }
+      },
+      {
+        "id": "parse",
+        "name": "Parse Signal",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          2200,
+          -100
+        ],
+        "parameters": {
+          "mode": "runOnceForAllItems",
+          "jsCode": "\nconst resp = items[0].json;\nlet text = '';\ntry { text = resp.candidates[0].content.parts[0].text; }\ncatch (e) { return [{ json: { skip: true, reason: 'no candidates', event_id: resp.event_id } }]; }\n\ntext = text.replace(/```json\\s*/gi, '').replace(/```/g, '').trim();\n\nlet signal;\ntry { signal = JSON.parse(text); }\ncatch (e) { return [{ json: { skip: true, reason: 'parse fail: ' + text.slice(0,100), event_id: resp.event_id } }]; }\n\nif (signal.skip) {\n  return [{ json: { skip: true, reason: signal.reason, event_id: resp.event_id } }];\n}\n\nconst required = ['instrument', 'timeframe', 'bias', 'confidence'];\nfor (const k of required) {\n  if (!(k in signal)) return [{ json: { skip: true, reason: 'missing ' + k, event_id: resp.event_id } }];\n}\n\nconst effective_refs = (signal.knowledge_refs && signal.knowledge_refs.length ? signal.knowledge_refs : (resp.knowledge_refs || []));\n\n\nreturn [{\n    json: {\n      skip: false,\n    event_id: resp.event_id,\n    instrument: signal.instrument,\n    timeframe: signal.timeframe,\n    bias: signal.bias,\n    confidence: Number(signal.confidence),\n    entry: signal.entry ?? null,\n    sl: signal.sl ?? null,\n    tp: signal.tp || null,\n    r_multiple: signal.r_multiple ?? null,\n    rationale: { positioning: signal.rationale || '' },\n    knowledge_refs: effective_refs,\n    strategy_tag: signal.strategy_tag || 'cot-positioning',\n    telegram_text: `[POS] ${signal.bias === 'long' ? 'LONG' : signal.bias === 'short' ? 'SHORT' : 'FLAT'} ${signal.instrument} ${signal.timeframe}\nconfidence: ${Number(signal.confidence).toFixed(2)}\nstrategy: ${signal.strategy_tag || 'cot-positioning'}\nwhy: ${signal.rationale || ''}\nrefs: ${effective_refs.join(', ')}`\n  }\n}];\n"
+        }
+      },
+      {
+        "id": "if-signal",
+        "name": "Is signal?",
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 2,
+        "position": [
+          2420,
+          -100
+        ],
+        "parameters": {
+          "conditions": {
+            "options": {
+              "version": 2,
+              "caseSensitive": true,
+              "typeValidation": "strict"
+            },
+            "conditions": [
+              {
+                "id": "c1",
+                "leftValue": "={{ $json.skip }}",
+                "rightValue": false,
+                "operator": {
+                  "type": "boolean",
+                  "operation": "equals"
+                }
+              }
+            ],
+            "combinator": "and"
+          }
+        }
+      },
+      {
+        "id": "insert-signal",
+        "name": "Insert signals_v2",
+        "type": "n8n-nodes-base.postgres",
+        "typeVersion": 2.5,
+        "position": [
+          2640,
+          -200
+        ],
+        "credentials": {
+          "postgres": {
+            "id": "TradingPostgres1",
+            "name": "Trading Postgres"
+          }
+        },
+        "parameters": {
+          "operation": "executeQuery",
+          "query": "INSERT INTO signals_v2 (instrument, timeframe, bias, confidence, entry, sl, tp, r_multiple, agents_fired, rationale, knowledge_refs, strategy_tag)\n                VALUES ('{{ $json.instrument }}',\n                        '{{ $json.timeframe }}',\n                        '{{ $json.bias }}',\n                        {{ $json.confidence }},\n                        {{ $json.entry === null ? 'NULL' : $json.entry }},\n                        {{ $json.sl === null ? 'NULL' : $json.sl }},\n                        {{ $json.tp === null ? 'NULL' : \"ARRAY[\" + $json.tp.join(',') + \"]::numeric[]\" }},\n                        {{ $json.r_multiple === null ? 'NULL' : $json.r_multiple }},\n                        ARRAY['PositioningAgent']::text[],\n                        '{{ JSON.stringify($json.rationale).replace(/'/g, \"''\") }}'::jsonb,\n                        ARRAY[{{ ($json.knowledge_refs || []).map(r => \"'\" + r.replace(/'/g, \"''\") + \"'\").join(',') }}]::text[],\n                        '{{ $json.strategy_tag }}')\n                RETURNING id, ts;",
+          "options": {}
+        }
+      },
+      {
+        "id": "alert",
+        "name": "Telegram Alert",
+        "type": "n8n-nodes-base.telegram",
+        "typeVersion": 1.2,
+        "position": [
+          2860,
+          -200
+        ],
+        "credentials": {
+          "telegramApi": {
+            "id": "TradingTelegramBot",
+            "name": "Trading Bot"
+          }
+        },
+        "parameters": {
+          "chatId": "804465999",
+          "text": "={{ $('Parse Signal').first().json.telegram_text }}",
+          "additionalFields": {}
+        },
+        "webhookId": "a79f4182-60e2-4210-933a-53a36693415a"
+      },
+      {
+        "id": "mark-processed",
+        "name": "Mark event processed",
+        "type": "n8n-nodes-base.postgres",
+        "typeVersion": 2.5,
+        "position": [
+          3080,
+          -100
+        ],
+        "credentials": {
+          "postgres": {
+            "id": "TradingPostgres1",
+            "name": "Trading Postgres"
+          }
+        },
+        "parameters": {
+          "operation": "executeQuery",
+          "query": "UPDATE events SET status='processed', processed_at=now()\n                WHERE id='{{ $('Parse Signal').first().json.event_id }}';",
+          "options": {}
+        }
+      },
+      {
+        "id": "mark-skipped",
+        "name": "Mark event skipped",
+        "type": "n8n-nodes-base.postgres",
+        "typeVersion": 2.5,
+        "position": [
+          2640,
+          0
+        ],
+        "credentials": {
+          "postgres": {
+            "id": "TradingPostgres1",
+            "name": "Trading Postgres"
+          }
+        },
+        "parameters": {
+          "operation": "executeQuery",
+          "query": "UPDATE events SET status='processed', processed_at=now(),\n                       error='skipped: {{ $json.reason.replace(/'/g, \"''\") }}'\n                WHERE id='{{ $json.event_id }}';",
+          "options": {}
+        }
+      }
+    ],
+    "connections": {
+      "Every 5 min": {
+        "main": [
+          [
+            {
+              "node": "Claim pending positioning events",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Claim pending positioning events": {
+        "main": [
+          [
+            {
+              "node": "Has events?",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Has events?": {
+        "main": [
+          [
+            {
+              "node": "Build RAG query",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          []
+        ]
+      },
+      "Build RAG query": {
+        "main": [
+          [
+            {
+              "node": "Annotate age",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Annotate age": {
+        "main": [
+          [
+            {
+              "node": "Gemini Embed",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Gemini Embed": {
+        "main": [
+          [
+            {
+              "node": "Vector Search Knowledge",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Vector Search Knowledge": {
+        "main": [
+          [
+            {
+              "node": "Build Gemini Prompt",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Build Gemini Prompt": {
+        "main": [
+          [
+            {
+              "node": "Gemini Generate Signal",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Gemini Generate Signal": {
+        "main": [
+          [
+            {
+              "node": "Attach context",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Attach context": {
+        "main": [
+          [
+            {
+              "node": "Parse Signal",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Parse Signal": {
+        "main": [
+          [
+            {
+              "node": "Is signal?",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Is signal?": {
+        "main": [
+          [
+            {
+              "node": "Insert signals_v2",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Mark event skipped",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Insert signals_v2": {
+        "main": [
+          [
+            {
+              "node": "Telegram Alert",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Telegram Alert": {
+        "main": [
+          [
+            {
+              "node": "Mark event processed",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "authors": "Maksim Parve",
+    "name": null,
+    "description": null,
+    "autosaved": false,
+    "workflowPublishHistory": [
+      {
+        "createdAt": "2026-04-22T18:37:41.607Z",
+        "id": 648,
+        "workflowId": "EtkEZYUkqGTOAsRk",
+        "versionId": "19ebdc31-d738-4427-b215-ee94399e731a",
+        "event": "deactivated",
+        "userId": "3462e3d2-f46b-4d98-acea-93ac07713bf5"
+      },
+      {
+        "createdAt": "2026-04-22T18:37:41.624Z",
+        "id": 649,
+        "workflowId": "EtkEZYUkqGTOAsRk",
+        "versionId": "19ebdc31-d738-4427-b215-ee94399e731a",
+        "event": "activated",
+        "userId": "3462e3d2-f46b-4d98-acea-93ac07713bf5"
+      },
+      {
+        "createdAt": "2026-04-22T18:51:41.457Z",
+        "id": 658,
+        "workflowId": "EtkEZYUkqGTOAsRk",
+        "versionId": "19ebdc31-d738-4427-b215-ee94399e731a",
+        "event": "deactivated",
+        "userId": "3462e3d2-f46b-4d98-acea-93ac07713bf5"
+      },
+      {
+        "createdAt": "2026-04-22T18:51:43.803Z",
+        "id": 659,
+        "workflowId": "EtkEZYUkqGTOAsRk",
+        "versionId": "19ebdc31-d738-4427-b215-ee94399e731a",
+        "event": "activated",
+        "userId": "3462e3d2-f46b-4d98-acea-93ac07713bf5"
+      },
+      {
+        "createdAt": "2026-04-25T10:19:23.395Z",
+        "id": 864,
+        "workflowId": "EtkEZYUkqGTOAsRk",
+        "versionId": "19ebdc31-d738-4427-b215-ee94399e731a",
+        "event": "deactivated",
+        "userId": "3462e3d2-f46b-4d98-acea-93ac07713bf5"
+      },
+      {
+        "createdAt": "2026-04-25T10:19:23.409Z",
+        "id": 865,
+        "workflowId": "EtkEZYUkqGTOAsRk",
+        "versionId": "19ebdc31-d738-4427-b215-ee94399e731a",
+        "event": "activated",
+        "userId": "3462e3d2-f46b-4d98-acea-93ac07713bf5"
+      }
+    ]
+  }
+}

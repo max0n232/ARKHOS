@@ -1,0 +1,862 @@
+{
+  "updatedAt": "2026-05-05T06:54:41.150Z",
+  "createdAt": "2026-04-12T13:30:17.058Z",
+  "id": "o4GyBrp2rs4jZ2Y0",
+  "name": "Trading: Decision Engine",
+  "description": null,
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 9 * * 1-5"
+            }
+          ]
+        }
+      },
+      "id": "sched1",
+      "name": "Weekday 09:00",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH regime AS (\n  SELECT macro_regime, risk_sentiment, fed_phase, yield_curve_spread, vix_level, dxy_trend, confidence, reasoning\n  FROM regime_state ORDER BY timestamp DESC LIMIT 1\n),\nseasonality AS (\n  SELECT json_agg(json_build_object('asset', asset, 'bias', current_bias, 'avg_return', avg_return, 'win_rate', win_rate)) as signals\n  FROM seasonality_signals WHERE month = EXTRACT(MONTH FROM NOW())\n),\ncot AS (\n  SELECT json_agg(json_build_object('commodity', commodity, 'signal', signal, 'pct_rank', large_spec_pct_rank, 'weekly_change', weekly_change)) as reports\n  FROM cot_reports WHERE report_date > NOW() - INTERVAL '14 days'\n),\ngeo AS (\n  SELECT json_agg(json_build_object('type', event_type, 'description', description, 'impact', impact_level, 'sentiment', sentiment_score, 'assets', affected_assets) ORDER BY timestamp DESC) as events\n  FROM geopolitical_events WHERE timestamp > NOW() - INTERVAL '48 hours' AND impact_level IN ('high', 'critical')\n),\nprices_macro AS (\n  SELECT json_agg(json_build_object('indicator', indicator, 'value', value, 'change', change_pct)) as data\n  FROM (SELECT DISTINCT ON (indicator) indicator, value, change_pct FROM macro_indicators ORDER BY indicator, timestamp DESC) t\n),\nprices_commodity AS (\n  SELECT json_agg(json_build_object('symbol', symbol, 'price', price, 'change', change_24h)) as data\n  FROM (SELECT DISTINCT ON (symbol) symbol, price, change_24h FROM commodity_snapshots ORDER BY symbol, timestamp DESC) t\n)\nSELECT \n  (SELECT row_to_json(r) FROM regime r) as regime,\n  (SELECT signals FROM seasonality) as seasonality,\n  (SELECT reports FROM cot) as cot,\n  (SELECT events FROM geo) as geopolitics,\n  (SELECT data FROM prices_macro) as macro_prices,\n  (SELECT data FROM prices_commodity) as commodity_prices;",
+        "options": {}
+      },
+      "id": "pg1",
+      "name": "Gather All Data",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        220,
+        0
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "TradingPostgres1",
+          "name": "Trading Postgres"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const d = $('Gather All Data').first().json;\n\nlet perfContext = '';\ntry {\n  const perf = $('Get Performance').first().json;\n  if (perf && perf.context_text) {\n    perfContext = `\\n\\n## Track record context\\n${perf.context_text}\\nUse this to calibrate confidence. Do not repeat recently failed patterns.`;\n  }\n} catch(e) {}\n\nconst watchlist = ['GOLD', 'SILVER', 'WTI_OIL', 'NATGAS', 'COPPER', 'SPY', 'QQQ', 'BTC', 'ETH'];\nconst evidence = {\n  regime: d.regime || null,\n  seasonality_count: Array.isArray(d.seasonality) ? d.seasonality.length : 0,\n  cot_count: Array.isArray(d.cot) ? d.cot.length : 0,\n  geopolitics_count: Array.isArray(d.geopolitics) ? d.geopolitics.length : 0,\n  macro_price_count: Array.isArray(d.macro_prices) ? d.macro_prices.length : 0,\n  commodity_price_count: Array.isArray(d.commodity_prices) ? d.commodity_prices.length : 0,\n};\n\nconst prompt = `Ты - риск-ориентированный макро/кросс-актив аналитик Mini-Aladdin. Это информационный бриф, не финансовая рекомендация. Отвечай только валидным JSON на русском.${perfContext}\n\nЦель: не пересказывать сырые данные, а решить, есть ли actionable setup. Если доказательств мало или конфликт факторов сильный - ставь HOLD или NO_TRADE, не выдумывай сделку.\n\n## Evidence coverage\n${JSON.stringify(evidence, null, 2)}\n\n## Current macro regime\n${JSON.stringify(d.regime, null, 2)}\n\n## Seasonality\n${JSON.stringify(d.seasonality, null, 2)}\n\n## COT positioning\n${JSON.stringify(d.cot, null, 2)}\n\n## Geopolitical events\n${JSON.stringify(d.geopolitics, null, 2)}\n\n## Macro prices\n${JSON.stringify(d.macro_prices, null, 2)}\n\n## Commodity prices\n${JSON.stringify(d.commodity_prices, null, 2)}\n\nВерни JSON массив из 1-5 объектов только для лучших сетапов из [${watchlist.join(', ')}].\nСхема:\n[{\n  \"asset\": \"GOLD\",\n  \"direction\": \"BUY|SELL|HOLD|NO_TRADE\",\n  \"conviction\": 1,\n  \"timeframe\": \"swing|position|long_term\",\n  \"reasoning\": \"2-3 коротких факта, почему сейчас\",\n  \"risk_note\": \"что отменяет идею\",\n  \"action\": \"что делать: wait for pullback / monitor / no action / paper trade only\",\n  \"evidence\": [\"regime\", \"cot\", \"seasonality\"]\n}]\n\nПравила:\n- BUY/SELL только при conviction >= 7 и минимум 2 независимых факторах.\n- HOLD/NO_TRADE допустимы и полезны, если setup слабый.\n- Не используй Markdown.\n- Никакого текста вне JSON.`;\n\nreturn [{ json: { prompt, watchlist, evidence, has_data: !!(d.regime || d.seasonality || d.commodity_prices) } }];"
+      },
+      "id": "code1",
+      "name": "Build AI Prompt",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        440,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent",
+        "sendQuery": false,
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ contents: [{ parts: [{ text: $json.prompt }] }], generationConfig: { temperature: 0.2, maxOutputTokens: 8192, responseMimeType: \"application/json\" } }) }}",
+        "options": {},
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "method": "POST"
+      },
+      "id": "http1",
+      "name": "Claude/Gemini Analysis",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        660,
+        0
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "lH0DpGTK2Q79me2I",
+          "name": "Gemini API Key (ARKHOS)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const resp = $input.first().json;\nlet text = '';\ntry {\n  text = resp.candidates[0].content.parts[0].text || '';\n} catch(e) {\n  return [{ json: { error: 'No AI response', raw: JSON.stringify(resp).slice(0, 500) } }];\n}\n\ntext = text.replace(/```json|```/g, '').trim();\n\nlet recommendations = [];\ntry {\n  const jsonMatch = text.match(/\\[\\s*\\{[\\s\\S]*\\}\\s*\\]/);\n  recommendations = JSON.parse(jsonMatch ? jsonMatch[0] : text);\n} catch(e) {\n  return [{ json: { error: 'Parse failed', raw: text.slice(0, 500) } }];\n}\n\nconst allowedAssets = new Set(['GOLD', 'SILVER', 'WTI_OIL', 'NATGAS', 'COPPER', 'SPY', 'QQQ', 'BTC', 'ETH']);\nconst allowedDirections = new Set(['BUY', 'SELL', 'HOLD', 'NO_TRADE']);\nconst allowedTimeframes = new Set(['swing', 'position', 'long_term']);\n\nconst cleaned = recommendations\n  .filter(r => r && allowedAssets.has(String(r.asset || '').toUpperCase()))\n  .map(r => ({\n    asset: String(r.asset).toUpperCase(),\n    direction: allowedDirections.has(String(r.direction || '').toUpperCase()) ? String(r.direction).toUpperCase() : 'NO_TRADE',\n    conviction: Math.max(1, Math.min(10, Number(r.conviction) || 1)),\n    timeframe: allowedTimeframes.has(r.timeframe) ? r.timeframe : 'swing',\n    factors: JSON.stringify({ evidence: Array.isArray(r.evidence) ? r.evidence.slice(0, 5) : [] }),\n    reasoning: String(r.reasoning || '').trim(),\n    risk_note: String(r.risk_note || '').trim(),\n    action: String(r.action || '').trim(),\n    valid_until: new Date(Date.now() + 24*60*60*1000).toISOString()\n  }))\n  .filter(r => r.reasoning && r.risk_note)\n  .sort((a, b) => b.conviction - a.conviction)\n  .slice(0, 5);\n\nif (!cleaned.length) {\n  return [{ json: {\n    asset: 'NO_TRADE',\n    direction: 'NO_TRADE',\n    conviction: 1,\n    timeframe: 'swing',\n    factors: JSON.stringify({ evidence: [] }),\n    reasoning: 'Модель не вернула валидных сетапов с достаточной доказательной базой.',\n    risk_note: 'Не открывать новые позиции без ручной проверки графика и ликвидности.',\n    action: 'No action today',\n    valid_until: new Date(Date.now() + 24*60*60*1000).toISOString()\n  } }];\n}\n\nreturn cleaned.map(r => ({ json: r }));"
+      },
+      "id": "code2",
+      "name": "Parse Recommendations",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        880,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "has-asset",
+              "leftValue": "={{ $json.asset }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "isNotEmpty",
+                "singleValue": true
+              }
+            }
+          ]
+        }
+      },
+      "id": "if1",
+      "name": "Valid Reco?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1100,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO recommendations (asset, direction, conviction, timeframe, factors, reasoning, risk_note, valid_until) VALUES ($1, $2, $3, $4, $5::jsonb, $6, $7, $8);",
+        "options": {
+          "queryReplacement": "={{ [$json.asset, $json.direction, $json.conviction, $json.timeframe, $json.factors, $json.reasoning, $json.risk_note, $json.valid_until] }}"
+        }
+      },
+      "id": "pg2",
+      "name": "Save Recommendations",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        1320,
+        -50
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "TradingPostgres1",
+          "name": "Trading Postgres"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\nconst allData = $('Gather All Data').first().json;\nconst commodityPrices = allData.commodity_prices || [];\nconst macroPrices = allData.macro_prices || [];\nconst tfMap = { swing: 'дни', position: 'недели', long_term: 'месяцы' };\nconst stopMap = { GOLD: 3, SILVER: 4, WTI_OIL: 3, NATGAS: 5, COPPER: 3, SPY: 2, QQQ: 2, BTC: 5, ETH: 5 };\n\nfunction priceFor(asset) {\n  const cp = commodityPrices.find(c => c.symbol === asset);\n  if (cp && cp.price !== undefined && cp.price !== null) return Number(cp.price);\n  const mp = macroPrices.find(m => m.indicator === asset);\n  if (mp && mp.value !== undefined && mp.value !== null) return Number(mp.value);\n  return null;\n}\n\nfunction fmt(n) {\n  if (n === null || Number.isNaN(n)) return 'n/a';\n  if (Math.abs(n) >= 1000) return n.toFixed(0);\n  if (Math.abs(n) >= 10) return n.toFixed(2);\n  return n.toFixed(4);\n}\n\nconst rows = items.map(i => i.json).sort((a, b) => (b.conviction || 0) - (a.conviction || 0)).slice(0, 5);\nconst lines = rows.map((r) => {\n  const entry = priceFor(r.asset);\n  const riskPct = stopMap[r.asset] || 3;\n  let plan = 'План: наблюдать, без входа.';\n  if ((r.direction === 'BUY' || r.direction === 'SELL') && entry) {\n    const long = r.direction === 'BUY';\n    const stop = long ? entry * (1 - riskPct / 100) : entry * (1 + riskPct / 100);\n    const target = long ? entry * (1 + riskPct * 2 / 100) : entry * (1 - riskPct * 2 / 100);\n    plan = `Entry/ref ${fmt(entry)} | SL ${fmt(stop)} | TP ${fmt(target)} | risk ${riskPct}%`;\n  }\n  return [\n    `${r.direction === 'BUY' ? 'BUY' : r.direction === 'SELL' ? 'SELL' : 'NO TRADE'} ${r.asset} (${r.conviction}/10, ${tfMap[r.timeframe] || r.timeframe})`,\n    `Почему: ${r.reasoning}`,\n    `Действие: ${r.action || plan}`,\n    `Риск: ${r.risk_note}`,\n    plan\n  ].join('\\n');\n}).join('\\n\\n');\n\nconst now = new Date();\nconst days = ['Воскресенье','Понедельник','Вторник','Среда','Четверг','Пятница','Суббота'];\nconst months = ['янв','фев','мар','апр','мая','июн','июл','авг','сен','окт','ноя','дек'];\nconst date = `${days[now.getDay()]}, ${now.getDate()} ${months[now.getMonth()]}`;\nconst msg = `Mini-Aladdin Daily Brief\\n${date}\\n\\n${lines}\\n\\nИнформационный бриф, не финсовет. Перед сделкой: график, ликвидность, размер позиции.`;\nreturn [{ json: { message: msg } }];"
+      },
+      "id": "code3",
+      "name": "Format Brief",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1320,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "chatId": "804465999",
+        "text": "={{ $json.message }}",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "id": "tg1",
+      "name": "Send Daily Brief",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1540,
+        100
+      ],
+      "credentials": {
+        "telegramApi": {
+          "id": "TradingTelegramBot",
+          "name": "Trading Bot"
+        }
+      },
+      "webhookId": "6cf9d466-8444-4c7f-a0dd-b139ee276d5c",
+      "disabled": false
+    },
+    {
+      "id": "wh1",
+      "name": "Webhook Test",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        200
+      ],
+      "parameters": {
+        "path": "trading-decision-test",
+        "httpMethod": "GET"
+      },
+      "webhookId": "da9b6b4b-0d1f-477e-94f9-e2a620d18472"
+    },
+    {
+      "id": "code-signal",
+      "name": "Build Signal Entry",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1540,
+        -50
+      ],
+      "parameters": {
+        "jsCode": "const items = $input.all();\nconst stopMap = { 'GOLD': 3, 'SILVER': 4, 'WTI_OIL': 3, 'NATGAS': 5, 'COPPER': 3, 'BRENT_OIL': 3, 'SPY': 2, 'QQQ': 2, 'BTC': 5, 'ETH': 5 };\n\nreturn items.map(item => {\n  const r = item.json;\n  // Get entry price from the gathered data node\n  const allData = $('Gather All Data').first().json;\n  const commodityPrices = allData.commodity_prices || [];\n  const macroPrices = allData.macro_prices || [];\n  \n  // Find current price for this asset\n  let entry = null;\n  const cp = commodityPrices.find(c => c.symbol === r.asset);\n  if (cp) entry = cp.price;\n  if (!entry) {\n    const mp = macroPrices.find(m => m.indicator === r.asset);\n    if (mp) entry = mp.value;\n  }\n  if (!entry) return { json: { skip: true } };\n  \n  const riskPct = stopMap[r.asset] || 3;\n  const rewardPct = riskPct * 2;\n  const dir = r.direction === 'BUY' ? 'long' : 'short';\n  \n  let target, stop;\n  if (dir === 'long') {\n    stop = entry * (1 - riskPct / 100);\n    target = entry * (1 + rewardPct / 100);\n  } else {\n    stop = entry * (1 + riskPct / 100);\n    target = entry * (1 - rewardPct / 100);\n  }\n  \n  // Get regime\n  const regime = allData.regime ? allData.regime.macro_regime : 'unknown';\n  \n  // valid_until based on timeframe\n  const tfDays = { swing: 5, position: 14, long_term: 60 };\n  const days = tfDays[r.timeframe] || 7;\n  const validUntil = new Date(Date.now() + days * 24 * 60 * 60 * 1000).toISOString();\n  \n  return {\n    json: {\n      asset: r.asset,\n      direction: dir,\n      conviction: r.conviction,\n      timeframe: r.timeframe,\n      regime_at_signal: regime,\n      reasoning: r.reasoning,\n      risk_note: r.risk_note,\n      entry_price: entry,\n      target_price: Math.round(target * 1000000) / 1000000,\n      stop_price: Math.round(stop * 1000000) / 1000000,\n      risk_pct: riskPct,\n      reward_pct: rewardPct,\n      valid_until: validUntil\n    }\n  };\n}).filter(i => !i.json.skip);"
+      }
+    },
+    {
+      "id": "pg-signal",
+      "name": "Save Signal",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        1780,
+        -50
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO signals_log (asset, direction, conviction, timeframe, regime_at_signal, reasoning, risk_note, entry_price, target_price, stop_price, risk_pct, reward_pct, valid_until)\nVALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13);",
+        "options": {
+          "queryReplacement": "={{ [$json.asset, $json.direction, $json.conviction, $json.timeframe, $json.regime_at_signal, $json.reasoning, $json.risk_note, $json.entry_price, $json.target_price, $json.stop_price, $json.risk_pct, $json.reward_pct, $json.valid_until] }}"
+        }
+      },
+      "credentials": {
+        "postgres": {
+          "id": "TradingPostgres1",
+          "name": "Trading Postgres"
+        }
+      }
+    },
+    {
+      "id": "pg-perf",
+      "name": "Get Performance",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        220,
+        200
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT context_text FROM performance_context ORDER BY created_at DESC LIMIT 1;",
+        "options": {}
+      },
+      "credentials": {
+        "postgres": {
+          "id": "TradingPostgres1",
+          "name": "Trading Postgres"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Weekday 09:00": {
+      "main": [
+        [
+          {
+            "node": "Gather All Data",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Get Performance",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gather All Data": {
+      "main": [
+        [
+          {
+            "node": "Build AI Prompt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build AI Prompt": {
+      "main": [
+        [
+          {
+            "node": "Claude/Gemini Analysis",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Claude/Gemini Analysis": {
+      "main": [
+        [
+          {
+            "node": "Parse Recommendations",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Recommendations": {
+      "main": [
+        [
+          {
+            "node": "Valid Reco?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Brief": {
+      "main": [
+        [
+          {
+            "node": "Send Daily Brief",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook Test": {
+      "main": [
+        [
+          {
+            "node": "Gather All Data",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Get Performance",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Valid Reco?": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Save Recommendations",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Format Brief",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Build Signal Entry",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Signal Entry": {
+      "main": [
+        [
+          {
+            "node": "Save Signal",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Performance": {
+      "main": [
+        [
+          {
+            "node": "Build AI Prompt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false,
+    "errorWorkflow": "mzrUOgpYW8OVSWGl"
+  },
+  "staticData": {
+    "node:Weekday 09:00": {
+      "recurrenceRules": []
+    }
+  },
+  "meta": null,
+  "pinData": null,
+  "versionId": "ba9bfa9f-9237-4230-9347-d3544de4dbc7",
+  "activeVersionId": "ba9bfa9f-9237-4230-9347-d3544de4dbc7",
+  "versionCounter": 85,
+  "triggerCount": 2,
+  "shared": [
+    {
+      "updatedAt": "2026-04-12T13:30:17.058Z",
+      "createdAt": "2026-04-12T13:30:17.058Z",
+      "role": "workflow:owner",
+      "workflowId": "o4GyBrp2rs4jZ2Y0",
+      "projectId": "PufDuNtXpreUjA3o",
+      "project": {
+        "updatedAt": "2025-12-05T21:25:37.247Z",
+        "createdAt": "2025-11-04T19:43:55.674Z",
+        "id": "PufDuNtXpreUjA3o",
+        "name": "Maksim Parve <maksim@studiokook.ee>",
+        "type": "personal",
+        "icon": null,
+        "description": null,
+        "creatorId": "3462e3d2-f46b-4d98-acea-93ac07713bf5"
+      }
+    }
+  ],
+  "tags": [],
+  "activeVersion": {
+    "updatedAt": "2026-05-05T06:54:41.151Z",
+    "createdAt": "2026-05-05T06:54:41.151Z",
+    "versionId": "ba9bfa9f-9237-4230-9347-d3544de4dbc7",
+    "workflowId": "o4GyBrp2rs4jZ2Y0",
+    "nodes": [
+      {
+        "parameters": {
+          "rule": {
+            "interval": [
+              {
+                "field": "cronExpression",
+                "expression": "0 9 * * 1-5"
+              }
+            ]
+          }
+        },
+        "id": "sched1",
+        "name": "Weekday 09:00",
+        "type": "n8n-nodes-base.scheduleTrigger",
+        "typeVersion": 1.2,
+        "position": [
+          0,
+          0
+        ]
+      },
+      {
+        "parameters": {
+          "operation": "executeQuery",
+          "query": "WITH regime AS (\n  SELECT macro_regime, risk_sentiment, fed_phase, yield_curve_spread, vix_level, dxy_trend, confidence, reasoning\n  FROM regime_state ORDER BY timestamp DESC LIMIT 1\n),\nseasonality AS (\n  SELECT json_agg(json_build_object('asset', asset, 'bias', current_bias, 'avg_return', avg_return, 'win_rate', win_rate)) as signals\n  FROM seasonality_signals WHERE month = EXTRACT(MONTH FROM NOW())\n),\ncot AS (\n  SELECT json_agg(json_build_object('commodity', commodity, 'signal', signal, 'pct_rank', large_spec_pct_rank, 'weekly_change', weekly_change)) as reports\n  FROM cot_reports WHERE report_date > NOW() - INTERVAL '14 days'\n),\ngeo AS (\n  SELECT json_agg(json_build_object('type', event_type, 'description', description, 'impact', impact_level, 'sentiment', sentiment_score, 'assets', affected_assets) ORDER BY timestamp DESC) as events\n  FROM geopolitical_events WHERE timestamp > NOW() - INTERVAL '48 hours' AND impact_level IN ('high', 'critical')\n),\nprices_macro AS (\n  SELECT json_agg(json_build_object('indicator', indicator, 'value', value, 'change', change_pct)) as data\n  FROM (SELECT DISTINCT ON (indicator) indicator, value, change_pct FROM macro_indicators ORDER BY indicator, timestamp DESC) t\n),\nprices_commodity AS (\n  SELECT json_agg(json_build_object('symbol', symbol, 'price', price, 'change', change_24h)) as data\n  FROM (SELECT DISTINCT ON (symbol) symbol, price, change_24h FROM commodity_snapshots ORDER BY symbol, timestamp DESC) t\n)\nSELECT \n  (SELECT row_to_json(r) FROM regime r) as regime,\n  (SELECT signals FROM seasonality) as seasonality,\n  (SELECT reports FROM cot) as cot,\n  (SELECT events FROM geo) as geopolitics,\n  (SELECT data FROM prices_macro) as macro_prices,\n  (SELECT data FROM prices_commodity) as commodity_prices;",
+          "options": {}
+        },
+        "id": "pg1",
+        "name": "Gather All Data",
+        "type": "n8n-nodes-base.postgres",
+        "typeVersion": 2.5,
+        "position": [
+          220,
+          0
+        ],
+        "credentials": {
+          "postgres": {
+            "id": "TradingPostgres1",
+            "name": "Trading Postgres"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "jsCode": "const d = $('Gather All Data').first().json;\n\nlet perfContext = '';\ntry {\n  const perf = $('Get Performance').first().json;\n  if (perf && perf.context_text) {\n    perfContext = `\\n\\n## Track record context\\n${perf.context_text}\\nUse this to calibrate confidence. Do not repeat recently failed patterns.`;\n  }\n} catch(e) {}\n\nconst watchlist = ['GOLD', 'SILVER', 'WTI_OIL', 'NATGAS', 'COPPER', 'SPY', 'QQQ', 'BTC', 'ETH'];\nconst evidence = {\n  regime: d.regime || null,\n  seasonality_count: Array.isArray(d.seasonality) ? d.seasonality.length : 0,\n  cot_count: Array.isArray(d.cot) ? d.cot.length : 0,\n  geopolitics_count: Array.isArray(d.geopolitics) ? d.geopolitics.length : 0,\n  macro_price_count: Array.isArray(d.macro_prices) ? d.macro_prices.length : 0,\n  commodity_price_count: Array.isArray(d.commodity_prices) ? d.commodity_prices.length : 0,\n};\n\nconst prompt = `Ты - риск-ориентированный макро/кросс-актив аналитик Mini-Aladdin. Это информационный бриф, не финансовая рекомендация. Отвечай только валидным JSON на русском.${perfContext}\n\nЦель: не пересказывать сырые данные, а решить, есть ли actionable setup. Если доказательств мало или конфликт факторов сильный - ставь HOLD или NO_TRADE, не выдумывай сделку.\n\n## Evidence coverage\n${JSON.stringify(evidence, null, 2)}\n\n## Current macro regime\n${JSON.stringify(d.regime, null, 2)}\n\n## Seasonality\n${JSON.stringify(d.seasonality, null, 2)}\n\n## COT positioning\n${JSON.stringify(d.cot, null, 2)}\n\n## Geopolitical events\n${JSON.stringify(d.geopolitics, null, 2)}\n\n## Macro prices\n${JSON.stringify(d.macro_prices, null, 2)}\n\n## Commodity prices\n${JSON.stringify(d.commodity_prices, null, 2)}\n\nВерни JSON массив из 1-5 объектов только для лучших сетапов из [${watchlist.join(', ')}].\nСхема:\n[{\n  \"asset\": \"GOLD\",\n  \"direction\": \"BUY|SELL|HOLD|NO_TRADE\",\n  \"conviction\": 1,\n  \"timeframe\": \"swing|position|long_term\",\n  \"reasoning\": \"2-3 коротких факта, почему сейчас\",\n  \"risk_note\": \"что отменяет идею\",\n  \"action\": \"что делать: wait for pullback / monitor / no action / paper trade only\",\n  \"evidence\": [\"regime\", \"cot\", \"seasonality\"]\n}]\n\nПравила:\n- BUY/SELL только при conviction >= 7 и минимум 2 независимых факторах.\n- HOLD/NO_TRADE допустимы и полезны, если setup слабый.\n- Не используй Markdown.\n- Никакого текста вне JSON.`;\n\nreturn [{ json: { prompt, watchlist, evidence, has_data: !!(d.regime || d.seasonality || d.commodity_prices) } }];"
+        },
+        "id": "code1",
+        "name": "Build AI Prompt",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          440,
+          0
+        ]
+      },
+      {
+        "parameters": {
+          "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent",
+          "sendQuery": false,
+          "sendBody": true,
+          "specifyBody": "json",
+          "jsonBody": "={{ JSON.stringify({ contents: [{ parts: [{ text: $json.prompt }] }], generationConfig: { temperature: 0.2, maxOutputTokens: 8192, responseMimeType: \"application/json\" } }) }}",
+          "options": {},
+          "authentication": "genericCredentialType",
+          "genericAuthType": "httpHeaderAuth",
+          "method": "POST"
+        },
+        "id": "http1",
+        "name": "Claude/Gemini Analysis",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          660,
+          0
+        ],
+        "credentials": {
+          "httpHeaderAuth": {
+            "id": "lH0DpGTK2Q79me2I",
+            "name": "Gemini API Key (ARKHOS)"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "jsCode": "const resp = $input.first().json;\nlet text = '';\ntry {\n  text = resp.candidates[0].content.parts[0].text || '';\n} catch(e) {\n  return [{ json: { error: 'No AI response', raw: JSON.stringify(resp).slice(0, 500) } }];\n}\n\ntext = text.replace(/```json|```/g, '').trim();\n\nlet recommendations = [];\ntry {\n  const jsonMatch = text.match(/\\[\\s*\\{[\\s\\S]*\\}\\s*\\]/);\n  recommendations = JSON.parse(jsonMatch ? jsonMatch[0] : text);\n} catch(e) {\n  return [{ json: { error: 'Parse failed', raw: text.slice(0, 500) } }];\n}\n\nconst allowedAssets = new Set(['GOLD', 'SILVER', 'WTI_OIL', 'NATGAS', 'COPPER', 'SPY', 'QQQ', 'BTC', 'ETH']);\nconst allowedDirections = new Set(['BUY', 'SELL', 'HOLD', 'NO_TRADE']);\nconst allowedTimeframes = new Set(['swing', 'position', 'long_term']);\n\nconst cleaned = recommendations\n  .filter(r => r && allowedAssets.has(String(r.asset || '').toUpperCase()))\n  .map(r => ({\n    asset: String(r.asset).toUpperCase(),\n    direction: allowedDirections.has(String(r.direction || '').toUpperCase()) ? String(r.direction).toUpperCase() : 'NO_TRADE',\n    conviction: Math.max(1, Math.min(10, Number(r.conviction) || 1)),\n    timeframe: allowedTimeframes.has(r.timeframe) ? r.timeframe : 'swing',\n    factors: JSON.stringify({ evidence: Array.isArray(r.evidence) ? r.evidence.slice(0, 5) : [] }),\n    reasoning: String(r.reasoning || '').trim(),\n    risk_note: String(r.risk_note || '').trim(),\n    action: String(r.action || '').trim(),\n    valid_until: new Date(Date.now() + 24*60*60*1000).toISOString()\n  }))\n  .filter(r => r.reasoning && r.risk_note)\n  .sort((a, b) => b.conviction - a.conviction)\n  .slice(0, 5);\n\nif (!cleaned.length) {\n  return [{ json: {\n    asset: 'NO_TRADE',\n    direction: 'NO_TRADE',\n    conviction: 1,\n    timeframe: 'swing',\n    factors: JSON.stringify({ evidence: [] }),\n    reasoning: 'Модель не вернула валидных сетапов с достаточной доказательной базой.',\n    risk_note: 'Не открывать новые позиции без ручной проверки графика и ликвидности.',\n    action: 'No action today',\n    valid_until: new Date(Date.now() + 24*60*60*1000).toISOString()\n  } }];\n}\n\nreturn cleaned.map(r => ({ json: r }));"
+        },
+        "id": "code2",
+        "name": "Parse Recommendations",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          880,
+          0
+        ]
+      },
+      {
+        "parameters": {
+          "conditions": {
+            "options": {
+              "version": 2,
+              "leftValue": "",
+              "caseSensitive": true,
+              "typeValidation": "loose"
+            },
+            "conditions": [
+              {
+                "id": "has-asset",
+                "leftValue": "={{ $json.asset }}",
+                "rightValue": "",
+                "operator": {
+                  "type": "string",
+                  "operation": "isNotEmpty",
+                  "singleValue": true
+                }
+              }
+            ]
+          }
+        },
+        "id": "if1",
+        "name": "Valid Reco?",
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 2.2,
+        "position": [
+          1100,
+          0
+        ]
+      },
+      {
+        "parameters": {
+          "operation": "executeQuery",
+          "query": "INSERT INTO recommendations (asset, direction, conviction, timeframe, factors, reasoning, risk_note, valid_until) VALUES ($1, $2, $3, $4, $5::jsonb, $6, $7, $8);",
+          "options": {
+            "queryReplacement": "={{ [$json.asset, $json.direction, $json.conviction, $json.timeframe, $json.factors, $json.reasoning, $json.risk_note, $json.valid_until] }}"
+          }
+        },
+        "id": "pg2",
+        "name": "Save Recommendations",
+        "type": "n8n-nodes-base.postgres",
+        "typeVersion": 2.5,
+        "position": [
+          1320,
+          -50
+        ],
+        "credentials": {
+          "postgres": {
+            "id": "TradingPostgres1",
+            "name": "Trading Postgres"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "jsCode": "const items = $input.all();\nconst allData = $('Gather All Data').first().json;\nconst commodityPrices = allData.commodity_prices || [];\nconst macroPrices = allData.macro_prices || [];\nconst tfMap = { swing: 'дни', position: 'недели', long_term: 'месяцы' };\nconst stopMap = { GOLD: 3, SILVER: 4, WTI_OIL: 3, NATGAS: 5, COPPER: 3, SPY: 2, QQQ: 2, BTC: 5, ETH: 5 };\n\nfunction priceFor(asset) {\n  const cp = commodityPrices.find(c => c.symbol === asset);\n  if (cp && cp.price !== undefined && cp.price !== null) return Number(cp.price);\n  const mp = macroPrices.find(m => m.indicator === asset);\n  if (mp && mp.value !== undefined && mp.value !== null) return Number(mp.value);\n  return null;\n}\n\nfunction fmt(n) {\n  if (n === null || Number.isNaN(n)) return 'n/a';\n  if (Math.abs(n) >= 1000) return n.toFixed(0);\n  if (Math.abs(n) >= 10) return n.toFixed(2);\n  return n.toFixed(4);\n}\n\nconst rows = items.map(i => i.json).sort((a, b) => (b.conviction || 0) - (a.conviction || 0)).slice(0, 5);\nconst lines = rows.map((r) => {\n  const entry = priceFor(r.asset);\n  const riskPct = stopMap[r.asset] || 3;\n  let plan = 'План: наблюдать, без входа.';\n  if ((r.direction === 'BUY' || r.direction === 'SELL') && entry) {\n    const long = r.direction === 'BUY';\n    const stop = long ? entry * (1 - riskPct / 100) : entry * (1 + riskPct / 100);\n    const target = long ? entry * (1 + riskPct * 2 / 100) : entry * (1 - riskPct * 2 / 100);\n    plan = `Entry/ref ${fmt(entry)} | SL ${fmt(stop)} | TP ${fmt(target)} | risk ${riskPct}%`;\n  }\n  return [\n    `${r.direction === 'BUY' ? 'BUY' : r.direction === 'SELL' ? 'SELL' : 'NO TRADE'} ${r.asset} (${r.conviction}/10, ${tfMap[r.timeframe] || r.timeframe})`,\n    `Почему: ${r.reasoning}`,\n    `Действие: ${r.action || plan}`,\n    `Риск: ${r.risk_note}`,\n    plan\n  ].join('\\n');\n}).join('\\n\\n');\n\nconst now = new Date();\nconst days = ['Воскресенье','Понедельник','Вторник','Среда','Четверг','Пятница','Суббота'];\nconst months = ['янв','фев','мар','апр','мая','июн','июл','авг','сен','окт','ноя','дек'];\nconst date = `${days[now.getDay()]}, ${now.getDate()} ${months[now.getMonth()]}`;\nconst msg = `Mini-Aladdin Daily Brief\\n${date}\\n\\n${lines}\\n\\nИнформационный бриф, не финсовет. Перед сделкой: график, ликвидность, размер позиции.`;\nreturn [{ json: { message: msg } }];"
+        },
+        "id": "code3",
+        "name": "Format Brief",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          1320,
+          100
+        ]
+      },
+      {
+        "parameters": {
+          "chatId": "804465999",
+          "text": "={{ $json.message }}",
+          "additionalFields": {
+            "appendAttribution": false
+          }
+        },
+        "id": "tg1",
+        "name": "Send Daily Brief",
+        "type": "n8n-nodes-base.telegram",
+        "typeVersion": 1.2,
+        "position": [
+          1540,
+          100
+        ],
+        "credentials": {
+          "telegramApi": {
+            "id": "TradingTelegramBot",
+            "name": "Trading Bot"
+          }
+        },
+        "webhookId": "6cf9d466-8444-4c7f-a0dd-b139ee276d5c",
+        "disabled": false
+      },
+      {
+        "id": "wh1",
+        "name": "Webhook Test",
+        "type": "n8n-nodes-base.webhook",
+        "typeVersion": 2,
+        "position": [
+          0,
+          200
+        ],
+        "parameters": {
+          "path": "trading-decision-test",
+          "httpMethod": "GET"
+        },
+        "webhookId": "da9b6b4b-0d1f-477e-94f9-e2a620d18472"
+      },
+      {
+        "id": "code-signal",
+        "name": "Build Signal Entry",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          1540,
+          -50
+        ],
+        "parameters": {
+          "jsCode": "const items = $input.all();\nconst stopMap = { 'GOLD': 3, 'SILVER': 4, 'WTI_OIL': 3, 'NATGAS': 5, 'COPPER': 3, 'BRENT_OIL': 3, 'SPY': 2, 'QQQ': 2, 'BTC': 5, 'ETH': 5 };\n\nreturn items.map(item => {\n  const r = item.json;\n  // Get entry price from the gathered data node\n  const allData = $('Gather All Data').first().json;\n  const commodityPrices = allData.commodity_prices || [];\n  const macroPrices = allData.macro_prices || [];\n  \n  // Find current price for this asset\n  let entry = null;\n  const cp = commodityPrices.find(c => c.symbol === r.asset);\n  if (cp) entry = cp.price;\n  if (!entry) {\n    const mp = macroPrices.find(m => m.indicator === r.asset);\n    if (mp) entry = mp.value;\n  }\n  if (!entry) return { json: { skip: true } };\n  \n  const riskPct = stopMap[r.asset] || 3;\n  const rewardPct = riskPct * 2;\n  const dir = r.direction === 'BUY' ? 'long' : 'short';\n  \n  let target, stop;\n  if (dir === 'long') {\n    stop = entry * (1 - riskPct / 100);\n    target = entry * (1 + rewardPct / 100);\n  } else {\n    stop = entry * (1 + riskPct / 100);\n    target = entry * (1 - rewardPct / 100);\n  }\n  \n  // Get regime\n  const regime = allData.regime ? allData.regime.macro_regime : 'unknown';\n  \n  // valid_until based on timeframe\n  const tfDays = { swing: 5, position: 14, long_term: 60 };\n  const days = tfDays[r.timeframe] || 7;\n  const validUntil = new Date(Date.now() + days * 24 * 60 * 60 * 1000).toISOString();\n  \n  return {\n    json: {\n      asset: r.asset,\n      direction: dir,\n      conviction: r.conviction,\n      timeframe: r.timeframe,\n      regime_at_signal: regime,\n      reasoning: r.reasoning,\n      risk_note: r.risk_note,\n      entry_price: entry,\n      target_price: Math.round(target * 1000000) / 1000000,\n      stop_price: Math.round(stop * 1000000) / 1000000,\n      risk_pct: riskPct,\n      reward_pct: rewardPct,\n      valid_until: validUntil\n    }\n  };\n}).filter(i => !i.json.skip);"
+        }
+      },
+      {
+        "id": "pg-signal",
+        "name": "Save Signal",
+        "type": "n8n-nodes-base.postgres",
+        "typeVersion": 2.5,
+        "position": [
+          1780,
+          -50
+        ],
+        "parameters": {
+          "operation": "executeQuery",
+          "query": "INSERT INTO signals_log (asset, direction, conviction, timeframe, regime_at_signal, reasoning, risk_note, entry_price, target_price, stop_price, risk_pct, reward_pct, valid_until)\nVALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13);",
+          "options": {
+            "queryReplacement": "={{ [$json.asset, $json.direction, $json.conviction, $json.timeframe, $json.regime_at_signal, $json.reasoning, $json.risk_note, $json.entry_price, $json.target_price, $json.stop_price, $json.risk_pct, $json.reward_pct, $json.valid_until] }}"
+          }
+        },
+        "credentials": {
+          "postgres": {
+            "id": "TradingPostgres1",
+            "name": "Trading Postgres"
+          }
+        }
+      },
+      {
+        "id": "pg-perf",
+        "name": "Get Performance",
+        "type": "n8n-nodes-base.postgres",
+        "typeVersion": 2.5,
+        "position": [
+          220,
+          200
+        ],
+        "parameters": {
+          "operation": "executeQuery",
+          "query": "SELECT context_text FROM performance_context ORDER BY created_at DESC LIMIT 1;",
+          "options": {}
+        },
+        "credentials": {
+          "postgres": {
+            "id": "TradingPostgres1",
+            "name": "Trading Postgres"
+          }
+        }
+      }
+    ],
+    "connections": {
+      "Weekday 09:00": {
+        "main": [
+          [
+            {
+              "node": "Gather All Data",
+              "type": "main",
+              "index": 0
+            },
+            {
+              "node": "Get Performance",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Gather All Data": {
+        "main": [
+          [
+            {
+              "node": "Build AI Prompt",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Build AI Prompt": {
+        "main": [
+          [
+            {
+              "node": "Claude/Gemini Analysis",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Claude/Gemini Analysis": {
+        "main": [
+          [
+            {
+              "node": "Parse Recommendations",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Parse Recommendations": {
+        "main": [
+          [
+            {
+              "node": "Valid Reco?",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Format Brief": {
+        "main": [
+          [
+            {
+              "node": "Send Daily Brief",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Webhook Test": {
+        "main": [
+          [
+            {
+              "node": "Gather All Data",
+              "type": "main",
+              "index": 0
+            },
+            {
+              "node": "Get Performance",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Valid Reco?": {
+        "main": [
+          [],
+          [
+            {
+              "node": "Save Recommendations",
+              "type": "main",
+              "index": 0
+            },
+            {
+              "node": "Format Brief",
+              "type": "main",
+              "index": 0
+            },
+            {
+              "node": "Build Signal Entry",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Build Signal Entry": {
+        "main": [
+          [
+            {
+              "node": "Save Signal",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Get Performance": {
+        "main": [
+          [
+            {
+              "node": "Build AI Prompt",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "authors": "Maksim Parve",
+    "name": null,
+    "description": null,
+    "autosaved": false,
+    "workflowPublishHistory": [
+      {
+        "createdAt": "2026-05-05T06:54:41.201Z",
+        "id": 1119,
+        "workflowId": "o4GyBrp2rs4jZ2Y0",
+        "versionId": "ba9bfa9f-9237-4230-9347-d3544de4dbc7",
+        "event": "deactivated",
+        "userId": "3462e3d2-f46b-4d98-acea-93ac07713bf5"
+      },
+      {
+        "createdAt": "2026-05-05T06:54:41.218Z",
+        "id": 1120,
+        "workflowId": "o4GyBrp2rs4jZ2Y0",
+        "versionId": "ba9bfa9f-9237-4230-9347-d3544de4dbc7",
+        "event": "activated",
+        "userId": "3462e3d2-f46b-4d98-acea-93ac07713bf5"
+      }
+    ]
+  }
+}

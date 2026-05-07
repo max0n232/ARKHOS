@@ -1,0 +1,272 @@
+---
+title: BG1 — L-corner module architecture (Sven's standard, 90% of projects)
+type: reference
+project: easykitchen
+created: 2026-04-26
+status: verified
+parent: "[[10-Projects/3D-Configurators/easykitchen/_index]]"
+tags: [easykitchen, sketchup, corner, BG1, layout]
+---
+
+# BG1 — L-corner module architecture
+
+Verified 2026-04-26 by loading `BG1.skp` через MCP, redraw, измерение child-positions. **Главный угловой модуль** — Sven использует ~90% случаев (BF2A 900×900 — только 2%).
+
+Файл: `C:/Users/sorte/Desktop/Новая папка/EasyKitchen/EasyKitchen/EasyKitchen/2 Нижние шкафы/BG1.skp`
+
+## Bbox and dimensions
+
+| Параметр | Native def | После apply_ek_height (laminate, 900) |
+|---|---|---|
+| lenx (X) | 950mm (hardcoded, no formula) | 950 (без изменений) |
+| leny (Y) | 670mm (`a100+x202+x203` cascade) | 670 |
+| lenz (Z) | 820mm (literal, NO formula) | 862 (forced via formula) |
+| e102 (legs) | 100mm default → 92 после cascade | 92 |
+| Carcass | 728mm (820-92) | 770 (862-92) ✓ |
+
+**Critical**: BG1 def has `_lengthunits=CENTIMETERS`, formulas in cm. `lenz=820` зашит как литерал — без `apply_ek_height` высота НЕ совпадает с BD1 (770 carcass standard). `apply_ek_height(inst, countertop_profile:, target_top_mm:)` форсит `lenz` и `e102` через `dc.set_attribute_formula` синхронно — иначе ломается cascade фасадов.
+
+## Internal layout (def-local axes)
+
+```
+        Y=670 ─────────────── (back wall, PANEL_F)
+        │                  │
+        │   [BLIND]       │  ← LEFT half (X=0..500): inaccessible
+        │                  │
+   X=0  │ PANEL_V_L───────│   ← X=500: vertical step
+        │ Y=84..100       │
+        │  ╲              │
+        │  BLEND1#1       │  ← diagonal step at corner
+        │   ╲ BLEND1      │
+        │    ╲            │
+        │     FACADE1     │  ← X=492..950: door (diagonal)
+        │     Y=38..120   │
+        Y=0 ──────────────  
+              X=950
+```
+
+### Key children (world coords after spawn at origin)
+
+| Component | World X (mm) | World Y (mm) | World Z (mm) | Role |
+|---|---|---|---|---|
+| PANEL_V_CUT_L#9 | [0, 16] | [100, 670] | [92, 862] | Left side wall |
+| PANEL_V_CUT_L#8 | [934, 950] | [100, 670] | [92, 862] | Right side wall |
+| PANEL_F#34 | [0, 950] | [654, 670] | [92, 862] | Back wall |
+| PANEL_G_CUT#12 | [0, 950] | [100, 670] | [92, 108] | Bottom (Дно) |
+| PANEL_G_CUT#11 | [0, 950] | [550, 650] | [846, 862] | Top crossbeam |
+| PANEL_V_L | [0, 500] | [84, 100] | [92, 862] | **Mating panel** (joint to W row) |
+| PANEL_V#10 | [0, 16] | [41, 100] | [92, 862] | Front-left pillar |
+| PANEL_V#9 | [484, 500] | [41, 100] | [92, 862] | Pillar at diagonal start |
+| BLEND1 | [500, 559] | [81, 100] | [92, 862] | Diagonal connector (flat) |
+| BLEND1#1 | [500, 519] | [41, 100] | [92, 862] | Diagonal post |
+| FACADE1#13 | [492.5, 950] | [38, 119.6] | [92, 862] | **Diagonal door** (45°, ~458mm wide) |
+
+## Sven-convention placement
+
+Walls at X=0 (W) and Y=0 (N), cabinets occupy -Y/+X half-plane.
+
+```ruby
+EkRealCompose.place_l_corner(
+  module_key: 'BG1',
+  countertop_profile: :laminate,
+  target_top_mm: 900,
+  model: model
+)
+# Internally:
+#   1. Spawn BG1 at temp at_mm=[-10000, -10000, 0], rot=0, redraw
+#   2. apply_ek_height (lenz=862, e102=92)
+#   3. anchor_to(x_min: 0, y_max: 0, z_min: 0)
+# Result world bbox: X=[0, 950], Y=[-670, 0], Z=[0, 862]
+#   • Back (def Y=670) → world Y=0  (touches N wall ✓)
+#   • Left (def X=0) → world X=0  (touches W wall ✓)
+#   • Door (def Y=0..120, X=492..950) → world Y=-670..-550, X=492..950 (faces -Y room ✓)
+```
+
+After placement, perpendicular rows continue:
+- **North row**: from `x_start_mm = corner.bounds.width.to_mm` (= 950) → +X direction
+- **West row**: from `y_top_mm = -corner.bounds.height.to_mm` (= -670) → -Y direction (rotated +90 CCW)
+
+## Asymmetry notes
+
+- **Width 950 ≠ depth 670**: BG1 occupies different lengths on each wall
+- North wall consumed by BG1: 950mm (left of N row starts at X=950)
+- West wall consumed by BG1: 670mm (top of W row starts at Y=-670)
+- This means N-row first cabinet sits 280mm "deeper" than W-row first cabinet relative to corner symmetry — by design
+
+## Hidden internal structure
+
+BG1's LEFT half (X=[0, 500]) is **blind** — closed off by PANEL_V_L (vertical mating panel at front Y=84..100). This blind volume:
+- Is NOT accessible through the diagonal door (door only opens to right half)
+- Acts as connector zone with the perpendicular row (W row's first cab back-meets BG1's PANEL_V_L)
+- In some EK projects, slug-pull mechanisms (carousel, magic corner) install here — separate hardware, not part of BG1 def
+
+## Параметры стыковки (k143/k144/k145/k146/k147)
+
+UI группа "Стыковка с примыкающим рядом" — управляет шириной mating zone и блендами.
+
+| Param | Default | Назначение | Где влияет |
+|---|---|---|---|
+| **k143** | 500mm | Общая ширина стыковки (зона panel + blend) | PANEL_V_L.lenx, FACADE1.lenx, BLEND1 origin |
+| **k144** | 500mm | Ширина панели стыковки (PANEL_V_L) | PANEL_V_L.lenx (при k147=1) |
+| **k145** | 40mm | Ширина бленды прямой (диагональ) | BLEND1.lenx |
+| **k146** | 40mm | Ширина бленды боковой (front pillar) | BLEND1#1.lenx |
+| **k147** | 1 | Позиция: 1=Внешняя / 2=Внутренняя | Selector, переключает CHOOSE-формулы |
+
+### Ключевые формулы зависимости
+
+```
+PANEL_V_L.leny    = CHOOSE(k147, k144, k143+k145+...)   # k147=1 → leny = k144
+BLEND1.lenx       = k143 − k144 + k145 + d101            # diagonal blend extends if k143>k144
+FACADE1.lenx      = z201 − k143 − k145 − a101            # diagonal door SHORTENS as k143 grows
+```
+
+### Инвариант (Sven convention)
+
+**`k143 = k144 = глубина_каркаса_примыкающего_ряда`**
+
+Для EK-стандарта глубина каркаса = **570mm** → k143=k144=570.
+
+⚠️ **Ключевое различие**: глубина каркаса (570mm) ≠ глубина bbox (670mm). Bbox включает 100mm front-zone (фасад + зазор + сама мати-панель). Стыковка идёт **по каркасу**, поэтому k143 = 570, не 670.
+
+- Default 500mm не подходит — мати-панель короче каркаса.
+- 670 (bbox) — тоже неверно, мати-панель залезла бы в зону фасада W-ряда.
+- При k143 > k144 — диагональная бленда удлиняется на разницу (для нестандартных стыков).
+
+### Verified изменение (2026-04-26)
+
+| Component | k143=500 (default) | k143=570 (правильно) |
+|---|---|---|
+| PANEL_V_L | X=[0, 500] | X=[0, 570] |
+| BLEND1 | X=[500, 559] | X=[570, 629] |
+| FACADE1 (диаг.) | X=[492.5, 950] = 458mm | X=[562.5, 950] = 387.5mm |
+
+### Helper
+
+```ruby
+EkRealCompose.apply_corner_mating(bg1_inst, depth_mm: 570, position: :external)
+# Or via place_l_corner:
+EkRealCompose.place_l_corner(module_key: 'BG1', mating_depth_mm: 570, ...)
+```
+
+## Зазор blend↔carcass (FIX 2026-04-26)
+
+⚠️ **Недоработка разработчика EK**: модульного параметра для зазора между блендами и каркасом нет. d106 (3mm) пропагируется только во FACADE1 (`x202=d106` внутри def), но не в BLEND1/BLEND1#1.
+
+В UI это решалось вручную "отступами" в Component Options. Library-level fix — модификация формул `_y_formula` на child-инстансах внутри BG1 def.
+
+### Ключевое открытие: instance AD vs def AD
+
+DC-движок хранит position-формулы в **двух местах**:
+
+| Место | Ключи | Роль |
+|---|---|---|
+| `child.definition.attribute_dictionary('dynamic_attributes')` | `_inst__y_formula` | **TEMPLATE** (используется при создании НОВЫХ instance) |
+| `child.attribute_dictionary('dynamic_attributes')` | `_y_formula` | **АКТИВНАЯ** формула текущего инстанса |
+
+При `redraw_with_undo` пересчитывается `_y_formula` инстанса, **не** def template. Чтобы изменить позицию существующего child'а — модифицировать **instance AD** через `dc.set_attribute_formula(child_inst, 'y', new_formula)`.
+
+### Применённый fix
+
+```ruby
+# BLEND1 instance
+old: CHOOSE(a102, parent!z102 - CHOOSE(parent!y102,0,parent!y103), CURRENT("Y")*2.54)
+new: CHOOSE(a102, parent!z102 - CHOOSE(parent!y102,0,parent!y103) - parent!d106, CURRENT("Y")*2.54)
+
+# BLEND1#1 instance
+old: CHOOSE(a102, parent!z102 - CHOOSE(parent!a103,LenX,0) - CHOOSE(parent!y102,0,parent!y103*2), CURRENT("Y")*2.54)
+new: CHOOSE(a102, parent!z102 - CHOOSE(parent!a103,LenX,0) - CHOOSE(parent!y102,0,parent!y103*2) - parent!d106, CURRENT("Y")*2.54)
+```
+
+### Verified эффект (d106=3mm)
+
+| Component | Y before fix | Y after fix | Δ |
+|---|---|---|---|
+| BLEND1 (диагональ) | [-589, -570] | [-592, -573] | -3mm ✓ |
+| BLEND1#1 (боковой) | [-629, -570] | [-632, -573] | -3mm ✓ |
+| FACADE1 outer | -632 | -632 | 0 (имел internal d106) |
+
+Ключ: BLEND1#1 outer Y=-632 теперь совпадает с FACADE1 outer Y=-632 → бленда и фасад в одной плоскости.
+
+### Файлы
+
+- `BG1.skp` сохранён через `defn.save_as(path)` → fix permanent в библиотеке
+- Backup: `BG1_BACKUP_20260426-153934.skp` (1.16MB) — на всякий случай
+- При свежем `model.definitions.load(BG1.skp)` fix автоматически загружается с инстансами
+
+## Cascade hooks
+
+BG1's leny is parametric: `leny = a100 + x202 + x203` где:
+- `a100 = mm!a1002` (carcass depth, from main menu)
+- `x202 = mm!a1005` (corner extension 1)
+- `x203 = mm!a1006` (corner extension 2)
+
+Default values: 500 + 50 + 100 = 650mm net (or 670 after a100=520 cascade variant).
+
+`lenx` is **hardcoded** at 950mm — width не cascade'ится из главного меню. Для нестандартной ширины (например, Sven 1177mm) нужен другой def-вариант (BG1_ST?) или ручное переопределение.
+
+## Two attachment axes (verified 2026-04-27)
+
+Угловые модули BG1 имеют **две независимые оси привязки**:
+
+| Ось | Формула | Значение | Назначение |
+|---|---|---|---|
+| **main_frame** | `leny = a100+x202+x203` | 670мм | Габарит модуля (Y-bbox), стыковка с **родительским рядом** (N-row). Совпадает с глубиной обычных шкафов BD1 (671мм) для визуальной непрерывности |
+| **bind_front** | `a100+d106+d101+k146` | 632мм | Ось стыковки **перпендикулярного ряда** (W-row). Имеет прямую зависимость от `d106` (Смещение фасада по Y) |
+
+### Дочерние формулы для bind_front (verified 2026-04-27)
+
+```
+# В BG1 def:
+_bind_front_formula = "a100+d106+d101+k146"
+_bind_front_label   = "bind_front"
+_bind_front_access  = "VIEW"
+
+# Визуальная рамка bind_front (внутри MAINFRAME → bind_front def):
+_inst__y_formula = "parent!x203-parent!k146-parent!d101-parent!d106"
+
+# MAINFRAME должен пропагировать d106 от BG1:
+_d106_formula = "parent!d106"
+```
+
+**Корень бага**: bind_front ось не учитывала d106 (смещение фасада на 3мм). MAINFRAME не пропагировал d106 из BG1. Без этого `parent!d106` в формуле bind_front возвращал nil.
+
+### Stamping / placing BG1 fresh
+
+⚠️ **НЕ оверрайдить EK-параметры на инстансе** — это ломает каскад от Главного меню.
+
+Правильный способ:
+
+```ruby
+# 1. Главное меню уже размещён в сцене с нужными параметрами проекта
+# 2. Загрузить BG1 def
+defn = model.definitions.load("#{EDITED}/BG1.skp")
+inst = model.entities.add_instance(defn, transform)
+
+# 3. Очистить кэшированные value keys, которые мешают cascade
+inst_dict = inst.attribute_dictionary('dynamic_attributes')
+def_dict  = defn.attribute_dictionary('dynamic_attributes')
+inst_dict.each_pair do |k, v|
+  next if k.to_s.start_with?('_')
+  f = def_dict["_#{k}_formula"]
+  inst_dict.delete_key(k) if f.is_a?(String) && f =~ /mm!|parent!/
+end
+
+# 4. Redraw — формулы a100, d106, k143-k147 пересчитаются от mm!aXXXX (Главное меню)
+$dc_observers.get_latest_class.redraw_with_undo(inst)
+```
+
+Если нужны другие размеры — менять параметры в Главном меню, не на инстансе.
+
+## См. также
+
+- [[sven-project-patterns]] — общая Sven-конвенция layout
+- [[real-bd1-architecture]] — BD1 для сравнения cascade
+- `~/Desktop/easykitchen/scripts/ek_real_compose.rb` — `place_l_corner`, `l_kitchen`
+- `~/Desktop/easykitchen/scripts/ek_demo_l_kitchen.rb` — демо L-кухни с нуля
+
+
+## Related
+<!-- auto-generated by vault-graph-builder 2026-05-03 -->
+- [[10-projects/3d-configurators/easykitchen/kitchen-build-checklist]]
+- [[10-projects/3d-configurators/easykitchen/tg1-architecture]]
+- [[10-projects/3d-configurators/easykitchen/agent-playbook]]

@@ -1,0 +1,630 @@
+## Zone.ee Staging Gotchas (2026-04-01)
+
+- **GOTCHA — Zone.ee субдомен провижнинг с задержкой**: staging каталог не создаётся мгновенно после создания субдомена. DocumentRoot (`…/www.{domain}/{subdomain}/`) провижнится с задержкой — нужно ждать и проверять через список поддоменов в панели Zone.ee (не через SSH/curl). <!-- decay:2026-04-01 tier:cold rel:0.505 -->
+
+- **GOTCHA — Zone.ee MySQL привилегии не сохраняются без явного подтверждения**: после выдачи привилегий пользователю MySQL обязательно нажимать **«select all»** + **«изменить доступ»** — без явного сохранения привилегии не применяются. Симптом: пользователь создан, но `SELECT` на БД не работает. <!-- decay:2026-04-01 tier:cold rel:0.505 -->
+
+- **GOTCHA — Zone.ee субдомен как подпапка**: DocumentRoot субдомена = `…/www.{domain}/{subdomain}/`, а не отдельный каталог. Пример: `staging.studiokook.ee` → `/data01/…/www.studiokook.ee/staging/`. <!-- decay:2026-04-01 tier:cold rel:0.505 -->
+
+---
+tags: [studiokook, infrastructure, wordpress]
+aliases: [Zone.ee, Seraphinite cache, Yoast SEO, hreflang config, NGG gallery, Code Snippet, dependency map, plugin versions]
+project: studiokook
+source: Desktop/Studiokook/.claude/skills/wordpress/projects/studiokook/INFRASTRUCTURE.md
+updated: 2026-03-29
+---
+
+# ИНФРАСТРУКТУРА WP: studiokook.ee
+
+**Версия документа:** 1.1
+**Дата:** 26 февраля 2026 (обновлено после SEO-аудита)
+**Назначение:** Карта инфраструктуры для безопасного внесения изменений. Читать перед ЛЮБЫМИ правками.
+
+---
+
+## 1. СЕРВЕР И ХОСТИНГ
+
+| Параметр | Значение |
+|----------|---------|
+| Хостинг | Zone.ee (shared hosting) |
+| Панель | https://my.zone.eu/hosting/103930 |
+| PHP | 8.2 |
+| DocumentRoot | `/data01/virt103578/domeenid/www.studiokook.ee/htdocs` |
+| FTP root | `/htdocs/` (chroot в корень домена) |
+| FTP host | `studiokook.ee` (НЕ ftp.zone.ee) |
+| FTP user | `d103930f913161` |
+| SSL | Let's Encrypt R13, до 03.04.2026 |
+| WAF | Отключен |
+| SSH | Раздел есть в панели, но не настроен |
+| WordPress | 6.9.4 |
+| URL сайта | https://studiokook.ee |
+| Permalink | `/%postname%/` |
+| Язык WP-admin | `ru_RU` |
+
+### FTP-структура корня
+
+```
+/htdocs/           ← DocumentRoot
+  ├── wp-admin/
+  ├── wp-content/
+  ├── wp-includes/
+  ├── robots.txt       ← Физический файл (заменён 13.02.2026)
+  ├── sitemap_index.xml ← Генерируется Yoast SEO
+  ├── wp-config.php
+  ├── .htaccess
+  ├── googlea8afd0d1a93c3611.html  ← верификация Google
+  ├── yandex_9e06327fd9111e0c.html ← верификация Yandex
+  ├── pinterest-2c34f.html         ← верификация Pinterest
+  ├── it-api.php                   ← кастомный API endpoint (назначение: уточнить)
+  ├── RUN_ONCE_check_hreflang.php  ← одноразовый скрипт проверки hreflang
+  └── old/                         ← старые файлы (уточнить содержимое)
+```
+
+---
+
+## 2. ТЕМА
+
+| Параметр | Значение |
+|----------|---------|
+| Активная тема | **Astra** (бесплатная) |
+| Child theme | Нет |
+| Запасная тема | Twenty Twenty-Five |
+
+**ВНИМАНИЕ:** Нет child theme. Обновление Astra может перезаписать кастомизации если они сделаны в файлах темы. Все кастомные CSS/JS должны идти через WPCode или Code Snippets.
+
+---
+
+## 3. ПЛАГИНЫ (29 установлено, 28 активных)
+
+### Критические (влияют на контент и SEO)
+
+| Плагин | Версия | Роль | Зависимости |
+|--------|--------|------|-------------|
+| **[[TranslatePress]] - Multilingual** | 2.7.4 | Мультиязычность (ET/RU/EN/FI) | [[TranslatePress]] - Business |
+| **[[TranslatePress]] - Business** | 1.3.8 | Расширение TP: доп. языки, SEO Pack | Зависит от [[TranslatePress]] |
+| **Yoast SEO** | 26.3 | SEO: title, meta, sitemap, Schema, hreflang | - |
+| **Elementor** | 3.25.11 | Page builder: главная, материалы, фурнитура | Xpro Addons, AI Addons, Sticky Header, Unlimited Elements |
+| **NextGEN Gallery** | 3.59.3 | Галереи фасадов и столешниц | NextGEN Pro, NGG Alt Text Updater, NGG MCP Abilities |
+| **NextGEN Pro** | 3.31.2 | Pro-функции галереи | Зависит от NextGEN Gallery |
+
+### Контактные формы
+
+| Плагин | Версия | Роль |
+|--------|--------|------|
+| Contact Form 7 | 6.1.3 | Формы обратной связи |
+| CF7 + Telegram | 0.10.0 | Пересылка заявок в Telegram |
+| Drag & Drop File Upload for CF7 | 1.3.9.2 | Загрузка файлов через формы |
+| Flamingo | 2.6 | Хранение заявок из CF7 в БД |
+
+### Elementor экосистема
+
+| Плагин | Версия | Роль |
+|--------|--------|------|
+| Elementor | 3.25.11 | Основной билдер |
+| AI Addons for Elementor | 2.2.1 | AI-виджеты |
+| Xpro Elementor Addons | 1.4.6.1 | Доп. виджеты |
+| Xpro Elementor Theme Builder | 1.2.8.2 | Header/Footer конструктор |
+| Unlimited Elements | 1.5.131 | Доп. виджеты HTML/CSS/JS |
+| Sticky Header Effects | 1.7.3 | Sticky header при скролле |
+
+### Утилиты
+
+| Плагин | Версия | Роль |
+|--------|--------|------|
+| Site Kit от Google | 1.171.0 | GA + GSC в WP-admin |
+| WPCode Lite | 2.3.1 | Сниппеты кода (header/footer) |
+| Code Snippets | 3.9.4 | PHP-сниппеты |
+| Better Search Replace | 1.4.10 | Поиск/замена в БД |
+| Серафинит Акселератор | 2.22.14 (Premium) | Кеширование, оптимизация скорости |
+| Диспетчер файлов WP | 8.0 | Файл-менеджер в WP-admin |
+| WordPress Importer | 0.8.3 | Импорт контента |
+| Kadence Blocks | 3.4.0 | Gutenberg-блоки |
+
+### Кастомные / CLI-созданные
+
+| Плагин | Версия | Роль | Статус |
+|--------|--------|------|--------|
+| Abilities API | 0.4.0 | Framework для AI abilities | Активен |
+| MCP Adapter | 0.4.1 | MCP tools из Abilities API | Активен |
+| NGG Alt Text Updater | 1.0 | Обновление alt через REST API | Активен |
+| NGG Alt Text Updater v2 | 2.0 | То же, relaxed permissions | **НЕАКТИВЕН** |
+| NGG MCP Abilities | 2.1.0 | MCP управление NGG | Активен |
+
+### WPCode сниппеты (все НЕАКТИВНЫ)
+
+| Название | Назначение |
+|----------|-----------|
+| 08-early-title-override.php | Перезапись title (отключен) |
+| 02-fix-canonical-urls.php | Фикс [[technical-seo|canonical URL]] (отключен) |
+| Focus_keywords | Фокусные ключевые слова (отключен) |
+| facebook | Facebook интеграция (отключен) |
+
+### Code Snippets (критические активные)
+
+| # | Название | Назначение | Статус |
+|---|----------|-----------|--------|
+| 105 | SK FAQ + SEO Enhancements | FAQPage schema, meta descriptions, ImageObject translations | **Активен** |
+| 259 | SK Service Schema | Service schema с provider → #business | **Активен** |
+| 285 | Schema.org LocalBusiness + Service Markup | LocalBusiness (#business) — единый источник NAP | **Активен** |
+
+**КРИТИЧЕСКИ ВАЖНО:** Snippet #285 — единственный источник адреса/NAP для всей Schema. При изменении контактов менять здесь + строки описания в #105.
+
+### Code Snippets (неактивные / служебные)
+
+| Название | Назначение |
+|----------|-----------|
+| SK hreflang x-default fix | Фикс x-default hreflang |
+| Read Debug Option | Отладка |
+| Write MU Plugin File | Запись MU plugin |
+| Flush Rewrite Rules | Сброс permalink rules |
+
+---
+
+## 4. МУЛЬТИЯЗЫЧНОСТЬ ([[TranslatePress]])
+
+### Настройки
+
+| Параметр | Значение |
+|----------|---------|
+| Плагин | [[TranslatePress]] Business 1.3.8 + Multilingual 2.7.4 |
+| Основной язык | **Эстонский (et)** |
+| Доп. языки | Русский (ru-RU), Английский (en-GB), Финский (fi) |
+| URL-схема | `/` = ET, `/ru/` = RU, `/en/` = EN, `/fi/` = FI |
+| Переводы | Хранятся в БД (таблица `wp_trp_*`) |
+| Доступ к настройкам | Только администратор (текущий user `admin` не имеет доступа к настройкам TP!) |
+
+### Как работают переводы
+
+[[TranslatePress]] перехватывает HTML-вывод страницы и подставляет переводы из БД. Оригинальный контент — на эстонском (в WordPress posts/pages). Переводы хранятся отдельно в таблицах `wp_trp_*`.
+
+**КРИТИЧЕСКИ ВАЖНО для CLI:**
+- НЕ менять контент в WP-редакторе для перевода — это изменит оригинал (ET) <!-- decay:2026-04-01 tier:cold rel:0.505 -->
+- Переводы редактируются ТОЛЬКО через [[TranslatePress]] visual editor или REST API <!-- decay:2026-04-01 tier:cold rel:0.505 -->
+- Если CLI меняет HTML-структуру страницы, переводы могут "отвалиться" (TP привязывается к конкретным строкам) <!-- decay:2026-04-01 tier:cold rel:0.505 -->
+- Галереи NextGEN генерируют HTML динамически — TP может не перехватить все элементы <!-- decay:2026-04-01 tier:cold rel:0.505 -->
+
+### hreflang (текущая реализация, проверено 27.02.2026)
+
+Генерируется [[TranslatePress]] SEO Pack автоматически. На каждой странице 5 тегов без дубликатов:
+
+```html
+<link rel="alternate" hreflang="x-default" href="https://studiokook.ee/..." />
+<link rel="alternate" hreflang="et" href="https://studiokook.ee/..." />
+<link rel="alternate" hreflang="ru" href="https://studiokook.ee/ru/..." />
+<link rel="alternate" hreflang="fi" href="https://studiokook.ee/fi/..." />
+<link rel="alternate" hreflang="en" href="https://studiokook.ee/en/..." />
+```
+
+Настройка `trp_advanced_settings.hreflang_remove_locale = remove_country_locale` активна — убирает дубли `ru-RU`/`en-GB`.
+
+---
+
+## 5. SEO (Yoast SEO)
+
+| Параметр | Значение |
+|----------|---------|
+| Плагин | Yoast SEO 26.3 (бесплатный) |
+| Sitemap | https://studiokook.ee/sitemap_index.xml (авто) |
+| Schema | WebPage, BreadcrumbList, WebSite (Yoast авто) + LocalBusiness, Service, FAQPage (кастом) |
+| Title separator | `|` |
+| Search engine visibility | **НЕ заблокировано** (blog_public = 1) |
+| Site Kit | Подключен (Google Analytics + Search Console) |
+
+### Schema.org архитектура (после аудита 26.02.2026)
+
+На главной странице 3 блока кастомной Schema:
+
+**1. LocalBusiness (Code Snippet #285)**
+- `@type`: LocalBusiness <!-- decay:2026-04-01 tier:cold rel:0.505 -->
+- `@id`: `https://studiokook.ee/#business` <!-- decay:2026-04-01 tier:cold rel:0.505 -->
+- Адрес: Paldiski mnt 21, Tallinn, 10137, EE <!-- decay:2026-04-01 tier:cold rel:0.505 -->
+- Email: julia@studiokook.ee <!-- decay:2026-04-01 tier:cold rel:0.505 -->
+- Телефон: +372 55 525 143 <!-- decay:2026-04-01 tier:cold rel:0.505 -->
+- Рабочие часы: Mon-Fri 09:00-18:00 <!-- decay:2026-04-01 tier:cold rel:0.505 -->
+
+**2. Service (mu-plugin studiokook-seo.php, секция 5)**
+- `@type`: Service <!-- decay:2026-04-01 tier:cold rel:0.505 -->
+- `provider`: ссылка на `#business` через `@id` <!-- decay:2026-04-01 tier:cold rel:0.505 -->
+- Не содержит адрес напрямую — берёт из LocalBusiness <!-- decay:2026-04-01 tier:cold rel:0.505 -->
+
+**3. FAQPage (Code Snippet #105)**
+- `@type`: FAQPage <!-- decay:2026-04-01 tier:cold rel:0.505 -->
+- 10 вопросов/ответов с переводами ET/RU/EN/FI <!-- decay:2026-04-01 tier:cold rel:0.505 -->
+- Включает контактные описания с адресом для каждого языка <!-- decay:2026-04-01 tier:cold rel:0.505 -->
+
+**ВАЖНО:** Единый источник NAP — Snippet #285. Service schema ссылается на `#business` по `@id`. При смене адреса/контактов — менять в #285 + контактные строки в #105.
+
+### Yoast REST API
+
+- Yoast REST API is **read-only** by default — no native POST/PUT for `_yoast_wpseo_*` <!-- decay:2026-04-01 tier:cold rel:0.505 -->
+- **Fix:** `register_post_meta()` in `studiokook-seo.php` mu-plugin makes fields writable via `wp/v2/pages` <!-- decay:2026-04-01 tier:cold rel:0.505 -->
+- Alternative: `sk/v1/update-seo` endpoint (snippet #205), supports `lang` param <!-- decay:2026-04-01 tier:cold rel:0.505 -->
+- Pattern: always use file payloads for non-ASCII (`curl -d @file.json`) <!-- decay:2026-04-01 tier:cold rel:0.505 -->
+
+### Yoast @graph
+
+Yoast генерирует автоматически: WebSite, WebPage, BreadcrumbList, ImageObject. Кастомные блоки (LocalBusiness, Service, FAQPage) добавляются через Code Snippets и mu-plugin.
+
+---
+
+## 6. СТРАНИЦЫ (30 шт)
+
+### Опубликованные страницы
+
+| ID | Slug | Название | Builder | Примечание |
+|----|------|---------|---------|-----------|
+| 8 | `/` (avaleht) | Главная | Elementor | Главная страница сайта |
+| - | `/koogid/` | Галерея кухонь | Elementor | Портфолио |
+| - | `/koogid-eritellimusel/` | Кухни на заказ | Gutenberg | Основная коммерческая |
+| - | `/valmistamine/` | Производство | Elementor | О процессе |
+| 2530 | `/materjalid/` | Материалы | Elementor | Обзор материалов |
+| 2706 | `/meie-furnituur/` | Фурнитура | Elementor | BLUM фурнитура |
+| 2776 | `/toopinnad/` | Столешницы (Töötasapinnad) | Elementor | Slug изменён с meie-toopinnad, WP 301-redirect работает |
+| - | `/kontakt/` | Контакты | Gutenberg | + Schema FurnitureStore + FAQ |
+| - | `/blogi/` | Блог | - | Архив записей |
+| - | `/hinnaparing/` | Ценовой запрос | - | Форма |
+| - | `/koogimoobli-valmistamine/` | Изготовление мебели | - | Доп. страница |
+
+### Фасады (новые страницы)
+
+| ID | Slug | Название | Builder | Примечание |
+|----|------|---------|---------|-----------|
+| 5800 | `/fassaadid/` | Фасады | Gutenberg | Родительская страница |
+| 6309 | `/fassaadid/egger-fassaadid/` | EGGER фасады | Gutenberg | Каталог декоров EGGER |
+| 5802 | `/fassaadid/egger/` | Egger (столешницы?) | Gutenberg | Уточнить отличие от 6309 |
+| - | `/fassaadid/fenix/` | Fenix | Gutenberg | Фасады Fenix NTM |
+
+### Столешницы (новые страницы)
+
+| ID | Slug | Название | Builder |
+|----|------|---------|---------|
+| 6291 | Дочерняя | Kivi (камень) | Gutenberg |
+| 6295 | Дочерняя | Monokroom | Gutenberg |
+| 6293 | Дочерняя | Puit (дерево) | Gutenberg |
+| 6335 | Дочерняя | HPL kompaktlaminaat | Gutenberg |
+
+### Elementor-страницы (доп. фурнитура)
+
+| ID | Slug | Название | Builder |
+|----|------|---------|---------|
+| 2651 | `/nurgamehhanismid/` | Угловые механизмы | Elementor |
+| 2619 | `/sahtlid/` | Ящики | Elementor |
+| 536 | `/tostemehhanismid/` | Подъёмные механизмы | Elementor |
+| - | `/ladustamissusteemid/` | Системы хранения | Elementor |
+| - | `/kividest-tootasapinnad/` | Каменные столешницы | Elementor |
+
+### Черновики
+
+| ID | Название | Примечание |
+|----|---------|-----------|
+| 5974 | Elementor #5974 | Без названия, Elementor |
+| 6351 | Elementor #6351 | Без названия, Elementor |
+| 6310 | F -- Kivi | Черновик подстраницы фасадов |
+| 6312 | H -- Puit | Черновик подстраницы фасадов |
+| 6314 | U -- Monokroom | Черновик подстраницы фасадов |
+
+---
+
+## 7. ГАЛЕРЕИ (NextGEN Gallery)
+
+### Список галерей
+
+| ID | Название | Контент | Используется на |
+|----|---------|---------|----------------|
+| 1 | Egger F-series (worktops) | Столешницы F-серия | Страница столешниц |
+| 2 | Egger H-series (worktops) | Столешницы H-серия | Страница столешниц |
+| 6 | Toopind Tehnostone | Столешницы Technistone | Каменные столешницы |
+| 7 | koogid gallery | Фото готовых кухонь | /koogid/ |
+| 8 | Fenix | Фасады Fenix NTM | /fassaadid/fenix/ |
+| 9 | Egger H-series | Фасады H-серия | /fassaadid/egger-fassaadid/ |
+| 10 | Egger F-series | Фасады F-серия | /fassaadid/egger-fassaadid/ |
+| 11 | Egger U-series | Фасады U-серия | /fassaadid/egger-fassaadid/ |
+| 14 | Egger | Общая EGGER галерея | Уточнить |
+| 16 | Fundermax HPL | HPL декоры Fundermax | /fassaadid/ или столешницы |
+
+### Alt-тексты в галереях
+
+Формат: `{КОД}_{ТЕКСТУРА}` (например `F186_ST9`, `H1113_ST10`)
+
+**ПРОБЛЕМА:** Alt-тексты содержат только технические коды, без описательных названий. Для SEO нужно: `F186 Бетон Чикаго светло-серый -- фасад EGGER для кухни`.
+
+### Известная проблема: дублирование маркировок в RU-версии
+
+**Причина:** CLI добавил CSS-хак для скрытия некорректного контента в RU-галерее. После этого маркировки стали дублироваться во ВСЕХ языковых версиях.
+
+**Корневая проблема:** [[TranslatePress]] перехватывает текст из галереи NGG. Если исходный текст (ET) изменён или HTML-структура поменялась, TP теряет привязку перевода и подставляет "мусор" (куски текста из других мест).
+
+**Правильное решение:**
+1. Убрать CSS-хак
+2. В [[TranslatePress]] visual editor найти и удалить некорректные переводы для галереи
+3. Заново перевести (или оставить коды без перевода -- они интернациональные)
+
+---
+
+## 8. КЕШИРОВАНИЕ
+
+| Параметр | Значение |
+|----------|---------|
+| Плагин | Серафинит Акселератор 2.22.14 (Premium) |
+| Тип | Server-side page cache + оптимизация ресурсов |
+| Настройки БД | `seraph_accel_Sett` (37KB JSON в wp_options) |
+| Кеш-директория | `wp-content/cache/seraphinite-accelerator/s/` |
+| Конфигурация | `.htaccess` + `seraph-accel-img-compr-redir.conf` |
+
+### Поведение cache-control (по результатам аудита 26.02.2026)
+
+- **HTML-страницы**: `no-store, no-cache, must-revalidate, max-age=0` — это **by design** <!-- decay:2026-04-01 tier:cold rel:0.505 -->
+  - Seraph кеширует HTML server-side (~500KB оптимизированных файлов)
+  - Браузерам отдаёт `no-cache` чтобы контролировать выдачу на стороне сервера
+  - Настройка `cacheBr.enable:true, timeout:43200` существует, но применяется только к статике
+- **Статические ресурсы** (CSS/JS/изображения/шрифты): кешируются через `.htaccess` (`ExpiresByType`, 43200 min) <!-- decay:2026-04-01 tier:cold rel:0.505 -->
+- **WebP/AVIF**: rewrite rules в `.htaccess` для автоматической подстановки <!-- decay:2026-04-01 tier:cold rel:0.505 -->
+
+### Очистка кеша
+
+**ВАЖНО при правках:** После изменений на сайте нужно очистить кеш Серафинита:
+- WP-admin -> Серафинит -> Настройки -> Очистить кеш <!-- decay:2026-04-01 tier:cold rel:0.505 -->
+- Программно: удалить файлы в `s/`, `pc/`, `q/` директориях кеша <!-- decay:2026-04-01 tier:cold rel:0.505 -->
+- Для проверки: добавить `?nocache=<timestamp>` к URL <!-- decay:2026-04-01 tier:cold rel:0.505 -->
+
+**Multilingual cache gotcha:**
+- `sk/v1/full-clear` flushes object cache but **NOT** Seraphinite static HTML files <!-- decay:2026-04-01 tier:cold rel:0.505 -->
+- `sk/v1/clear-seraph` may also miss files (returns `{"seraph_cleared":0}`) <!-- decay:2026-04-01 tier:cold rel:0.505 -->
+- Solution: SSH `find wp-content/cache/seraphinite-accelerator/ -path '*{slug}*' -delete` <!-- decay:2026-04-01 tier:cold rel:0.505 -->
+- Cache files at: `s/m/v/cmn/c/0/s/@/s/@/o/{lang}/{slug}/` <!-- decay:2026-04-01 tier:cold rel:0.505 -->
+- Elementor CSS also cached: `s/m/d/css/*.css.deflu` <!-- decay:2026-04-01 tier:cold rel:0.505 -->
+- After Elementor data write, always delete cache for the page + all language variants <!-- decay:2026-04-01 tier:cold rel:0.505 -->
+
+---
+
+## 9. КОНТАКТНЫЕ ДАННЫЕ (актуальные, после аудита 26.02.2026)
+
+| Параметр | Значение | Источник |
+|----------|---------|---------|
+| Телефон | +372 55 525 143 | Snippet #285, #105 |
+| Email | julia@studiokook.ee | Snippet #285, #105 |
+| Адрес | Paldiski mnt 21, Tallinn, 10137 | Snippet #285, #105, #259 |
+| Рабочие часы | Mon-Fri 09:00-18:00 | Snippet #285 |
+
+**NAP унифицирован** (26.02.2026): все сниппеты (#285, #105, #259) и mu-plugin используют единые данные. Старый email `maksim@` и индекс `11317` исправлены на `julia@` и `10137`.
+
+---
+
+## 10. ПРАВИЛА ДЛЯ CLI / АВТОМАТИЗАЦИИ
+
+### Перед ЛЮБОЙ правкой:
+
+1. **Прочитай этот документ** -- определи какие системы затрагиваются
+2. **Проверь зависимости** -- изменение в одном месте может сломать другое
+3. **Не используй CSS-хаки** вместо исправления данных
+4. **Проверь все языковые версии** после изменения (ET, RU, EN, FI)
+5. **Очисти кеш** Серафинита после правок
+6. **Не трогай [[TranslatePress]] переводы** через прямое редактирование БД -- используй visual editor или REST API
+
+### Карта зависимостей
+
+```
+Elementor -> Astra theme -> Xpro Theme Builder (header/footer)
+         -> AI Addons, Xpro Addons, Unlimited Elements (виджеты)
+         -> Sticky Header Effects (поведение header)
+
+NextGEN Gallery -> NextGEN Pro (pro-функции)
+              -> NGG MCP Abilities (API управление)
+              -> NGG Alt Text Updater (alt тексты через API)
+              -> TranslatePress (перевод подписей!) <- ТОЧКА КОНФЛИКТА
+
+TranslatePress -> Yoast SEO (hreflang генерация)
+              -> Elementor (перевод виджетов)
+              -> NextGEN Gallery (перевод подписей) <- ТОЧКА КОНФЛИКТА
+              -> Contact Form 7 (перевод форм)
+
+Yoast SEO -> TranslatePress (sitemap + hreflang)
+          -> Site Kit (GSC данные)
+
+Contact Form 7 -> CF7 Telegram (уведомления)
+              -> Drag & Drop Upload (файлы)
+              -> Flamingo (хранение заявок)
+```
+
+### Опасные операции
+
+| Операция | Риск | Что делать |
+|----------|------|-----------|
+| Изменение HTML-структуры страницы | Переводы TP отвалятся | Заново привязать в TP visual editor |
+| Обновление Elementor | Несовместимость с Xpro/AI Addons | Сначала проверить совместимость |
+| Правка галереи NGG | Дублирование/мусор в переводах | Проверить все 4 языка после |
+| Правка [[technical-seo|robots.txt]] | Блокировка индексации | Валидация через fix_robots.py |
+| Обновление [[TranslatePress]] | Потеря переводов | Бэкап БД перед обновлением |
+
+---
+
+## 11. ИЗВЕСТНЫЕ ПРОБЛЕМЫ
+
+| # | Проблема | Приоритет | Статус |
+|---|---------|-----------|--------|
+| 1 | [[technical-seo|robots.txt]] блокировал краулеров | КРИТИЧНО | **Исправлено** 13.02.2026 |
+| 2 | Дублирование hreflang (ru-RU + ru, en-GB + en) | СРЕДНИЙ | **Не актуально** — настройка `hreflang_remove_locale=remove_country_locale` уже активна, дублей нет |
+| 3 | `/meie-toopinnad/` возвращает 404 | ВЫСОКИЙ | **Не актуально** — slug изменён на `/toopinnad/`, 301-redirect работает |
+| 4 | Дублирование маркировок в RU-галерее фасадов | СРЕДНИЙ | **Не воспроизводится** 10.04.2026 — проверка HTML: 0 дублей, 0 gallery captions. Закрыто |
+| 5 | Смешение языков на странице EGGER RU | СРЕДНИЙ | **Исправлено** 10.04.2026 — нет эстонского текста в body |
+| 6 | Email расхождение (julia vs maksim) в Schema | НИЗКИЙ | **Исправлено** 26.02.2026 — унифицировано на julia@ |
+| 7 | Плагины: 6/14 обновлены (22.03.2026). Safe: Disable Admin Notices 1.4.3, Drag&Drop CF7 1.3.9.6, Site Kit 1.174.0, WP Importer 0.9.5, WPCode 2.3.5, Kadence 3.6.6. Deferred (8): Elementor 3.25→3.35 MAJOR+ecosystem, NGG 3.59→4.1 MAJOR, Seraphinite 2.22→2.28 MAJOR, Yoast 26→27 MAJOR, Xpro Addons/TB minor but Elementor-dep, Sticky Header/Unlimited Elements MAJOR | СРЕДНИЙ | **Частично** — high-risk deferred до staging |
+| 8 | Elementor 3.25 -> 3.35 major update warning | ВЫСОКИЙ | Не обновлять без тестирования |
+| 9 | Alt-тексты галерей только коды, без названий | НИЗКИЙ | Открыто |
+| 10 | Title "Meie furnituur" — текущий: "BLUM ja Hettich furnituur \| Austria kvaliteet \| Studioköök" | НИЗКИЙ | **Требует пересмотра** — не навешивать чужие бренды. Title должен описывать свой продукт, не поставщика |
+| 11 | Schema дублирование (несколько LocalBusiness/BreadcrumbList) | ВЫСОКИЙ | **Исправлено** 22.03.2026 — деактивирован Snippet #285 (дубль LocalBusiness), закомментирован BreadcrumbList в mu-plugin. Итого: 3 блока (Yoast @graph, LocalBusiness, FAQPage) |
+| 12 | postalCode 11317 в Service schema | СРЕДНИЙ | **Исправлено** 26.02.2026 → 10137 |
+| 13 | FAQ страницы без meta description | СРЕДНИЙ | **Исправлено** 26.02.2026 — ET/RU/EN/FI |
+| 14 | Homepage meta desc без эстонских диакритиков | СРЕДНИЙ | **Исправлено** 26.02.2026 — köögid, mõõdistamine |
+| 15 | Contact form EN не переведена (Nimi/Teade) | НИЗКИЙ | **Исправлено** 26.02.2026 — Name/Message |
+| 16 | ImageObject caption на ET вместо EN/RU | НИЗКИЙ | **Исправлено** 26.02.2026 — переведено в Snippet #105 |
+| 17 | Sitemap hreflang не совпадает с HTML hreflang | НИЗКИЙ | Ограничение [[TranslatePress]] SEO Pack, документировано |
+| 18 | Старые slug'и без 301-redirect (/furnituur/, /kkk/, /quartz-kivitasapinnad/) | ВЫСОКИЙ | **Исправлено** 10.04.2026 — все 3 slug отдают 301 на правильные URL |
+| 19 | Отсутствуют HTTP security headers (X-Frame-Options, CSP, HSTS) | СРЕДНИЙ | **Исправлено** 10.04.2026 — sk-security-headers.php mu-plugin: HSTS + CSP (enforce). X-Frame-Options, X-Content-Type, Referrer-Policy, Permissions-Policy тоже присутствуют |
+| 20 | Schema: 5→3 блока. Деактивирован Snippet #285 (дублировал LocalBusiness из mu-plugin). Закомментирован BreadcrumbList в studiokook-seo.php (дублировал Yoast). Итого: Yoast @graph (WebPage, ImageObject, BreadcrumbList, WebSite), LocalBusiness @id=#localbusiness (mu-plugin), FAQPage (Snippet #105) | СРЕДНИЙ | **Исправлено** 22.03.2026 |
+| 21 | Gallery alt-тексты только коды (F186, F187) без описаний | НИЗКИЙ | **Закрыто** 10.04.2026 — дубликат #9, объединён |
+| 22 | Sitemap: только 3 подкарты (post, page, category), нет language sitemaps | НИЗКИЙ | **Исправлено** 10.04.2026 — 400 xhtml:link тегов в sitemap, 125 URL для каждого языка (ru/fi/en) |
+| 23 | WPCode плагин удалён, заменён Code Snippets 3.9.5 | ИНФОРМАЦИЯ | Документировано 22.03.2026 |
+| 24 | Site Kit by Google 1.173.0 добавлен | ИНФОРМАЦИЯ | Документировано 22.03.2026 |
+| 25 | SSL сертификат обновлён: expires 02.06.2026, issuer R12 | ИНФОРМАЦИЯ | Предыдущий: R13, expires 03.04.2026 |
+| 26 | WP File Manager 8.0 — security risk (CVE-2020-25213 RCE в v6.4) | ВЫСОКИЙ | **Исправлено** 10.04.2026 — плагин удалён (readme.txt и connector → 404) |
+| 27 | it-api.php и RUN_ONCE_check_hreflang.php в webroot | СРЕДНИЙ | **Частично исправлено** 10.04.2026 — RUN_ONCE удалён (404), it-api.php ещё отвечает (200). Удалить it-api.php |
+| 28 | WordPress 6.9.4 (актуальная). Автообновления ALL versions включены | СРЕДНИЙ | **Рекомендация** — переключить на security/maintenance only (избежать major auto-update) |
+| 29 | Stray video insights удалены из infrastructure.md | НИЗКИЙ | **Исправлено** 22.03.2026 — 10 misrouted entries cleaned up |
+| 30 | SEO/AEO оптимизация: title tags + meta descriptions × 4 языка | ВЫСОКИЙ | **Исправлено** 22.03.2026 — ET (Yoast API), RU/EN/FI (Snippet #105 v5.5 via SSH). Все titles 43-58c, все descs 126-143c. FAQ /ru/ переведён |
+| 31 | Homepage ET meta desc 83c → 143c | ВЫСОКИЙ | **Исправлено** 22.03.2026 — расширено с USP, CTA, телефоном |
+| 32 | /valmistamine/ ET title 25c → 47c | ВЫСОКИЙ | **Исправлено** 22.03.2026 — добавлен keyword + location |
+| 33 | Snippet #285 деактивирован (дублировал LocalBusiness из mu-plugin) | ИНФОРМАЦИЯ | Документировано 22.03.2026. mu-plugin studiokook-seo.php — единственный источник LocalBusiness |
+
+## Elementor REST API (2026-03-22)
+
+mu-plugin: `sk-elementor-write.php` (deployed 2026-03-22)
+Requires: `manage_options` capability (admin app password)
+
+| Endpoint | Method | Source |
+|----------|--------|--------|
+| `/sk/v1/elementor/{id}` | GET | sk-elementor-api.php |
+| `/sk/v1/elementor/{id}/replace` | POST | sk-elementor-api.php |
+| `/sk/v1/elementor/{id}/backup` | GET | sk-elementor-api.php |
+| `/sk/v1/elementor/{id}/restore` | POST | sk-elementor-api.php |
+| `/sk/v1/elementor/{id}/write` | POST | sk-elementor-write.php |
+
+Write endpoint auto-creates `_elementor_data_backup` before overwrite.
+
+<!-- source: YT-2026-03-23-RnhgSdeLtVw_2026-03-23-19-03.md -->
+
+### GOTCHA — Ограничения по подписке
+
+Claude Code subscription limits affect bot operation; monitor token usage and plan accordingly; bot stops when quota exhausted.
+
+<!-- source: YT-2026-03-23-RnhgSdeLtVw_2026-03-23-19-03.md -->
+
+### PATTERN — Мониторинг ресурсов
+
+Check Claude Code subscription limits regularly, plan token usage, consider premium for intensive use, test gradually.
+
+## Distilled 2026-03-24
+
+### Path Facts
+
+- **youtube-notes correct path**: `youtube-notes/` (vault root) — the folder `30-Resources/Learning/video-notes/` was a blank duplicate causing path confusion; deleted 2026-03-22. All Nexus configs and workflow nodes must reference `youtube-notes/`. <!-- decay:2026-03-24 tier:cold rel:0.385 -->
+
+### NGG Gallery Integration Method
+
+- **Preferred integration order** (Elementor safety, descending priority): <!-- decay:2026-03-24 tier:cold rel:0.385 -->
+  1. Shortcode widget (`[ngg src="galleries" ids="X" display="basic_thumbnail"]`) — safest, editor-friendly
+  2. Direct `post_content` insertion via API — use when Elementor is not active on page
+  3. Elementor visual widget — last resort; WYSIWYG constraints cause rendering conflicts
+- **Rationale**: Elementor hybrid rendering makes direct widget placement fragile when `post_content` and `_elementor_data` meta coexist. <!-- decay:2026-03-24 tier:cold rel:0.385 -->
+
+<!-- source: YT-2026-03-24-oRnmHNVPrZ4_2026-03-24-18-52.md -->
+
+### FACT — Требования к серверу
+
+Минимальный VPS $4-6/мес (Vultr), Ubuntu 22.04, SSH-доступ обязателен
+
+<!-- source: YT-2026-03-24-oRnmHNVPrZ4_2026-03-24-18-52.md -->
+
+### FACT — Стоимость решения
+
+Cloud Code Pro $17/мес, VPS $4-6/мес, подписка экономичнее API-доступа
+
+<!-- source: YT-2026-03-24-oRnmHNVPrZ4_2026-03-24-18-52.md -->
+
+### FACT — RebootPrompt.en файл
+
+>1100 lines, bridges Cloud Code to Telegram, available EN/RU, loaded via VS Code
+
+<!-- source: YT-2026-03-24-oRnmHNVPrZ4_2026-03-24-18-52.md -->
+
+### FACT — Легальность интеграции
+
+Anthropic officially allows WhatsApp/Telegram/Discord bridges, encourages use
+
+<!-- source: YT-2026-03-24-oRnmHNVPrZ4_2026-03-24-18-52.md -->
+
+### FACT — Расход токенов
+
+Full setup: 8-17% of monthly Pro subscription, visible as percentage tracking
+
+<!-- source: YT-2026-03-24-oRnmHNVPrZ4_2026-03-24-18-52.md -->
+
+### FACT — Базовые возможности агента
+
+Content creation, video analysis, image generation, voice processing, research, code, automation
+
+<!-- source: YT-2026-03-24-oRnmHNVPrZ4_2026-03-24-18-52.md -->
+
+### FACT — Интеграции с внешними сервисами
+
+OpenAI, Google Gemini, Nano Banana v2, Obsidian, Notion integrations supported
+
+<!-- source: YT-2026-03-24-oRnmHNVPrZ4_2026-03-24-18-52.md -->
+
+### FACT — Необходимые сервисы
+
+Cloud Code Pro $17/mth, Vultr VPS $4+/mth, Telegram BotFather, VS Code, Terminus
+
+<!-- source: YT-2026-03-24-oRnmHNVPrZ4_2026-03-24-18-52.md -->
+
+### FACT — Решаемые проблемы
+
+Terminal complexity → Telegram UI, developer-only → any user, expensive API → fixed $17/mth, limited → extensible
+
+## Distilled 2026-03-26
+
+### Known Issues (from SEO Audit 2026-03-25)
+
+| # | Issue | Priority | Status |
+|---|-------|----------|--------|
+| 34 | /koogid — 3 images without width/height attributes (CLS risk) | СРЕДНИЙ | **Исправлено** 10.04.2026 — осталась 1 base64 placeholder, не влияет на CLS |
+| 35 | /teenused — missing FAQ schema | СРЕДНИЙ | **Не актуально** 10.04.2026 — страница /teenused/ не существует (404). /valmistamine/ имеет Service+HowTo schema |
+| 36 | /kontakt — broken internal link | СРЕДНИЙ | **Исправлено** 10.04.2026 — все внутренние ссылки отдают 200 |
+
+### SEO Score Baseline (2026-03-25)
+
+- Overall SEO Score: **82/100** (+3 vs prior week) <!-- decay:2026-03-26 tier:cold rel:0.415 -->
+- Pages audited: 25 <!-- decay:2026-03-26 tier:cold rel:0.415 -->
+
+<!-- source: YT-2026-03-28-wOWkxH2JTq0_2026-03-28-15-31.md -->
+FACT: Бесплатные лимиты FireCrawl
+New users: 500 free credits/month. Typical periodic use: ~430 credits/month. Credits accumulate (author: 8178 total). Sufficient for testing and regular work.
+
+<!-- source: YT-2026-03-28-wOWkxH2JTq0_2026-03-28-15-31.md -->
+FACT: Форматы данных FireCrawl
+Output: Markdown (headers, articles, sections) + structured data (company names, prices, email, phones, links). Compatible with Obsidian knowledge bases.
+
+<!-- source: YT-2026-03-28-wOWkxH2JTq0_2026-03-28-15-31.md -->
+FACT: Стек технологий
+Stack: FireCrawl (web parser, HTML→Markdown), Cloud Code (E-agent platform, Telegram integration), Obsidian (knowledge base), N8N (legacy automation), MCP (tool protocol).
+
+<!-- source: YT-2026-03-29-56KZASHPkV8_2026-03-29.md -->
+
+### FACT — Формат метаданных поста
+
+Each Markdown file includes: content ID, publication date, title, properties, tags, direction, source, reactions (added after 3+ days)
+
+<!-- source: YT-2026-03-29-56KZASHPkV8_2026-03-29.md -->
+
+### FACT — Инструмент для экспорта
+
+Telegram Desktop (not mobile app) has extended export features; use JSON format
+
+<!-- source: YT-2026-03-29-56KZASHPkV8_2026-03-29.md -->
+
+### FACT — Рекомендуемые AI-модели
+
+Claude 3.5 Sonnet (Anthropic), Cloud Code/Claude API, Telegram bots (E-Bots), Codex/Code Agents
+
+<!-- source: YT-2026-03-29-56KZASHPkV8_2026-03-29.md -->
+
+### FACT — Доступные документы
+
+Igor Zugevich Telegram channel (first pinned message): (1) "Full content strategy for March 2026" (2) "Full AI-powered content generation system" (3) Additional hierarchy docs
+
+## Distilled 2026-05-04
+
+### Telegram Bot Token Facts (2026-05-03)
+
+- **FACT: StudiokookBot token lost during migration** — `@StudiokookBot` token was lost during `lagedi_bot` → `@StudiokookBot` migration. Regenerated via `@BotFather` → `/token` command. Stored in `~/.claude/credentials/studiokook-bot.token`, env: `STUDIOKOOK_BOT_TOKEN`.
+- **GOTCHA: `lagedi_bot` (8009187517) in polling mode auto-deletes webhook** — ClaudeClaw service on VPS polls `lagedi_bot` in polling mode; setWebhook is automatically reset to `url: ""`. Fix: Studiokook bot must use dedicated token (`@StudiokookBot`) separate from ClaudeClaw's bot.

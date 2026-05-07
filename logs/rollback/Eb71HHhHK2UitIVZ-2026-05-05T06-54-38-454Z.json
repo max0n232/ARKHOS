@@ -1,0 +1,434 @@
+{
+  "updatedAt": "2026-05-01T17:19:18.095Z",
+  "createdAt": "2026-05-01T17:17:44.570Z",
+  "id": "Eb71HHhHK2UitIVZ",
+  "name": "Trading: Signal Resolver",
+  "description": null,
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "id": "sched1",
+      "name": "Hourly Check",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 * * * 1-5"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "wh1",
+      "name": "Webhook Test",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        200
+      ],
+      "parameters": {
+        "path": "trading-signal-resolver-test",
+        "httpMethod": "GET"
+      },
+      "webhookId": "59234ca5-7db5-4d81-9b30-4603747087e1"
+    },
+    {
+      "id": "pg1",
+      "name": "Resolve Signals",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        260,
+        100
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH current_prices AS (\n    SELECT DISTINCT ON (symbol) symbol, price\n    FROM commodity_snapshots\n    ORDER BY symbol, timestamp DESC\n),\nresolved AS (\n    UPDATE signals_log s\n    SET \n        status = CASE\n            WHEN s.direction = 'long' AND cp.price >= s.target_price THEN 'hit_target'\n            WHEN s.direction = 'long' AND cp.price <= s.stop_price THEN 'hit_stop'\n            WHEN s.direction = 'short' AND cp.price <= s.target_price THEN 'hit_target'\n            WHEN s.direction = 'short' AND cp.price >= s.stop_price THEN 'hit_stop'\n            WHEN NOW() >= s.valid_until THEN 'expired'\n        END,\n        exit_price = cp.price,\n        resolved_at = NOW(),\n        pnl_pct = CASE s.direction\n            WHEN 'long' THEN ROUND(((cp.price - s.entry_price) / s.entry_price) * 100, 4)\n            WHEN 'short' THEN ROUND(((s.entry_price - cp.price) / s.entry_price) * 100, 4)\n        END,\n        r_multiple = CASE s.direction\n            WHEN 'long' THEN ROUND((cp.price - s.entry_price) / NULLIF(s.entry_price - s.stop_price, 0), 3)\n            WHEN 'short' THEN ROUND((s.entry_price - cp.price) / NULLIF(s.stop_price - s.entry_price, 0), 3)\n        END\n    FROM current_prices cp\n    WHERE s.status = 'open'\n      AND cp.symbol = s.asset\n      AND (\n          (s.direction = 'long' AND (cp.price >= s.target_price OR cp.price <= s.stop_price))\n          OR (s.direction = 'short' AND (cp.price <= s.target_price OR cp.price >= s.stop_price))\n          OR NOW() >= s.valid_until\n      )\n    RETURNING s.id, s.asset, s.direction, s.entry_price, s.exit_price, s.target_price, s.stop_price, s.status, s.pnl_pct, s.r_multiple, s.conviction\n)\nSELECT * FROM resolved;",
+        "options": {}
+      },
+      "credentials": {
+        "postgres": {
+          "id": "TradingPostgres1",
+          "name": "Trading Postgres"
+        }
+      }
+    },
+    {
+      "id": "if1",
+      "name": "Has Resolved?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        500,
+        100
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "has-data",
+              "leftValue": "={{ $json.id }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "isNotEmpty",
+                "singleValue": true
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "code1",
+      "name": "Format Notifications",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        740,
+        0
+      ],
+      "parameters": {
+        "jsCode": "const items = $input.all();\nconst messages = items.map(item => {\n  const r = item.json;\n  const statusEmoji = r.status === 'hit_target' ? '\\u2705' : r.status === 'hit_stop' ? '\\u274c' : '\\u23f0';\n  const dirEmoji = r.direction === 'long' ? '\\ud83d\\udfe2' : '\\ud83d\\udd34';\n  const pnl = r.pnl_pct >= 0 ? `+${r.pnl_pct}%` : `${r.pnl_pct}%`;\n  \n  return {\n    json: {\n      message: `${statusEmoji} *Signal closed:* ${dirEmoji} ${r.asset} ${r.direction.toUpperCase()}\\n\\nEntry: ${r.entry_price} > Exit: ${r.exit_price}\\nTarget: ${r.target_price} | Stop: ${r.stop_price}\\n\\n*Result:* ${pnl} | R: ${r.r_multiple}\\n*Status:* ${r.status.replace('_', ' ')}`\n    }\n  };\n});\nreturn messages;"
+      }
+    },
+    {
+      "id": "tg1",
+      "name": "Send Notification",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        980,
+        0
+      ],
+      "parameters": {
+        "chatId": "804465999",
+        "text": "={{ $json.message }}",
+        "additionalFields": {
+          "parse_mode": "Markdown"
+        }
+      },
+      "credentials": {
+        "telegramApi": {
+          "id": "TradingTelegramBot",
+          "name": "Trading Bot"
+        }
+      },
+      "webhookId": "ed52898b-3cd6-47c0-b4f7-41914086736c"
+    }
+  ],
+  "connections": {
+    "Hourly Check": {
+      "main": [
+        [
+          {
+            "node": "Resolve Signals",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook Test": {
+      "main": [
+        [
+          {
+            "node": "Resolve Signals",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Resolve Signals": {
+      "main": [
+        [
+          {
+            "node": "Has Resolved?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Resolved?": {
+      "main": [
+        [
+          {
+            "node": "Format Notifications",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Format Notifications": {
+      "main": [
+        [
+          {
+            "node": "Send Notification",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "errorWorkflow": "mzrUOgpYW8OVSWGl"
+  },
+  "staticData": {
+    "node:Hourly Check": {
+      "recurrenceRules": []
+    }
+  },
+  "meta": null,
+  "pinData": null,
+  "versionId": "103b3150-d6e9-4192-9cf4-0f4892c99138",
+  "activeVersionId": "103b3150-d6e9-4192-9cf4-0f4892c99138",
+  "versionCounter": 10,
+  "triggerCount": 2,
+  "shared": [
+    {
+      "updatedAt": "2026-05-01T17:17:44.570Z",
+      "createdAt": "2026-05-01T17:17:44.570Z",
+      "role": "workflow:owner",
+      "workflowId": "Eb71HHhHK2UitIVZ",
+      "projectId": "PufDuNtXpreUjA3o",
+      "project": {
+        "updatedAt": "2025-12-05T21:25:37.247Z",
+        "createdAt": "2025-11-04T19:43:55.674Z",
+        "id": "PufDuNtXpreUjA3o",
+        "name": "Maksim Parve <maksim@studiokook.ee>",
+        "type": "personal",
+        "icon": null,
+        "description": null,
+        "creatorId": "3462e3d2-f46b-4d98-acea-93ac07713bf5"
+      }
+    }
+  ],
+  "tags": [],
+  "activeVersion": {
+    "updatedAt": "2026-05-01T17:17:44.570Z",
+    "createdAt": "2026-05-01T17:17:44.570Z",
+    "versionId": "103b3150-d6e9-4192-9cf4-0f4892c99138",
+    "workflowId": "Eb71HHhHK2UitIVZ",
+    "nodes": [
+      {
+        "id": "sched1",
+        "name": "Hourly Check",
+        "type": "n8n-nodes-base.scheduleTrigger",
+        "typeVersion": 1.2,
+        "position": [
+          0,
+          0
+        ],
+        "parameters": {
+          "rule": {
+            "interval": [
+              {
+                "field": "cronExpression",
+                "expression": "0 * * * 1-5"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "id": "wh1",
+        "name": "Webhook Test",
+        "type": "n8n-nodes-base.webhook",
+        "typeVersion": 2,
+        "position": [
+          0,
+          200
+        ],
+        "parameters": {
+          "path": "trading-signal-resolver-test",
+          "httpMethod": "GET"
+        },
+        "webhookId": "59234ca5-7db5-4d81-9b30-4603747087e1"
+      },
+      {
+        "id": "pg1",
+        "name": "Resolve Signals",
+        "type": "n8n-nodes-base.postgres",
+        "typeVersion": 2.5,
+        "position": [
+          260,
+          100
+        ],
+        "parameters": {
+          "operation": "executeQuery",
+          "query": "WITH current_prices AS (\n    SELECT DISTINCT ON (symbol) symbol, price\n    FROM commodity_snapshots\n    ORDER BY symbol, timestamp DESC\n),\nresolved AS (\n    UPDATE signals_log s\n    SET \n        status = CASE\n            WHEN s.direction = 'long' AND cp.price >= s.target_price THEN 'hit_target'\n            WHEN s.direction = 'long' AND cp.price <= s.stop_price THEN 'hit_stop'\n            WHEN s.direction = 'short' AND cp.price <= s.target_price THEN 'hit_target'\n            WHEN s.direction = 'short' AND cp.price >= s.stop_price THEN 'hit_stop'\n            WHEN NOW() >= s.valid_until THEN 'expired'\n        END,\n        exit_price = cp.price,\n        resolved_at = NOW(),\n        pnl_pct = CASE s.direction\n            WHEN 'long' THEN ROUND(((cp.price - s.entry_price) / s.entry_price) * 100, 4)\n            WHEN 'short' THEN ROUND(((s.entry_price - cp.price) / s.entry_price) * 100, 4)\n        END,\n        r_multiple = CASE s.direction\n            WHEN 'long' THEN ROUND((cp.price - s.entry_price) / NULLIF(s.entry_price - s.stop_price, 0), 3)\n            WHEN 'short' THEN ROUND((s.entry_price - cp.price) / NULLIF(s.stop_price - s.entry_price, 0), 3)\n        END\n    FROM current_prices cp\n    WHERE s.status = 'open'\n      AND cp.symbol = s.asset\n      AND (\n          (s.direction = 'long' AND (cp.price >= s.target_price OR cp.price <= s.stop_price))\n          OR (s.direction = 'short' AND (cp.price <= s.target_price OR cp.price >= s.stop_price))\n          OR NOW() >= s.valid_until\n      )\n    RETURNING s.id, s.asset, s.direction, s.entry_price, s.exit_price, s.target_price, s.stop_price, s.status, s.pnl_pct, s.r_multiple, s.conviction\n)\nSELECT * FROM resolved;",
+          "options": {}
+        },
+        "credentials": {
+          "postgres": {
+            "id": "TradingPostgres1",
+            "name": "Trading Postgres"
+          }
+        }
+      },
+      {
+        "id": "if1",
+        "name": "Has Resolved?",
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 2.2,
+        "position": [
+          500,
+          100
+        ],
+        "parameters": {
+          "conditions": {
+            "options": {
+              "version": 2,
+              "leftValue": "",
+              "caseSensitive": true,
+              "typeValidation": "loose"
+            },
+            "conditions": [
+              {
+                "id": "has-data",
+                "leftValue": "={{ $json.id }}",
+                "rightValue": "",
+                "operator": {
+                  "type": "string",
+                  "operation": "isNotEmpty",
+                  "singleValue": true
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "id": "code1",
+        "name": "Format Notifications",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          740,
+          0
+        ],
+        "parameters": {
+          "jsCode": "const items = $input.all();\nconst messages = items.map(item => {\n  const r = item.json;\n  const statusEmoji = r.status === 'hit_target' ? '\\u2705' : r.status === 'hit_stop' ? '\\u274c' : '\\u23f0';\n  const dirEmoji = r.direction === 'long' ? '\\ud83d\\udfe2' : '\\ud83d\\udd34';\n  const pnl = r.pnl_pct >= 0 ? `+${r.pnl_pct}%` : `${r.pnl_pct}%`;\n  \n  return {\n    json: {\n      message: `${statusEmoji} *Signal closed:* ${dirEmoji} ${r.asset} ${r.direction.toUpperCase()}\\n\\nEntry: ${r.entry_price} > Exit: ${r.exit_price}\\nTarget: ${r.target_price} | Stop: ${r.stop_price}\\n\\n*Result:* ${pnl} | R: ${r.r_multiple}\\n*Status:* ${r.status.replace('_', ' ')}`\n    }\n  };\n});\nreturn messages;"
+        }
+      },
+      {
+        "id": "tg1",
+        "name": "Send Notification",
+        "type": "n8n-nodes-base.telegram",
+        "typeVersion": 1.2,
+        "position": [
+          980,
+          0
+        ],
+        "parameters": {
+          "chatId": "804465999",
+          "text": "={{ $json.message }}",
+          "additionalFields": {
+            "parse_mode": "Markdown"
+          }
+        },
+        "credentials": {
+          "telegramApi": {
+            "id": "TradingTelegramBot",
+            "name": "Trading Bot"
+          }
+        },
+        "webhookId": "ed52898b-3cd6-47c0-b4f7-41914086736c"
+      }
+    ],
+    "connections": {
+      "Hourly Check": {
+        "main": [
+          [
+            {
+              "node": "Resolve Signals",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Webhook Test": {
+        "main": [
+          [
+            {
+              "node": "Resolve Signals",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Resolve Signals": {
+        "main": [
+          [
+            {
+              "node": "Has Resolved?",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Has Resolved?": {
+        "main": [
+          [
+            {
+              "node": "Format Notifications",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          []
+        ]
+      },
+      "Format Notifications": {
+        "main": [
+          [
+            {
+              "node": "Send Notification",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "authors": "Maksim Parve",
+    "name": null,
+    "description": null,
+    "autosaved": false,
+    "workflowPublishHistory": [
+      {
+        "createdAt": "2026-05-01T17:19:18.154Z",
+        "id": 984,
+        "workflowId": "Eb71HHhHK2UitIVZ",
+        "versionId": "103b3150-d6e9-4192-9cf4-0f4892c99138",
+        "event": "activated",
+        "userId": "3462e3d2-f46b-4d98-acea-93ac07713bf5"
+      }
+    ]
+  }
+}

@@ -1,0 +1,152 @@
+# Sven Scene Audit - 2026-05-03
+
+Source scene: `C:\Users\sorte\Desktop\Проекты\Sven\Scene.skp`
+
+Audit artifacts:
+- JSON: `C:/tmp/ek-scene-audit-20260503-sven.json`
+- Screenshots: `C:/tmp/ek-scene-audit-20260503-sven-top.png`, `C:/tmp/ek-scene-audit-20260503-sven-iso.png`
+
+## Extraction Summary
+
+- Live read-only extraction through SketchUp TCP on 2026-05-03.
+- Model bounds mm: `X[-1001.8..4430.9]`, `Y[-5024.4..2319.3]`, `Z[-226.7..2927.4]`.
+- Top-level entities: `45 ComponentInstance`, `13 Face`, `30 Edge`, `40 DimensionLinear`, `1 ConstructionLine`, `2 Text`.
+- Definitions in model: `7788`.
+- Top-level component kinds: `9 panel_facade`, `8 other`, `4 pencil`, `4 lower`, `1 corner_lower`, `4 appliance`, `4 countertop`, `8 upper`, `3 panel`.
+- Corner modules: `BG1#3`.
+- Pencil/tall modules: `PB2#3`, `PB2#2`, `PD1_6#1`, `PB3F#2`.
+- Appliances observed: `Miele H6461`, `Wine Fridge`, `Miele KM 6322 PowerFlex`, sink, mixer.
+
+## Room And Architecture
+
+The scene is an L-shaped kitchen in a room corner, with raw wall/ceiling geometry present. The room dimensions are explicitly annotated:
+
+- Long left/tall wall: `4339`.
+- Back wall run: `2564`.
+- Room height / top references: `2558`, `2248`, and furniture top zones around `2218`, `2438`, `2530` depending on module family.
+
+Pattern: raw room faces and dimension entities are first-class design evidence. The generator must read wall axes and ceiling/top constraints before placing modules.
+
+## Layout Composition
+
+This is not the same pattern as the previous Margit U-like scene. Sven is a compact L with a tall appliance bank on the left leg and the working sink/fridge run on the back wall.
+
+### Left/Tall Leg
+
+Top-level chain along the left leg (`X[0..671]`, negative Y):
+
+- `PB2#3`: `Y[-4289..-3789]`, 500mm wide tall module.
+- `PB2#2`: `Y[-3789..-3289]`, 500mm wide tall module.
+- `PD1_6#1`: `Y[-3289..-2689]`, 600mm oven/micro pencil.
+- `Wine Fridge`: `Y[-2665.2..-2370]`, low wine appliance next to tall bank.
+- `BD2#1`: `Y[-2351..-1496]`, 855mm drawer base.
+- `BD2_1#1`: `Y[-1496..-641]`, 855mm cooktop base.
+- `BG1#3`: corner module at `X[0..1177]`, `Y[-670..0]`.
+
+The left leg uses a 50mm terminal strip at the far end, two 500mm tall modules, then a 600mm oven pencil, then a 300mm wine-fridge visual/appliance slot, then 19mm panel transition before the lower run.
+
+### Back/Sink/Fridge Row
+
+Back row chain (`Y[-671..0]`):
+
+- `BG1#3`: corner start, `X[0..1177]` with dimension intent `50+535`.
+- `BD1`: sink base, `X[1177..1777]`, 600mm.
+- `BI#1`: dishwasher, `X[1777..2377]`, 600mm.
+- `BJ`: narrow/filler module, `X[2377.1..2602.1]`, observed 225mm, dimension intent includes `150` near this zone.
+- `PB3F#2`: integrated fridge/tall module, `X[2527..3127]`, 600mm, full height `Z[0..2530]`.
+- `PANEL-FACADE#3`: right full-height side panel, 19.3mm thick, `Z[0..2530]`.
+
+Pattern: integrated fridge/tall module can terminate a back row; countertop must stop before the fridge/pencil zone. Dimension entities encode the row chain: `50+535`, `600`, `600`, `150`, `600`, `19`.
+
+## Corner And Junction Logic
+
+Only one real lower corner is used: `BG1#3` at the inside L turn. It joins the back row and left leg, instead of synthesizing the corner from straight cabinets.
+
+Learning rule: compact L scenes may use one `BG1` plus asymmetric straight modules around it. The dimension label `50+535` near the corner should be preserved as intent, not simplified to a generic 600.
+
+## Appliances And Services
+
+- Cooktop: `Miele KM 6322 PowerFlex`, over `BD2_1#1` on the left leg, bbox `X[53..567]`, `Y[-1350.5..-735.5]`, `Z[900..910]`.
+- Oven: `Miele H6461`, in `PD1_6#1`, bbox `X[72..670]`, `Y[-3287..-2691]`, `Z[476.8..1068.5]`.
+- Microwave/upper appliance: `Samsung`, above oven in `PD1_6#1`, bbox `X[256.3..676.3]`, `Y[-3287.7..-2692.7]`, `Z[1068.5..1454.8]`.
+- Wine fridge: existing component, bbox `X[20..657.4]`, `Y[-2665.2..-2370]`, `Z[5..878.1]`.
+- Sink: over `BD1`, bbox `X[1261..1711]`, `Y[-585..-75]`, `Z[673..903]`.
+- Mixer: `Group30#1`, bbox `X[1452.9..1564.3]`, `Y[-314.9..-65.7]`, `Z[900..1235.3]`.
+
+Pattern: this scene separates cooktop base and oven pencil. Do not infer oven-under-cooktop when the design uses `PD1_6` for the oven/micro stack.
+
+## Fridge Rule Evidence
+
+`PB3F#2` is an integrated fridge/tall module, not a standalone-fridge niche. The separate `Wine Fridge` confirms that visual appliance components may be kept in the scene when they represent real appliances. For future standalone-fridge openings, use existing fridge components from the available component library; do not create separate measuring geometry.
+
+## Panels, Fillers, And Cladding
+
+Top-level `PANEL-FACADE` roles include:
+
+- Tall side/end panels: `PANEL-FACADE#3`, `#4`, `#5`, `#6`.
+- Toe/plinth or low front strips: `PANEL-FACADE#7`, `#8`, `#9` with low heights around 128/138mm and long runs.
+- Detached sample/side panels visible outside the main kitchen footprint: `PANEL-FACADE#1`, `#2`.
+
+Pattern: classify `PANEL-FACADE` by bbox and adjacency, not only by name. This scene reinforces the multi-role panel rule from Margit.
+
+## Countertops And Work Zones
+
+Four countertop-like components were found:
+
+- Main back worktop: `X[590..2508]`, `Y[-650..0]`, `Z[862..900]`.
+- Left leg worktop: `X[0..650]`, `Y[-2351..10]`, `Z[862..900]`.
+- Vertical backsplash/upstand-like slab on back: `X[-0.2..2507.8]`, `Y[-10..0]`, `Z[850..1500]`.
+- Vertical backsplash/upstand-like slab on left: `X[-0.2..9.8]`, `Y[-2351..-10]`, `Z[850..1500]`.
+
+Pattern: worktops remain straight segments, and backsplash/upstand objects may share the countertop definition/kind. Verification must distinguish horizontal worktop from vertical backsplash by bbox orientation.
+
+## Upper And Lighting Pattern
+
+Upper row uses mixed upper widths:
+
+- Back row: `TA` 420mm, then `TB1` modules around 494mm, with high `Z[1500..2530]`.
+- Left row: `TB2-H3#1` 856mm, then two `TB1#2` modules of 428mm.
+- LED/profile components run under uppers on both legs (`Врезной профиль для подсветки`).
+
+Pattern: upper layout follows lower/corner geometry but uses its own width sequence; do not force upper widths to mirror lower modules one-to-one.
+
+## Dimensions Worth Preserving
+
+Dimension texts: `2564`, `4339`, `2248`, `2558`, `19`, `600`, `150`, `600`, `600`, `50+535`, `855+49`, `500`, `500`, `50`, `606`, `420`, `494`, `494`, `494`, `1030`, `600`, `38`, `770`, `92`, `392`, `2438`, `28`, `855`, `2126`, `30`, `300`, `639`, `856`, `428`, `428`.
+
+Important recurring standards:
+
+- Base system: `92` legs + `770` carcass + `38` countertop = `900` working top.
+- Full-height side/end panels: 19mm.
+- Tall module sequence includes 500/500/600 widths.
+- Back row module sequence includes corner intent `50+535`, then 600/600/150/600/19.
+
+## Reusable Pattern Candidates
+
+| Pattern ID | Evidence | Rule | Confidence | Destination |
+|---|---|---|---|---|
+| `compact_l_tall_bank_left` | `PB2#3`, `PB2#2`, `PD1_6#1`, wine fridge, then lower run | L kitchens may start with a tall appliance bank and transition into lower worktop run | verified-live | [[row-composition-formulas]], `ek_standards.rb` candidate |
+| `single_bg1_l_corner_with_asymmetric_runs` | One `BG1#3`, dimension `50+535`, 855mm left modules | Preserve real corner module and asymmetric dimensions | verified-live | [[finished-project-patterns]] |
+| `integrated_fridge_terminates_back_row` | `PB3F#2` + right full-height panel | Integrated fridge/tall module can terminate a back row; countertop stops before it | verified-live | [[appliances-taxonomy]] |
+| `wine_fridge_component_kept_in_scene` | `Wine Fridge` existing component between pencil and lower run | Appliance components can remain in scene when they represent real appliances | verified-live | [[appliances-taxonomy]] |
+| `vertical_backsplash_uses_countertop_kind` | Countertop-kind objects with vertical bbox at `Z[850..1500]` | Verify orientation before treating every countertop-kind object as horizontal worktop | verified-live | extractor improvement candidate |
+| `upper_widths_do_not_mirror_lowers` | Upper widths 420/494/428/856 vs lower 855/600/150 | Upper row follows visual/design logic, not one-to-one lower widths | verified-live | [[project-audit-template]] |
+
+## Generator Implications
+
+Future EK generation should:
+
+1. Support compact L layouts with a tall appliance bank on one leg and a sink/fridge row on the other.
+2. Use one real `BG1` corner when the layout is a standard L; do not synthesize the inside corner from straight modules.
+3. Preserve non-round dimension expressions like `50+535` and `855+49` as design intent.
+4. Stop horizontal countertop at tall/fridge modules and classify vertical backsplash/upstand separately.
+5. Use existing appliance components for visual/verification appliances such as wine fridges and standalone fridges.
+6. Keep upper-row sizing independent from lower-row sizing when the finished scene shows that pattern.
+7. Extract lighting/profile components as part of the design pattern under uppers.
+
+## Open Items
+
+- Decode/normalize non-ASCII names in JSON extraction; current PowerShell display shows mojibake for Russian names, while scene evidence is still readable visually.
+- Add orientation-based classification for countertop-kind components: horizontal worktop vs vertical backsplash/upstand.
+- Add panel role classifier for tall side panel, low strip/plinth, and detached sample panels.
+- Inspect one more similar L+tall-bank project before promoting `compact_l_tall_bank_left` into a hard generator standard.

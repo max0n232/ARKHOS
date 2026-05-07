@@ -1,0 +1,184 @@
+## Distilled 2026-04-29
+
+- **GOTCHA: Get-PSDrive / Win32_LogicalDisk return empty in Claude Code Windows env** — returns 0/empty without error exit code. Fix: use `fs.statfsSync('C:\\')` (Node 20+) which returns real `bavail * bsize` disk stats.
+- **GOTCHA: `!` as command prefix interpreted as negation in PowerShell** — PowerShell treats `!` as a boolean negation operator, not a command prefix. Fix: execute the command directly without `!` prefix.
+- **GOTCHA: gemini-cli `@file` syntax not working in headless mode (`-p`)** — `@file` input syntax is only supported in interactive mode for `gemini-cli@0.40.0`. Fix: pipe file content to stdin: `cat file | gemini -p "prompt"`.
+- **GOTCHA: VPS Gemini CLI requires --skip-trust flag for headless operation** — when trusted folder is not configured, CLI prompts interactively. Fix: add `--skip-trust` to all headless gemini invocations.
+- **PATTERN: Windows CLI tool pitfalls checklist** — when integrating new CLI tools: (1) PATH detection, (2) `@file` quoting with spaces, (3) Cyrillic characters in paths, (4) SSH keep-alive for long-running commands, (5) `!` operator conflicts in PowerShell.
+
+## Distilled 2026-04-22
+
+- **GOTCHA: Bash single-quotes collapse backslashes in JSON** — single-quoted strings strip backslash escape sequences, corrupting JSON. Fix: use forward slashes in path literals inside JSON, or write to `@file.json` and pass via `-d @file.json`.
+- **GOTCHA: cmd.exe misinterprets URL `&` as command chaining via execSync** — `execSync` routes through `cmd.exe` on Windows; `&` in URL query strings is interpreted as shell chaining. Fix: use native `https.get`/`https.request` instead of spawning curl via shell.
+- **GOTCHA: TLS cert chain from CDN not verified by Node's bundle** — Node.js downloader throws CERT_UNTRUSTED for some CDN hosts. Fix: `rejectUnauthorized: false` for read-only download operations (never for auth endpoints).
+- **GOTCHA: HTML entity `&amp;` breaks URL query strings** — HTML-encoded URLs keep `&amp;` instead of `&`, causing batch processing failures. Fix: replace `&amp;` with `&` before constructing URLs.
+- **GOTCHA: `rm -rf` blocked by permission prompts on Windows** — UAC or file locks block shell `rm -rf`. Fix: use PowerShell `Remove-Item -Recurse -Force`, or relocate to a temp trash dir, or request explicit user approval.
+- **PATTERN: Cloudflare DoH to bypass DNS blocking** — when a domain is filtered by ISP/hosting DNS (e.g., Hetzner blocking annas-archive.org), use Cloudflare DoH (`1.1.1.1`) as resolver. Last resort: archive.org or direct Google search.
+- **FIX: Multi-byte chars corrupted at chunk boundaries** — `data += chunk` in Node.js streams mis-encodes UTF-8 multi-byte chars split across chunks. Fix: `Buffer.concat(chunks).toString('utf8')` after stream end.
+
+## Distilled 2026-04-20
+
+### Unicode File Operations
+
+- **GOTCHA: Moving files with Unicode names fails in shell** — standard `mv`/`cp` commands mishandle Unicode characters in filenames or paths on Windows. Fix: use PowerShell `Move-Item`/`Copy-Item` instead of shell commands.
+
+## Distilled 2026-04-05
+
+### PDF Extraction on Windows (Node 24 / no pdftoppm)
+
+- **WORKAROUND: PDF extraction fails on Windows when pdftoppm missing or pdf-parse API broken under Node 24** — upload PDF to VPS via `scp`, extract text via Python (`pdfminer` or `pdftotext`). Pattern: when Windows-side tools are broken/missing, delegate file processing to VPS where Unix tooling is available. <!-- decay:2026-04-05 tier:cold rel:0.565 -->
+
+```bash
+scp localfile.pdf user@vps:/tmp/
+ssh user@vps "python3 -c \"import pdfminer.high_level; print(pdfminer.high_level.extract_text('/tmp/localfile.pdf'))\" > /tmp/output.txt"
+```
+
+## Distilled 2026-03-30
+
+### Python subprocess on Windows (.cmd Files)
+
+- **`subprocess.Popen` with `claude.cmd` requires `shell=True`** — `_winapi.CreateProcess` cannot locate `.cmd` files without it. Applies to `run_loop.py` and any Python script invoking `.cmd` launchers. Pattern: always add `shell=True` when calling `.cmd`/`.bat` via subprocess on Windows. <!-- decay:2026-03-30 tier:cold rel:0.475 -->
+- **Add `encoding='utf-8'` to `Popen`** — prevents garbled output from default ANSI codepage decoding on Windows Python. <!-- decay:2026-03-30 tier:cold rel:0.475 -->
+- **Stream event parsing must NOT be inside an else-block (Unix path)** — `run_loop.py` had the stream-event parser inside the Unix branch; Windows path received buffer via `communicate()` but never parsed it. Fix: dedent the parsing block out of `else` so it runs regardless of OS path. <!-- decay:2026-03-30 tier:cold rel:0.475 -->
+- **Same shell=True patch applies to `improve_description.py`** — any Python file that calls `claude` CLI must apply the same fix. <!-- decay:2026-03-30 tier:cold rel:0.475 -->
+
+---
+tags: [wordpress, windows, gotcha, encoding]
+aliases: [curl UTF-8, ANSI codepage, Buffer.byteLength, Content-Length, shell-quote, better-sqlite3, Git Bash gotchas, Node 24, UV_HANDLE_CLOSING, path.join Windows]
+project: cross-project
+source: Desktop/Studiokook/.claude/skills/wordpress/references/windows-gotchas.md
+updated: 2026-03-17
+---
+
+# Windows/Bash Gotchas
+
+> Platform-specific issues when working with studiokook.ee API from Windows Git Bash.
+
+## UTF-8 Encoding
+
+Never pass Unicode (o with umlaut, u with umlaut, a with umlaut, Cyrillic) inline in `curl -d`.
+
+**Root cause:** Windows ANSI codepage converts argv before curl sees it. Curl is encoding-agnostic, sends bytes as-is.
+
+Solutions:
+- **Fix A:** `printf '…' | curl -d @-` (pipe bypasses argv) <!-- decay:2026-03-30 tier:cold rel:0.475 -->
+- **Fix B:** `cat > /tmp/payload.json << 'EOF' … EOF && curl -d @/tmp/payload.json` <!-- decay:2026-03-30 tier:cold rel:0.475 -->
+- **Fix C:** Use Node.js script with `https` module <!-- decay:2026-03-30 tier:cold rel:0.475 -->
+
+See: [curl/curl#10820](https://github.com/curl/curl/issues/10820)
+
+## History Expansion (`!`)
+
+Bash interprets `!` as history expansion inside double quotes. Write content to a file instead of inline.
+
+## Content-Length in Node.js
+
+For `https.request` ALWAYS set `Content-Length: Buffer.byteLength(data)`.
+
+Without it, multi-byte UTF-8 characters cause truncated payloads.
+
+## Pipe Blocking
+
+`curl | node -e` is blocked by security patterns. Use intermediate file:
+
+```bash
+curl -s "..." -o /tmp/response.json
+node -e "const d = require('fs').readFileSync('/tmp/response.json','utf8'); ..."
+```
+
+## `node -e` Inline Eval
+
+`!==` and other `!`-containing code breaks in `node -e` via [[Claude]] Code Bash tool.
+
+**Root cause:** [[Claude]] Code's `shell-quote` library escapes `!` to `\!`. Bash non-interactive mode has histexpand off, so `\!` escaping is unnecessary but still applied.
+
+**Fix:** Always Write code to `.js` file, then `node file.js`.
+
+See: [claude-code#23740](https://github.com/anthropics/claude-code/issues/23740)
+
+## Base64 Auth Pattern
+
+`curl -u "USER:PASS"` fails on Windows Git Bash when password has spaces. Use explicit header:
+
+```bash
+source ~/Desktop/Studiokook/credentials/wp-auth.env
+export WP_AUTH=$(echo -n "$WP_USER:$WP_APP_PASS" | base64)
+curl -H "Authorization: Basic $WP_AUTH" "https://studiokook.ee/wp-json/sk/v1/..."
+```
+
+## [[studiokook-examples|deploy-file]] Content Field
+
+The `content` field in POST to `sk/v1/deploy-file` must be **raw PHP source as a string**. Do NOT base64-encode — the endpoint stores `content` literally to disk. Sending base64 causes PHP file to contain base64 text and breaks the site.
+
+## Path Normalization for REST API Calls
+
+Windows `path.join()` produces backslashes. REST APIs (Obsidian, n8n) expect forward slashes in URL paths.
+
+```javascript
+// BAD — backslashes cause REST API 404/write failure
+const relPath = absolutePath.replace(VAULT_DIR + '/', '');
+
+// GOOD — normalize before API call
+const relPath = absolutePath.replace(/\\/g, '/').replace(VAULT_DIR + '/', '');
+```
+
+Applies to: any hook that builds URL paths from Windows absolute paths.
+
+## git index.lock Contention ([[Claude]] Code + GitHub Desktop)
+
+When [[Claude]] Code CLI and GitHub Desktop both operate on the same repo simultaneously, git index.lock conflicts arise.
+
+**Root cause:** GitHub Desktop's background git status polling holds the lock.
+
+**Fix:** Close GitHub Desktop before CLI operations, or wait for lock release.
+
+## yt-dlp Browser Cookie Extraction (DPAPI Encryption)
+
+Chrome/Edge block yt-dlp cookie extraction due to DPAPI encryption (issue #10927).
+
+**Fix:**
+1. Install `yt-dlp.exe`
+2. Close browser **completely**
+3. Open PowerShell **as Administrator**
+4. Run `yt-dlp --cookies-from-browser {chrome|edge|firefox} <url>`
+
+---
+
+## Связанные файлы
+
+- [[10-Projects/Studiokook/20-Areas/WordPress/_index|← WordPress (Studiokook)]] <!-- decay:2026-03-30 tier:cold rel:0.475 -->
+- [[30-Resources/API-Reference/studiokook-examples|API Examples]] — curl/Node.js примеры с учётом Windows-специфики <!-- decay:2026-03-30 tier:cold rel:0.475 -->
+- [[10-Projects/Studiokook/knowledge|Knowledge]] — архитектурные особенности сайта <!-- decay:2026-03-30 tier:cold rel:0.475 -->
+
+## Distilled 2026-03-24
+
+### Batch Script Debugging
+
+- **Log with timestamp + exit code** in all batch scripts: `echo [%DATE% %TIME%] Exit: %ERRORLEVEL% >> script.log` <!-- decay:2026-03-24 tier:cold rel:0.385 -->
+- Critical for async debugging when human is offline and cannot observe terminal output in real time. <!-- decay:2026-03-24 tier:cold rel:0.385 -->
+- Apply to any `.bat`/`.cmd` script running as a scheduled task or background process. <!-- decay:2026-03-24 tier:cold rel:0.385 -->
+
+
+## Related
+<!-- auto-generated by vault-graph-builder 2026-04-23 -->
+- [[10-projects/studiokook/20-areas/infrastructure/troubleshooting-current]] <!-- decay:2026-03-24 tier:cold rel:0.385 -->
+- [[10-projects/studiokook/20-areas/infrastructure/global-patterns]] <!-- decay:2026-03-24 tier:cold rel:0.385 -->
+
+## Distilled 2026-04-25
+
+### Windows Path & Shell Gotchas
+
+- **GOTCHA: CC/MSYS converts `C:/...` paths to `C:\...` in bash** — forward-slash fix did not resolve it; MSYS path conversion intercepts before bash execution. Workaround: use `//c/...` (double-slash) or pass paths via environment variable to bypass MSYS conversion.
+
+## Distilled 2026-04-25 (from troubleshooting-current + global-patterns)
+
+### Windows tar & Git Bash
+
+- **GOTCHA: GNU tar treated `C:` as remote host** — during baseline creation, tar interpreted drive letter as hostname. Fix: use `--force-local` flag.
+- **GOTCHA: Tar path issue with backslashes** — during baseline restore, tar failed on Windows backslash paths. Fix: convert temp path to forward-slash form before passing to tar.
+- **PATTERN: Robust tar on Windows/Git Bash** — always use `--force-local` and convert paths to forward slashes to avoid drive letter misinterpretation or path issues.
+
+## GPU/Driver
+
+- **PATTERN: Admin privileges required for System Restore and GPU driver** — Checkpoint-Computer, vssadmin, DDU Safe Mode all need elevation. When unavailable, use non-admin alternatives: registry backup and shader cache cleanup.
+- **PATTERN: Clean shader cache before driver changes** — clear NVIDIA DXCache, GLCache, D3DSCache as non-admin pre-step before major driver changes.

@@ -1,0 +1,1055 @@
+---
+title: workflow-patterns
+type: reference
+created: 2026-05-03
+updated: 2026-05-04
+tags: [studiokook, n8n, patterns, workflow]
+---
+
+## Distilled 2026-04-05
+
+## Distilled 2026-04-06 — TG Community Catalog (2,129 workflows)
+
+### AI Agent Architecture (dominant pattern — 65% of all workflows)
+
+- [PATTERN] **Standard AI Agent chain**: trigger → AI:agent node + AI:lmChat{Model} + AI:outputParserStructured → action node. Used in 1,395/2,129 workflows. The agent node is the universal orchestrator. <!-- decay:2026-04-06 tier:cold rel:0.58 -->
+- [PATTERN] **Model selection**: OpenAI (994 uses), Google Gemini (447), Groq (for speed), OpenRouter (model routing), DeepSeek (budget). Use OpenRouter for fallback across providers. <!-- decay:2026-04-06 tier:cold rel:0.58 -->
+- [PATTERN] **Memory patterns**: AI:memoryBufferWindow (355 uses) is the default for chat-based agents. For persistent memory: memoryPostgresChat or memoryRedisChat. Buffer window = simple, Postgres = durable. <!-- decay:2026-04-06 tier:cold rel:0.58 -->
+- [PATTERN] **Structured output**: AI:outputParserStructured (658 uses) — always parse LLM output to JSON schema. Prevents downstream node failures from unstructured text. <!-- decay:2026-04-06 tier:cold rel:0.58 -->
+
+### Top Trigger Patterns
+
+- [PATTERN] **scheduleTrigger → AI → HTTP/Sheets** (298 workflows): The "content machine" pattern. Cron fires → AI generates/processes → stores in Google Sheets or sends via HTTP. Used for: blog automation, newsletter generation, social media scheduling, market monitoring. <!-- decay:2026-04-06 tier:cold rel:0.58 -->
+- [PATTERN] **telegramTrigger → AI agent + memory → telegram response** (182 workflows): The "smart bot" pattern. User sends message → agent with buffer memory processes → responds in same chat. Add tools (Google Calendar, Gmail, HTTP) for multi-capability bots. <!-- decay:2026-04-06 tier:cold rel:0.58 -->
+- [PATTERN] **webhook → AI agent → respondToWebhook** (175 workflows): The "API endpoint" pattern. External service calls n8n → AI processes request → returns structured response. Used for: CRM integration, chatbot backends, form processing. <!-- decay:2026-04-06 tier:cold rel:0.58 -->
+- [PATTERN] **formTrigger → AI → action** (151 workflows): The "smart form" pattern. User fills n8n form → AI enriches/classifies input → creates document, sends email, or updates CRM. Low-code lead generation. <!-- decay:2026-04-06 tier:cold rel:0.58 -->
+- [PATTERN] **chatTrigger → AI agent** (33 workflows): The "embedded chat" pattern. n8n's built-in chat widget as frontend. Quick prototyping without Telegram/web integration. <!-- decay:2026-04-06 tier:cold rel:0.58 -->
+
+### Integration Patterns
+
+- [PATTERN] **Google Sheets as lightweight DB**: 1,648 uses across workflows. Primary data store for: lead tracking, content calendars, monitoring logs. Cheaper and simpler than Postgres for small-scale automation. <!-- decay:2026-04-06 tier:cold rel:0.58 -->
+- [PATTERN] **HTTP Request as universal connector**: 3,524 uses. For any API without a native n8n node — Firecrawl, HeyGen, Dumpling AI, custom webhooks. Always pair with error handling (IF node check status code). <!-- decay:2026-04-06 tier:cold rel:0.58 -->
+- [PATTERN] **Code node for transformations**: 3,070 uses. When Set/IF nodes are insufficient — complex data mapping, regex extraction, API response parsing. JS only (no Python). <!-- decay:2026-04-06 tier:cold rel:0.58 -->
+
+### Extracted from claudeclaw-features triage (2026-04-12)
+
+- [PATTERN] **Reels сценарии из топ-видео**: Apify Instagram Scraper → Whisper транскрипция → Claude анализ паттернов → 7 сценариев (Hook → Problem → Solution → How to) → Google Sheets. Формат: `scheduleTrigger → Apify → OpenAI → Claude → Sheets`. <!-- decay:2026-04-06 tier:cold rel:0.58 -->
+- [PATTERN] **RSS + AI → WordPress черновики**: RSS-ленты → AI рерайт/адаптация → WordPress draft post. Автоматизация блога без ручного контента. Подходит для studiokook.ee новости/тренды. <!-- decay:2026-04-06 tier:cold rel:0.58 -->
+- [PATTERN] **Форма бронирования + Google Calendar**: n8n form → проверка свободных слотов в Calendar → создание события → подтверждение email через Gmail. Применимо для Studiokook (бронирование консультаций). <!-- decay:2026-04-06 tier:cold rel:0.58 -->
+- [PATTERN] **Глобальное key-value хранилище**: n8n Data Tables как персистентное хранилище переменных между workflow runs. Замена для globals/env: состояние между запусками, кеш API-ответов, счётчики. <!-- decay:2026-04-06 tier:cold rel:0.58 -->
+- [PATTERN] **Многоязычный перевод DeepL + GPT-4o-mini**: DeepL для точного перевода → GPT для адаптации тона/контекста → Google Sheets лог. Для 4-язычного Studiokook (ET/RU/EN/FI). <!-- decay:2026-04-06 tier:cold rel:0.58 -->
+- [PATTERN] **Авто-загрузка видео на YouTube с SEO**: генерация title/description/tags через AI → YouTube API upload → SEO-оптимизация метаданных. OAuth2 + n8n HTTP Request. <!-- decay:2026-04-06 tier:cold rel:0.58 -->
+- [PATTERN] **Async API polling (kie.ai / image gen)**: formTrigger → GPT-4 (web search, формирует промпт) → HTTP Request (POST /jobs/createTask) → Loop: Wait 15s → GET /jobs/recordInfo → IF status=success → Download + Email; IF попытки>20 → Error Email. Шаблон применим ко всем async генераторам с polling API. <!-- decay:2026-04-06 tier:cold rel:0.58 -->
+
+### Self-Improving / RAG Patterns
+
+- [PATTERN] **Vector store + document loader + embeddings → retrieval agent**: Supabase (pgvector), Pinecone, Qdrant, Weaviate as vector stores. Pattern: ingest docs → chunk → embed → store. Query: user input → embed → similarity search → inject context → LLM responds. <!-- decay:2026-04-06 tier:cold rel:0.58 -->
+- [PATTERN] **Human-in-the-loop knowledge expansion**: webhook receives question → agent searches KB → if not found → escalate to human → LLM generalizes answer → write back to KB. Each escalation permanently expands coverage. (File: `Самосовершенствующаяся_поддержка_ИИ_электронной_почты.json`) <!-- decay:2026-04-06 tier:cold rel:0.58 -->
+- [PATTERN] **Positive/negative feedback stores**: Two separate vector collections — successful responses and failed responses. Agent searches both before answering, avoids repeating mistakes. (File: `Создайте_чат_бота_с_обратной_связью.json`) <!-- decay:2026-04-06 tier:cold rel:0.58 -->
+
+### Content Pipeline Patterns
+
+- [PATTERN] **Full content machine**: Schedule → RSS/scrape → AI summarize → Google Sheets (content calendar) → AI generate post → publish to WordPress/social. Example: 81-node blog automation workflow. <!-- decay:2026-04-06 tier:cold rel:0.58 -->
+- [PATTERN] **Video generation pipeline**: Schedule → AI script generation → HeyGen/Seedance API for avatar video → upload to TikTok/YouTube/Instagram. Multiple 30-40 node workflows for this pattern. <!-- decay:2026-04-06 tier:cold rel:0.58 -->
+- [PATTERN] **Newsletter from YouTube**: YouTube transcript → AI extract key points → format as newsletter draft → Gmail send. 8-node minimal workflow. <!-- decay:2026-04-06 tier:cold rel:0.58 -->
+
+### n8n Template Import — Community Nodes Check
+
+<!-- triage:2026-04-21 — extracted from claudeclaw-features n8n-templates priority 9 -->
+
+- [PATTERN] **Анимация из рисунков**: scheduleTrigger/webhook → загрузка рисунков → image-to-video API (Runway/Kling/Hailuo) → сборка анимации → публикация или уведомление. Использовать для персонализированного детского контента AiGeneration. Риски: нестабильность внешних API + высокая сложность настройки (complexity: high). Интеграция: добавить как отдельный n8n workflow с polling-паттерном (аналог async kie.ai шаблона). <!-- decay:2026-04-06 tier:cold rel:0.58 -->
+
+- **GOTCHA: n8n template import via MCP API fails silently if required community nodes are missing** — templates using `firecrawl`, `apify`, or other community nodes import without error but nodes are broken. Fix: check installed community nodes BEFORE importing templates. If missing → install via UI first, or import manually through the n8n UI (Settings → Community Nodes → Install). <!-- decay:2026-04-06 tier:cold rel:0.58 -->
+
+### Health Check Sequence (Cross-Project)
+
+- **PATTERN: Health check run order** — (1) n8n workflows status (active/inactive), (2) site HTTP check across all language variants, (3) analyze errors in execution logs, (4) prioritize tasks by impact. Run in this sequence to catch cascade failures before diving into code. <!-- decay:2026-04-06 tier:cold rel:0.58 -->
+
+## Distilled 2026-04-20
+
+### n8n Workflow Fixes
+
+- **FIX: duplicate ingestion from two pipelines** — ingest-bot wrote `_incoming.jsonl` (triggering cron-sync) AND called n8n webhook simultaneously, causing double-pushes to vault. Fix: disable cron, use n8n as primary pipeline only.
+- **FIX: n8n + cron race condition on git push** — both n8n and a cron job were pushing to git, causing conflicts. Fix: comment out cron entry with inline reason for easy rollback.
+- **FIX: `fetch is not defined` in n8n Code node** — `ReferenceError: fetch is not defined` in task runner sandbox. Only `HTTP Request` nodes have network access; `fetch()`, `$http`, `?.`, `?:` are unavailable. Fix: replace Code node fetch calls with HTTP Request nodes.
+- **FIX: Alert Engine sends 'undefined' via Telegram** — `={{ $json.message }}` without checking if `message` is defined. Fix: add IF node or filter before Telegram node to guard against undefined.
+- **FIX: n8n workflow stays active after `active=f` SQL update** — n8n scheduler holds state in in-process cache. Full deactivation sequence: (1) SQL `UPDATE workflows SET active=false`, (2) n8n CLI `update:workflow --id=X --active=false`, (3) n8n service restart.
+- **FIX: GDELT API 429 / IP block** — `1 request per 5 seconds` rate limit; with repeated violations, IP gets banned. External resolution required. Pattern: insert Wait nodes between GDELT requests, reduce frequency.
+- **FIX: `varchar(10)` too short for `current_bias` column** — Seasonality Engine failed on longer bias strings. Fix: `ALTER TABLE seasonality_data ALTER COLUMN current_bias TYPE varchar(20)`.
+- **PATTERN: n8n rate limit mitigation** — when workflows hit HTTP 429, insert Wait nodes between requests or reduce trigger frequency. If IP-banned: requires external (CDN/proxy) resolution.
+
+## Distilled 2026-04-19
+
+### YouTube Pipeline Fix
+
+- **FIX: Missing `_incoming.jsonl` entry for YouTube video** — n8n pipeline did not create `_incoming.jsonl` for a processed video (GBbbXlfHkS8). Root cause unclear from transcript. Fix: manual intervention. Preventive: add explicit validation step in pipeline that checks `_incoming.jsonl` write succeeded before marking video as processed.
+
+### Automated Vault Routing Pattern
+
+- **PATTERN: `video-insight-router.js` pipeline** — classifies insights from YouTube notes, writes to `30-Resources/…` destinations based on routing-map.md, marks `routed: true` after successful vault pull. Auto-pull every ~15 minutes keeps vault in sync.
+
+## Triage 2026-04-22
+
+- [PATTERN] **n8n backup to Google Drive**: Scheduled trigger → n8n API (GET /workflows) → Google Drive upload node. Requires: Google Drive OAuth2 (use existing `0a4JFSW3JyCsi8wo` credential), target folder ID. Риски: ошибка OAuth2 блокирует весь бэкап; скрипт очистки может удалить актуальные данные. Рекомендация: версионировать имена файлов по дате, не перезаписывать.
+- [PATTERN] **Автоматизация нарезки видео для соцсетей (RenderIO + OpenAI)**: scheduleTrigger/webhook → OpenAI (script/scene breakdown) → n8n-nodes-renderio (видеонарезка) → Google Drive upload → уведомление. Установить community node `n8n-nodes-renderio`. Риски: зависимость от внешних API + OAuth2 для Google Drive/Sheets.
+
+## Distilled 2026-03-30
+
+### n8n IF Node Unary Operators
+
+- **IF nodes with unary operators require `singleValue: true`** — without this flag, unary operators (e.g. `exists`, `notExists`) silently misroute. Always set `singleValue: true` when using unary condition operators in IF nodes. <!-- decay:2026-03-30 tier:cold rel:0.475 -->
+
+## Distilled 2026-03-29
+
+### API Fallback Pattern
+
+- **When browser-based UI is blocked: pivot to direct API calls** — if browser upload/interaction is blocked by security restrictions, switch to the service's native API endpoint directly (e.g., File Upload → Image Generation → Download flow). Applicable to Kling, Midjourney, and similar SaaS platforms with both UI and API access. <!-- decay:2026-03-29 tier:cold rel:0.46 -->
+
+## Distilled 2026-03-25
+
+### Audio API & Media Format Handling
+
+- **FormData over manual multipart**: Whisper API returns 400 (Invalid file format) when multipart/form-data boundary is constructed manually — use native `FormData` API instead. Manual boundary construction is error-prone. <!-- decay:2026-03-25 tier:cold rel:0.4 -->
+- **Pre-convert audio to mp3 before Whisper**: validate and convert audio format with ffmpeg to mp3 before Whisper API call — avoids format-negotiation failures across .ogg, .m4a, and other container formats. <!-- decay:2026-03-25 tier:cold rel:0.4 -->
+
+### Docker Volume & Filesystem Paths
+
+- **Always use host-mapped paths for `fs` operations**: when a service runs in Docker with a volume mount, `fs.existsSync()` / `fs.readFile()` must use the host-side mount path (e.g. `/opt/n8n/telegram-bot-api-data`), NOT the container-internal path (e.g. `/var/lib/telegram-bot-api`). Verify volume mappings before any direct filesystem access. <!-- decay:2026-03-25 tier:cold rel:0.4 -->
+
+### Stateful Claude Sessions in n8n
+
+- **One session per user, persist and resume**: for Claude Code / Claude API stateful conversations via Telegram or webhook, create one `--session-id` UUID per `chatId` and store it in handler state. Pass `--resume <session-id>` on all subsequent messages from that user to maintain conversation context across interactions. <!-- decay:2026-03-25 tier:cold rel:0.4 -->
+
+---
+tags: [n8n, patterns, architecture]
+aliases: [webhook auth, HMAC verification, rate limiting, workflow debugging, Scheduled trigger, HTTP Request node, AI Agent node, n8n pagination]
+project: cross-project
+source: .claude/skills/n8n-expert/references/workflow-patterns.md
+updated: 2026-03-17
+---
+
+# Workflow Patterns Reference
+
+Proven architectural patterns for building n8n workflows.
+
+---
+
+## The 5 Core Patterns
+
+### 1. Webhook Processing (Most Common)
+
+```
+Webhook → [Validate] → [Transform] → [Action] → [Response/Notify]
+```
+- Receive HTTP requests from external systems <!-- decay:2026-03-25 tier:cold rel:0.4 -->
+- Use cases: form submissions, payment webhooks, chat commands, GitHub webhooks <!-- decay:2026-03-25 tier:cold rel:0.4 -->
+- **CRITICAL**: Data under `$json.body`, NOT `$json` directly <!-- decay:2026-03-25 tier:cold rel:0.4 -->
+- Response modes: `onReceived` (immediate 200, background processing) vs `lastNode` (custom response via Webhook Response node) <!-- decay:2026-03-25 tier:cold rel:0.4 -->
+
+### 2. HTTP API Integration
+
+```
+Trigger → HTTP Request → [Transform] → [Action] → [Error Handler]
+```
+- Fetch from REST APIs, transform, store/use <!-- decay:2026-03-25 tier:cold rel:0.4 -->
+- Use cases: data fetching, API-to-API sync, enrichment, monitoring <!-- decay:2026-03-25 tier:cold rel:0.4 -->
+- Auth methods: None, Bearer Token, API Key, Basic Auth, OAuth2 <!-- decay:2026-03-25 tier:cold rel:0.4 -->
+- Always use credentials system (never hardcode) <!-- decay:2026-03-25 tier:cold rel:0.4 -->
+
+### 3. Database Operations
+
+```
+Trigger → [Query/Read] → [Transform] → [Write/Update] → [Verify]
+```
+- Read/write/sync database data <!-- decay:2026-03-25 tier:cold rel:0.4 -->
+- Use cases: ETL, data sync, cleanup, backup, real-time updates <!-- decay:2026-03-25 tier:cold rel:0.4 -->
+- **CRITICAL**: Always use parameterized queries (`$1`, `?`) — never string concatenation <!-- decay:2026-03-25 tier:cold rel:0.4 -->
+- Supported: Postgres, MySQL, MongoDB, MSSQL, SQLite, Redis <!-- decay:2026-03-25 tier:cold rel:0.4 -->
+
+### 4. AI Agent Workflow
+
+```
+Trigger → AI Agent (Model + Tools + Memory) → [Process] → Output
+```
+- AI agents with tool access, memory, and reasoning <!-- decay:2026-03-25 tier:cold rel:0.4 -->
+- Use cases: chatbots, document Q&A, data analysis, automation agents <!-- decay:2026-03-25 tier:cold rel:0.4 -->
+- See [AI Agent section](#ai-agent-workflows) below <!-- decay:2026-03-25 tier:cold rel:0.4 -->
+
+### 5. Scheduled Tasks
+
+```
+Schedule → [Fetch Data] → [Process] → [Deliver] → [Log/Notify]
+```
+- Recurring automation workflows <!-- decay:2026-03-25 tier:cold rel:0.4 -->
+- Use cases: reports, syncs, monitoring, cleanup, content publishing <!-- decay:2026-03-25 tier:cold rel:0.4 -->
+
+---
+
+## Pattern Selection Guide
+
+| Need | Pattern | Example |
+|------|---------|---------|
+| Receive events from external systems | Webhook | Stripe payment → update DB |
+| Fetch data from APIs | HTTP API | GitHub issues → Jira tickets |
+| Database read/write/sync | Database | Postgres → MySQL sync |
+| AI with tool access | AI Agent | Chat with DB + API access |
+| Recurring automation | Scheduled | Daily report → email team |
+
+---
+
+## Data Flow Patterns
+
+| Flow | Structure | When |
+|------|-----------|------|
+| Linear | `Trigger → Transform → Action → End` | Simple single-path |
+| Branching | `Trigger → IF → [True] / [False]` | Conditional actions |
+| Parallel | `Trigger → [Branch 1] + [Branch 2] → Merge` | Independent ops |
+| Loop | `Trigger → Split In Batches → Process → Loop` | Large datasets |
+| Error Handler | `Main Flow + Error Trigger → Handler` | Separate error handling |
+
+---
+
+## Common Components
+
+**Triggers**: Webhook (instant), Schedule (periodic), Manual (testing), Polling (intervals)
+
+**Data Sources**: HTTP Request (APIs), Database nodes, Service nodes (Slack, Sheets), Code
+
+**Transformation**: Set (field mapping), Code (complex logic), IF/Switch (routing), Merge (combine streams)
+
+**Outputs**: HTTP Request (APIs), Database (write), Communication (email, Slack), Storage (files, cloud)
+
+**Error Handling**: Error Trigger (catch errors), IF (check conditions), Stop and Error (explicit fail), continueOnFail (per-node)
+
+---
+
+## AI Agent Workflows
+
+### 8 AI Connection Types
+
+| Type | Purpose | Example |
+|------|---------|---------|
+| `ai_languageModel` | The LLM | OpenAI, Anthropic, Gemini |
+| `ai_tool` | Functions agent can call | HTTP Request, DB, Code |
+| `ai_memory` | Conversation context | Buffer, Window Buffer, Summary |
+| `ai_outputParser` | Parse structured outputs | JSON, XML parsers |
+| `ai_embedding` | Vector embeddings | OpenAI Embeddings |
+| `ai_vectorStore` | Vector database | Pinecone, Qdrant |
+| `ai_document` | Document loaders | File, URL loaders |
+| `ai_textSplitter` | Text chunking | Character, Token splitter |
+
+### Making ANY Node a Tool
+
+Connect any n8n node to AI Agent via `ai_tool` port (NOT main port):
+
+```javascript
+{
+  name: "search_github_issues",
+  description: "Search GitHub issues by keyword. Returns issue titles and URLs.",
+  // + normal HTTP Request config
+}
+```
+
+**Tool descriptions matter**: AI uses them to decide WHEN to call tools. Be specific, not vague.
+
+### Agent Types
+
+| Type | Best For | When |
+|------|----------|------|
+| Conversational Agent | General chat, support | Most common |
+| OpenAI Functions Agent | Tool-heavy workflows | Multiple tools, structured output |
+| ReAct Agent | Step-by-step reasoning | Complex multi-step tasks |
+
+### Memory Types
+
+| Type | Behavior | Recommendation |
+|------|----------|----------------|
+| Buffer Memory | Store all messages | Short conversations |
+| Window Buffer Memory | Store last N messages | **Recommended** for most cases |
+| Summary Memory | Summarize old messages | Long conversations |
+
+```javascript
+// Window Buffer Memory config
+{
+  sessionKey: "={{$json.body.session_id}}",
+  contextWindowLength: 10
+}
+```
+
+### AI Agent Prompt Structure
+
+```
+You are a [ROLE].
+
+You can:
+- [CAPABILITY 1] <!-- decay:2026-03-25 tier:cold rel:0.4 -->
+- [CAPABILITY 2] <!-- decay:2026-03-25 tier:cold rel:0.4 -->
+
+Guidelines:
+- [GUIDELINE 1] <!-- decay:2026-03-25 tier:cold rel:0.4 -->
+- [GUIDELINE 2] <!-- decay:2026-03-25 tier:cold rel:0.4 -->
+
+Format:
+- [OUTPUT FORMAT] <!-- decay:2026-03-25 tier:cold rel:0.4 -->
+```
+
+### AI Security
+
+- **Read-only DB access** for tools (`GRANT SELECT` only) <!-- decay:2026-03-25 tier:cold rel:0.4 -->
+- **Validate tool inputs** (block DROP, DELETE, UPDATE in SQL) <!-- decay:2026-03-25 tier:cold rel:0.4 -->
+- **Sanitize user input** (trim, length limit) <!-- decay:2026-03-25 tier:cold rel:0.4 -->
+- **Rate limiting** on webhooks <!-- decay:2026-03-25 tier:cold rel:0.4 -->
+- **Monitor tool usage** for abuse <!-- decay:2026-03-25 tier:cold rel:0.4 -->
+
+### Common AI Gotchas
+
+| Wrong | Correct |
+|-------|---------|
+| Tools connected to main port | Connect via `ai_tool` port |
+| Vague tool description: "Get data" | Specific: "Query customer orders by email" |
+| No memory for conversations | Add Window Buffer Memory via `ai_memory` |
+| Full DB access for AI tools | Read-only DB user |
+| Unbounded tool responses | `LIMIT 10` in queries |
+
+---
+
+## Webhook Configuration
+
+### Data Structure
+
+```json
+{
+  "headers": {"content-type": "...", "x-api-key": "..."},
+  "params": {"id": "123"},           // URL params: /webhook/:id
+  "query": {"token": "abc"},         // Query: ?token=abc
+  "body": { /* YOUR DATA IS HERE */ }
+}
+```
+
+### Authentication
+
+- **Query token**: `{{$json.query.token}}` (simple) <!-- decay:2026-03-25 tier:cold rel:0.4 -->
+- **Header auth**: `{{$json.headers['x-api-key']}}` (better) <!-- decay:2026-03-25 tier:cold rel:0.4 -->
+- **Signature verification**: HMAC with secret (best — for Stripe, GitHub) <!-- decay:2026-03-25 tier:cold rel:0.4 -->
+
+---
+
+## Schedule Configuration
+
+### Modes
+
+```javascript
+// Interval: every 15 min
+{ mode: "interval", interval: 15, unit: "minutes" }
+
+// Days & Hours: weekdays at 9 AM
+{ mode: "daysAndHours", days: ["monday","tuesday","wednesday","thursday","friday"], hour: 9 }
+
+// Cron: complex schedules
+{ mode: "cron", expression: "0 9 * * 1-5" }  // Weekdays 9 AM
+```
+
+### Cron Quick Reference
+
+```
+minute hour day month weekday
+0 9 * * 1-5      Weekdays 9 AM
+*/15 * * * *      Every 15 min
+0 0 1 * *         First day of month midnight
+0 */6 * * *       Every 6 hours
+```
+
+### Key Practices
+
+- **Set workflow timezone** explicitly in settings <!-- decay:2026-03-25 tier:cold rel:0.4 -->
+- **Prevent overlaps**: use Redis lock for long-running tasks <!-- decay:2026-03-25 tier:cold rel:0.4 -->
+- **Early exit**: check if data exists before heavy processing <!-- decay:2026-03-25 tier:cold rel:0.4 -->
+- **Batch processing**: `Split In Batches` for large datasets <!-- decay:2026-03-25 tier:cold rel:0.4 -->
+
+---
+
+## HTTP API Configuration
+
+### Authentication Methods
+
+| Method | Config |
+|--------|--------|
+| None | `authentication: "none"` |
+| Bearer Token | `nodeCredentialType: "httpHeaderAuth"` |
+| API Key | Header or query parameter |
+| Basic Auth | `nodeCredentialType: "httpBasicAuth"` |
+| OAuth2 | `nodeCredentialType: "oAuth2Api"` |
+
+### Pagination Patterns
+
+- **Offset-based**: increment page, check `has_more` <!-- decay:2026-03-25 tier:cold rel:0.4 -->
+- **Cursor-based**: use `next_cursor` from response <!-- decay:2026-03-25 tier:cold rel:0.4 -->
+- **Link header**: parse `rel="next"` URL <!-- decay:2026-03-25 tier:cold rel:0.4 -->
+
+### Rate Limiting
+
+- **Wait between requests**: `Split In Batches` + `Wait` node <!-- decay:2026-03-25 tier:cold rel:0.4 -->
+- **Exponential backoff**: 1s → 2s → 4s retry delays <!-- decay:2026-03-25 tier:cold rel:0.4 -->
+- **Respect headers**: check `x-ratelimit-remaining` <!-- decay:2026-03-25 tier:cold rel:0.4 -->
+
+---
+
+## Database Best Practices
+
+### Parameterized Queries (CRITICAL)
+
+```javascript
+// SAFE
+{ query: "SELECT * FROM users WHERE id = $1", parameters: ["={{$json.id}}"] }
+
+// DANGEROUS (SQL injection)
+{ query: "SELECT * FROM users WHERE id = '={{$json.id}}'" }
+```
+
+### Batch Processing
+
+```
+Query (LIMIT 10000) → Split In Batches (100) → Process → Loop
+```
+
+### Transactions
+
+```
+BEGIN → Operations (continueOnFail) → COMMIT or ROLLBACK
+```
+
+### Performance
+
+- Add database indexes for query columns <!-- decay:2026-03-25 tier:cold rel:0.4 -->
+- Always use `LIMIT` on SELECT <!-- decay:2026-03-25 tier:cold rel:0.4 -->
+- Use cursor-based pagination for large tables (`WHERE id > $1 ORDER BY id LIMIT 1000`) <!-- decay:2026-03-25 tier:cold rel:0.4 -->
+- Batch writes (insert arrays, not individual rows) <!-- decay:2026-03-25 tier:cold rel:0.4 -->
+
+---
+
+## Error Handling Patterns
+
+### 1. Error Trigger Workflow
+
+```
+Main: Trigger → Process → Output
+Error: Error Trigger → Log → Slack Alert
+```
+
+### 2. Retry with Backoff
+
+```
+HTTP Request (continueOnFail) → IF (error) → Wait → Retry → IF (still error) → Alert
+```
+
+### 3. [[Validation]] Early Exit
+
+```
+Webhook → IF (validate) → [True: Process] / [False: 400 Error Response]
+```
+
+### 4. Partial Failure Handling
+
+```
+Split In Batches → Process (continueOnFail) → Code (track successes/failures) → Report
+```
+
+---
+
+## Quick Start Examples
+
+### Webhook → Slack
+
+```
+1. Webhook (POST, path: "form-submit")
+2. Set (map fields from $json.body)
+3. Slack (post to #notifications)
+```
+
+### Scheduled Report
+
+```
+1. Schedule (daily 9 AM)
+2. HTTP Request (fetch analytics)
+3. Code (aggregate data)
+4. Email (formatted report)
+5. Error Trigger → Slack (notify on failure)
+```
+
+### AI Assistant
+
+```
+1. Webhook (receive chat message)
+2. AI Agent
+   ├─ OpenAI Chat Model (ai_languageModel)
+   ├─ HTTP Request Tool (ai_tool)
+   ├─ Postgres Tool (ai_tool, read-only)
+   └─ Window Buffer Memory (ai_memory)
+3. Webhook Response (send AI reply)
+```
+
+### Database Sync
+
+```
+1. Schedule (every 15 min)
+2. Postgres (SELECT WHERE updated_at > last_sync)
+3. IF (records exist)
+4. MySQL (INSERT/UPDATE)
+5. Postgres (UPDATE sync_log)
+```
+
+---
+
+## Workflow Creation Checklist
+
+**Planning**: Identify pattern → List nodes ([[mcp-tools|search_nodes]]) → Plan data flow → Plan error handling
+
+**Implementation**: Create with trigger → Add data sources → Configure auth → Add transformation → Add outputs → Add error handling
+
+**[[Validation]]**: [[mcp-tools|validate_node]] each node → validate_workflow → Test with sample data → Handle edge cases
+
+**Deployment**: Review settings → Activate (`activateWorkflow` operation) → Monitor first executions
+
+## Instagram Publishing (Meta Graph API)
+
+### Single Image Post
+
+```
+Webhook → POST /{ig}/media (image_url + caption) → Wait 10s → POST /{ig}/media_publish
+```
+
+```javascript
+// Step 1: Create media container
+POST https://graph.facebook.com/v18.0/{ig_user_id}/media
+{ "image_url": "https://...", "caption": "...", "access_token": "..." }
+// → { "id": "container_id" }
+
+// Step 2: Publish
+POST https://graph.facebook.com/v18.0/{ig_user_id}/media_publish
+{ "creation_id": "container_id", "access_token": "..." }
+```
+
+### Carousel Post
+
+```
+POST /{ig}/media (is_carousel_item=true) × N
+→ POST /{ig}/media (CAROUSEL, children=[...])
+→ POST /{ig}/media_publish
+```
+
+**Active workflow**: `gRjdWA4KKjRH2kCM` (single image only — carousel TODO)
+
+**Note**: `image_url` must be a public URL. Upload to `wp-content/uploads/smm/` via SCP first if needed.
+
+## YouTube / n8n Video Processing Patterns
+
+### YouTube Access from VPS
+
+All public Invidious instances unsuitable for VPS — 20-30s timeout overhead before failure (inv.nadeko.net timeout, privacyredirect.com 404, fdn.fr DNS unresolved). **Only reliable method:** cookies-based authentication via yt-dlp.
+
+### Telegram Local Bot-API: Filesystem Paths vs HTTP URLs
+
+Local `telegram-bot-api` returns absolute filesystem paths, not HTTP URLs.
+
+**Fix:** Detect path format — if absolute filesystem path, read directly from disk instead of attempting HTTP fetch.
+
+### Binary Transfer: Pass URLs Not Payloads
+
+n8n binary transfer via Download File → Transcribe File node chain is unreliable.
+
+**Fix:** Pass `telegram_url` directly to downstream video-service instead of binary payload. General rule: pass URLs between services instead of binary payloads via HTTP when possible.
+
+### [[Claude]] + Telegram Delivery
+
+- Always **disable `parse_mode`** when [[Claude]] controls text content (---, ##, ** break Telegram renderer) <!-- decay:2026-03-25 tier:cold rel:0.4 -->
+- Strip code fences in Extract Note node: `.replace(/\`\`\`[\w]*\n|\`\`\`/g, '')` <!-- decay:2026-03-25 tier:cold rel:0.4 -->
+
+## n8n Workflow Debugging Quick Reference
+
+```
+1. Check execution logs:   mcp__n8n-mcp__n8n_executions
+2. Inspect workflow:       mcp__n8n-mcp__n8n_get_workflow  (before changes)
+3. Inline fixes:           mcp__n8n-mcp__n8n_update_partial_workflow
+4. Validate after:         mcp__n8n-mcp__n8n_get_workflow
+```
+
+## API Error Handling Patterns (General)
+
+- Validate API response objects before calling string methods — wrap in `try-catch` with `typeof` checks <!-- decay:2026-03-25 tier:cold rel:0.4 -->
+- Log error type separately (`RequestBlocked` / `NoTranscript` / `ParseError`) for operational debugging <!-- decay:2026-03-25 tier:cold rel:0.4 -->
+- Test error paths explicitly (no captions, blocked IP, missing data) — not just happy path <!-- decay:2026-03-25 tier:cold rel:0.4 -->
+- For cloud-blocked services, pivot to user-provided files instead of fighting IP bans <!-- decay:2026-03-25 tier:cold rel:0.4 -->
+
+## Large Media File Pipeline Pattern
+
+1. Detect source protocol/format
+2. Normalize to intermediate format (mp3/jpg)
+3. Implement streaming/chunking for processing
+4. Aggregate results before final delivery
+
+Always check if local/self-hosted versions of APIs exist (e.g., telegram-bot-api, llm inference) — often remove size limits entirely and reduce latency.
+
+## Vision + Transcription Pipeline
+
+Extract frames → describe visually → combine with speech recognition → richer context for downstream LLM. Captures content that audio-only misses.
+
+<!-- source: [[YT-2026-03-22-Q9LXDfEFFmY_2026-03-22-08-19]].md -->
+PATTERN: Двухэтапное подключение инструментов через промты
+Two-prompt tool integration: (1) API docs + spec parsing, (2) API key + format params. Achieves full integration in 2-5 min vs 4-8h N8n workflow. Applies to REST APIs, Nano Banana, Key AI.
+
+<!-- source: [[YT-2026-03-22-Q9LXDfEFFmY_2026-03-22-08-19]].md -->
+PATTERN: Автоматическое тестирование интеграций
+[[Claude]] auto-executes test requests post-API-connection. Logs contain execution timestamps. Requires no explicit test instructions.
+
+<!-- source: [[YT-2026-03-22-Q9LXDfEFFmY_2026-03-22-08-19]].md -->
+PATTERN: Замена N8n workflows для 80% задач
+[[Claude]] replaces N8n for simple integrations. Before: 4-8h N8n setup. After: 2 prompts, auto-testing, multiple simultaneous operations.
+
+<!-- source: [[YT-2026-03-22-Q9LXDfEFFmY_2026-03-22-08-19]].md -->
+PATTERN: Использование Telegram как основного интерфейса
+Telegram interface preferred over terminal for quick commands. Instant result notifications. Web UI alternative available.
+
+<!-- source: [[YT-2026-03-22-Q9LXDfEFFmY_2026-03-22-08-19]].md -->
+PATTERN: Параметризация генерации изображений
+Resolution (1K default), format (PNG), aspect ratio (16:9), prompt enhancement (optional). Fast generation without manual config.
+
+<!-- source: [[YT-2026-03-22-Q9LXDfEFFmY_2026-03-22-08-19]].md -->
+PATTERN: Когда N8n остается необходимым
+N8n still needed for: YouTube scraping, complex data logic, logging/monitoring, alt LLM models, [[Claude]] offload at scale. Not for simple APIs.
+
+<!-- source: [[YT-2026-03-22-Q9LXDfEFFmY_2026-03-22-08-19]].md -->
+GOTCHA: N8n больше не нужен для простых API интеграций
+N8n simple API workflows: 4-8h dev vs [[Claude]]: 2 prompts 5min. Recommendation: use N8n only critical parsing, else [[Claude]].
+
+<!-- source: [[YT-2026-03-22-Q9LXDfEFFmY_2026-03-22-08-19]].md -->
+PATTERN: Фазированный подход к расширению возможностей
+Phase 1 (week 1): [[Claude]] Telegram + Nano Banana 2 + task mgmt. Phase 2 (week 2-3): Notion MCP + Skills + tracking. Phase 3 (week 4+): Drive + N8n parsing + alt LLM.
+
+<!-- source: [[YT-2026-03-22-Q9LXDfEFFmY_2026-03-22-08-19]].md -->
+GOTCHA: N8n не умер, просто изменилась его роль
+N8n role shift: primary tool → specialized tool (parsing, logging, special cases). Hybrid [[Claude]]+N8n approach optimal, not full replacement.
+
+<!-- source: [[YT-2026-03-22-xUQ1BAH1vtw_2026-03-22-08-45]].md -->
+
+### PATTERN — Структура обработки данных
+
+5-step data pipeline: natural language request → AI agent determines MCP tools → Firecrawl scraping → structured output formatting → results saved to DataTable/Google Sheets → user response via Telegram.
+
+<!-- source: [[YT-2026-03-22-xUQ1BAH1vtw_2026-03-22-08-45]].md -->
+
+### GOTCHA — Ограничение Telegram на объем текста
+
+Telegram enforces strict character limits per message. Mitigation: duplicate results to Google Sheets/DataTable; provide shortened Telegram response + link to full table for large datasets.
+
+<!-- source: [[YT-2026-03-22-xUQ1BAH1vtw_2026-03-22-08-45]].md -->
+
+### GOTCHA — Выбор модели LLM критичен
+
+Select LLM capable of handling large context. Recommended: [[Claude]] 3.5 Nano (primary) + [[Claude]] 3.5 (fallback) for scraping result analysis. Weak models fail with bulk data processing.
+
+<!-- source: [[YT-2026-03-22-xUQ1BAH1vtw_2026-03-22-08-45]].md -->
+
+### EXAMPLE — Анализ конкурентов (агентства таргетированной рекламы)
+
+Query: analyze advertising agency websites → extract unique offers, compare advantages, market overview, structured table output.
+
+<!-- source: [[YT-2026-03-22-xUQ1BAH1vtw_2026-03-22-08-45]].md -->
+
+### EXAMPLE — Сравнение цен на товары
+
+Query: price comparison across Moscow retailers → store list, prices, source links, sorted by cost.
+
+<!-- source: [[YT-2026-03-22-xUQ1BAH1vtw_2026-03-22-08-45]].md -->
+
+### EXAMPLE — Поиск трендов и новостей
+
+Query: latest AI startup news → current news, trend analysis, significant events, structured summary.
+
+<!-- source: [[YT-2026-03-22-xUQ1BAH1vtw_2026-03-22-08-45]].md -->
+
+### EXAMPLE — Сбор данных о блогах
+
+Query: popular marketing Instagram blogs → account list, content description, profile links, audience assessment.
+
+<!-- source: [[YT-2026-03-22-xUQ1BAH1vtw_2026-03-22-08-45]].md -->
+
+### EXAMPLE — Анализ отзывов о продукте
+
+Query: marketer reviews of Canva → consolidated sentiment analysis highlighting ease-of-use and template library as key strengths.
+
+<!-- source: [[YT-2026-03-22-xUQ1BAH1vtw_2026-03-22-08-45]].md -->
+
+### PATTERN — Use cases для предпринимателей
+
+Competitor/partner analysis, market report automation, content base creation, niche discovery, data-driven decision making, automated monitoring processes.
+
+<!-- source: [[YT-2026-03-22-xUQ1BAH1vtw_2026-03-22-08-45]].md -->
+
+### PATTERN — Последовательность настройки агента
+
+10-step setup: import template, register Firecrawl, obtain API key, copy MCP URL, configure MCP Client node, set Russian prompts, configure Telegram, connect Google Sheets/DataTable, test, scale.
+
+<!-- source: [[YT-2026-03-22-xUQ1BAH1vtw_2026-03-22-08-45]].md -->
+
+### GOTCHA — Безопасность API ключей
+
+Remove all API keys after demo video recording. Never publish production keys publicly. Rotate keys regularly on compromise suspicion.
+
+<!-- source: [[YT-2026-03-22-xUQ1BAH1vtw_2026-03-22-08-45]].md -->
+
+### PATTERN — Преобразование сырых данных в структуру
+
+MCP returns raw data → AI agent structures/analyzes → technical details abstracted → clean Russian output formatted for tables.
+
+<!-- source: [[YT-2026-03-22-xUQ1BAH1vtw_2026-03-22-08-45]].md -->
+
+### PATTERN — Хранение результатов
+
+DataTable: interim storage in workflow database. Google Sheets: long-term shared storage. Telegram: summary digest. Tables contain full data, Telegram delivers key takeaways.
+
+<!-- source: [[YT-2026-03-22-xUQ1BAH1vtw_2026-03-22-08-45]].md -->
+
+### PATTERN — Формулирование запросов
+
+Use plain Russian, be specific about task and result format (list/table/analysis), clarify geography and timeframe when relevant.
+
+<!-- source: [[YT-2026-03-22-xUQ1BAH1vtw_2026-03-22-08-45]].md -->
+
+### EXAMPLE — Эффективные запросы
+
+Good: detailed queries with location/timeframe and expected output format. Bad: vague requests like 'find information' or 'check competitors' without specificity.
+
+<!-- source: [[YT-2026-03-22-xUQ1BAH1vtw_2026-03-22-08-45]].md -->
+
+### PATTERN — Итеративное уточнение
+
+Start broad → analyze results → refine query based on findings → repeat for precision.
+
+<!-- source: [[YT-2026-03-22-xUQ1BAH1vtw_2026-03-22-08-45]].md -->
+
+### PATTERN — Двухуровневая система промптов
+
+User prompt triggers MCP tool usage; system prompt contains detailed MCP instructions. Both in Russian for optimal LLM processing.
+
+<!-- source: [[YT-2026-03-22-xUQ1BAH1vtw_2026-03-22-08-45]].md -->
+
+### GOTCHA — Ограничение Telegram на объе�� текста
+
+Telegram has strict character limits. Workaround: duplicate results to Google Sheets/DataTable; send abbreviated response + link in Telegram.
+
+<!-- source: YT-2026-03-23-xazEqMaLSmY_2026-03-23-18-55.md -->
+
+### PATTERN — Автоматизация через n8n
+
+Connect n8n to create automated workflows between agents and external systems. Cross-agent automation.
+
+## Distilled 2026-03-24
+
+### n8n Expression Engine Limitations
+
+- **IF node output indices unreliable**: n8n expression engine cannot evaluate ternary operators (`? :`) or optional chaining (`?.`) correctly — outputs always route to FALSE branch. **Fix**: remove IF node; use HTTP Request node's native `continueOnFail` + `onError` error handling instead. <!-- decay:2026-03-24 tier:cold rel:0.385 -->
+- **Avoid conditional branching (IF/Switch)** when downstream node error handling suffices — use node-native error controls (`continueOnFail`, `onError`) to reduce expression evaluation surface area. <!-- decay:2026-03-24 tier:cold rel:0.385 -->
+
+### External API Calls
+
+- **Use HTTP Request MCP tool** for all external network calls inside n8n — the task runner sandbox does not expose `fetch` or `axios`. <!-- decay:2026-03-24 tier:cold rel:0.385 -->
+- **Validate model IDs** against a working reference node before using in new Claude call nodes. Last verified working ID: `claude-sonnet-4-5` (confirmed 2026-03-22; `claude-sonnet-4-6-20250514` returns 404). <!-- decay:2026-03-24 tier:cold rel:0.385 -->
+- **Add guard clauses** before accessing `response.content[0].text` in downstream processing nodes — failed API calls return error objects, not structured responses. Pattern: return `{skipped: true}` when extraction errors. <!-- decay:2026-03-24 tier:cold rel:0.385 -->
+
+### Workflow Reliability
+
+- **Commit workflow changes immediately** after a fix is confirmed working — preserves tested state and enables clean rollback. <!-- decay:2026-03-24 tier:cold rel:0.385 -->
+- **Case-insensitive project lookup + explicit mapping**: when batch processing stalls on name resolution, print the project→key mapping at startup and verify CLI args match storage keys exactly (case and spacing). <!-- decay:2026-03-24 tier:cold rel:0.385 -->
+
+### AI Agent Patterns
+
+- **Hybrid routing — Haiku→Sonnet two-stage**: use Haiku for fast/cheap classification, Sonnet for deep analysis. Reduces costs while maintaining accuracy on complex decisions. <!-- decay:2026-03-24 tier:cold rel:0.385 -->
+- **Content-first analysis**: pass full text content to analyzer nodes (not just metadata/statistics) — semantic pattern detection requires actual content, not surface counts. <!-- decay:2026-03-24 tier:cold rel:0.385 -->
+- **State-driven deduplication**: track processed insight hashes + timestamps in a state file to prevent duplicate task generation across multiple router runs. <!-- decay:2026-03-24 tier:cold rel:0.385 -->
+- **Sub-agent delegation via MCP**: connect n8n to Claude Code via MCP to delegate workflow creation/debugging tasks. Claude Code with n8n Skills knowledge base can plan workflow logic before implementing, reducing errors vs direct generation. <!-- decay:2026-03-24 tier:cold rel:0.385 -->
+- **English prompts for token efficiency**: Claude processes English prompts significantly cheaper than Russian/other languages — use English for all automated n8n prompt nodes. <!-- decay:2026-03-24 tier:cold rel:0.385 -->
+
+### Notification Architecture
+
+- **Tri-channel notification pattern**: critical findings → Telegram (real-time alert), medium-priority tasks → Obsidian note (persistent todo), low-priority flags → state file (background monitoring). <!-- decay:2026-03-24 tier:cold rel:0.385 -->
+
+## Video Notes Distilled 2026-03-24
+
+### Claude Code + n8n MCP Integration (from youtube-notes/n8n/)
+
+- **Plan Mode before implementation**: always activate Planning Mode in Claude Code before workflow creation. Claude first builds a logical dependency map, then implements — significantly fewer structural errors than direct generation without planning. <!-- decay:2026-03-24 tier:cold rel:0.385 -->
+- **n8n API key setup for MCP**: create API key at Settings → n8n API → Create API Key; name it `mcp-n8n`. Add to `mcp.json` with instance URL (no trailing slash). Verify connection by asking Claude to list existing workflows. <!-- decay:2026-03-24 tier:cold rel:0.385 -->
+- **Specialized Claude agent > generic**: Claude Code loaded with the n8n Skills GitHub knowledge base produces workflows with correct node architecture; generic Claude/ChatGPT generates workflows without logical pre-planning and produces more structural errors. <!-- decay:2026-03-24 tier:cold rel:0.385 -->
+- **Enable auto-execute in Claude Code**: activate the "allow automatic execution without confirmation" setting. Without it, every operation requires manual approval, slowing workflow creation significantly. <!-- decay:2026-03-24 tier:cold rel:0.385 -->
+- **mcp.json config pattern**: <!-- decay:2026-03-24 tier:cold rel:0.385 -->
+  ```json
+  { "n8n-api-key": "<key>", "url": "https://your-n8n-instance" }
+  ```
+
+### Claude Code Skills Management (from youtube-notes/ai-tools/)
+
+- **Lazy Loading for skills**: store only the Description (when/why to invoke) in `CLAUDE.md`; keep full skill logic in individual `skill.md` files inside each skill folder. Load-on-demand reduces session context by ~50% (394 → 207 lines). <!-- decay:2026-03-24 tier:cold rel:0.385 -->
+- **Remove duplicate skills**: audit installed skills for functional overlap; remove redundant ones. 22 skills → 15 after dedup — same functionality, lower context overhead. <!-- decay:2026-03-24 tier:cold rel:0.385 -->
+- **Reference file for brand voice**: create `reference.md` with brand voice, content examples, audience description, and writing rules. Link content skills (SEO, copywriting, social) to this file for personalized output instead of generic results. <!-- decay:2026-03-24 tier:cold rel:0.385 -->
+- **Skill Description must be explicit**: description must state clearly *when and why* Claude should invoke the skill instead of solving directly. Vague descriptions cause Claude to skip the skill entirely. <!-- decay:2026-03-24 tier:cold rel:0.385 -->
+- **Use official Anthropic Skill Creator**: includes automated tests, before/after performance comparison, and trigger optimization — superior to community templates. <!-- decay:2026-03-24 tier:cold rel:0.385 -->
+- **Don't pre-install skills speculatively**: install skills only when a specific task arises that Claude cannot handle natively. Target 12–15 active skills maximum. <!-- decay:2026-03-24 tier:cold rel:0.385 -->
+
+### Token Optimization Patterns (from youtube-notes/ai-tools/)
+
+- **English prompts in n8n nodes**: Russian-language prompts consume significantly more tokens than English equivalents — use English for all automated Claude call nodes in n8n workflows. <!-- decay:2026-03-24 tier:cold rel:0.385 -->
+- **Sub-agent delegation for routine tasks**: delegate repetitive operations (video transcription, subtitle generation, content optimization) to cheaper sub-agents via n8n MCP rather than loading the primary Claude Code agent. <!-- decay:2026-03-24 tier:cold rel:0.385 -->
+- **Obsidian as filtered memory backend**: structured Obsidian vault with tags and graph links allows Claude to read only 10–50 relevant notes instead of 1000+ — token savings up to 95% vs. flat file folder. <!-- decay:2026-03-24 tier:cold rel:0.385 -->
+- **Caching as interim measure**: prompt caching reduces token costs ~10x but is a workaround; proper knowledge structure (Obsidian graph) achieves 95% savings structurally. <!-- decay:2026-03-24 tier:cold rel:0.385 -->
+
+### Claude Code + Telegram Deployment (from youtube-notes/ai-tools/)
+
+- **VPS requirements for Claude Code**: Ubuntu 22.04, minimum $4–6/month VPS (Vultr or equivalent). SSH access required for initial setup only; all subsequent interaction via Telegram. <!-- decay:2026-03-24 tier:cold rel:0.385 -->
+- **Anthropic officially permits Telegram bridges**: WhatsApp, Telegram, Discord bridges are explicitly allowed per Anthropic ToS. Use `RebootPrompt.en` file (>1100 lines) to establish the bridge. <!-- decay:2026-03-24 tier:cold rel:0.385 -->
+- **Upload large config files via VS Code Remote SSH** — do not paste into terminal. Files >100 lines are error-prone when copied inline. <!-- decay:2026-03-24 tier:cold rel:0.385 -->
+- **Keep terminal access open for first 1–2 days**: Claude Code self-debugs by reading logs, but keep SSH available until system is stable. After stabilization, full Telegram-only operation is reliable. <!-- decay:2026-03-24 tier:cold rel:0.385 -->
+- **Command approval mode**: keep enabled during initial deployment (first 1–2 days). Disable only after confirming stable operation. Acts as safety layer for server-side actions. <!-- decay:2026-03-24 tier:cold rel:0.385 -->
+- **Four-level memory architecture**: configure Claude Code with hierarchical memory (session, project, user, global levels) for persistent context across Telegram conversations. <!-- decay:2026-03-24 tier:cold rel:0.385 -->
+
+<!-- source: YT-2026-03-28-wOWkxH2JTq0_2026-03-28-15-31.md -->
+PATTERN: Создание структурированных отчетов в Obsidian
+E-agent + FireCrawl workflow: automatic data collection → structured tables (links, phones, emails, prices) in Obsidian. ~10 min per medium-complexity task.
+
+<!-- source: YT-2026-03-28-wOWkxH2JTq0_2026-03-28-15-31.md -->
+PATTERN: Мониторинг цен конкурентов
+Long-term price tracking setup: agent checks multiple times per hour, alerts on price changes/discounts. Works across multiple retail sites simultaneously.
+
+<!-- source: YT-2026-03-28-wOWkxH2JTq0_2026-03-28-15-31.md -->
+PATTERN: Применимые сценарии использования
+Use cases: competitor analysis, lead generation, market research, scrape job listings, change monitoring, database creation, social media parsing.
+
+<!-- source: YT-2026-03-28-GQRTMk2bBlA_2026-03-28-18-07.md -->
+
+### EXAMPLE: Автоматизация через n8n
+
+Автоскрейпинг постов, создание контента для платформ, обработка видео без участия, расписание выполнения задач.
+
+<!-- source: YT-2026-03-29-pPkqtxsZwus_2026-03-29.md -->
+PATTERN — DataTable как временный буфер перед выгрузкой
+• Транскрипции и метаданные накапливаются в DataTable внутри n8n, ежесуточно выгружаются в Google Drive / Obsidian, строки удаляются
+• Расписание разнесено по времени (4:45 / 8:00 / 11:45) для исключения конкурирующих нагрузок
+• Шаблон: накопление → периодическая выгрузка → очистка
+
+
+<!-- triage:2026-04-15 — extracted from claudeclaw-features n8n-templates -->
+
+### Content & SEO Automation Templates
+
+- [PATTERN] **Google Forms → AI blog pipeline**: Google Forms collects topic/keyword inputs → n8n webhook receives submission → Groq/Mistral generates SEO-optimised post → publishes to WordPress. Generalises to any form-driven content factory; swap LLM provider without changing flow structure. <!-- decay:2026-03-24 tier:cold rel:0.385 -->
+
+- [PATTERN] **Stale content detector**: Scheduled n8n workflow → fetch sitemap → for each URL: crawl page content → send to OpenAI with a freshness-scoring prompt → write results to Google Sheets (ContentAudit tab). Flag pages where score < threshold for manual review. Avoids crawling budget waste and preserves ranking signals on evergreen content. <!-- decay:2026-03-24 tier:cold rel:0.385 -->
+
+- [PATTERN] **Lead qualification + auto-response via OpenAI + Gmail**: Webhook or form trigger → OpenAI scores lead (ICP fit, urgency) and generates personalised reply → Gmail sends draft or auto-sends based on score threshold. Reduces first-response time to seconds; human reviews flagged edge cases only. Guard clause: wrap OpenAI call in error node — API failures must not silently drop leads. <!-- decay:2026-03-24 tier:cold rel:0.385 -->
+
+## PATTERN — Автоматизация бронирования встреч с Google Календарём
+
+Source: [[2026-04-14-77579-автоматизация-бронирования-встреч-с-google-календа]]
+
+- Webhook trigger принимает заявку → проверка доступности слота через Google Calendar API <!-- decay:2026-03-24 tier:cold rel:0.385 -->
+- OAuth2 Google credentials в n8n: один credential покрывает и Calendar API и Gmail API <!-- decay:2026-03-24 tier:cold rel:0.385 -->
+- Подтверждение/отказ автоматически отправляется через Gmail с деталями встречи <!-- decay:2026-03-24 tier:cold rel:0.385 -->
+- Антипаттерн: не использовать polling Calendar — только webhook + event-driven подход <!-- decay:2026-03-24 tier:cold rel:0.385 -->
+- Тест: создать тестовый календарь перед подключением production-календаря <!-- decay:2026-03-24 tier:cold rel:0.385 -->
+
+## PATTERN — Автоматизация обработки лидов через OpenAI и Gmail
+
+Source: [[2026-04-14-77585-автоматизация-обработки-лидов-через-openai-и-gmail]]
+
+- Входящая форма на сайте → n8n webhook → OpenAI scoring (оценка качества лида по критериям) <!-- decay:2026-03-24 tier:cold rel:0.385 -->
+- OpenAI генерирует персонализированный email-ответ на основе данных формы и score <!-- decay:2026-03-24 tier:cold rel:0.385 -->
+- Gmail OAuth2: использовать dedicated service account, не личный email — для production надёжности <!-- decay:2026-03-24 tier:cold rel:0.385 -->
+- Конфиденциальность: данные лидов не логировать в n8n execution data (настройка "Save data" = off) <!-- decay:2026-03-24 tier:cold rel:0.385 -->
+- Pipeline: форма → webhook → LLM score → условный branch (высокий/низкий лид) → email + CRM запись <!-- decay:2026-03-24 tier:cold rel:0.385 -->
+
+<!-- triage:2026-04-19 — extracted from claudeclaw-features n8n-templates priority 8 -->
+
+### PATTERN: WordPress → соцсети автопубликация через WP Webhooks (8/10)
+
+- Trigger: WP Webhooks plugin fires webhook on post publish → n8n receives → adapts content per platform → publishes to Instagram/Facebook/etc. <!-- decay:2026-03-24 tier:cold rel:0.385 -->
+- Plugin: WP Webhooks (free tier covers post publish event) — no custom PHP needed <!-- decay:2026-03-24 tier:cold rel:0.385 -->
+- n8n side: one webhook trigger → Switch node by social platform → platform-specific HTTP Request nodes <!-- decay:2026-03-24 tier:cold rel:0.385 -->
+- Risk: API key rotation on social platforms breaks silently — add error branch with Telegram alert <!-- decay:2026-03-24 tier:cold rel:0.385 -->
+- Source: feature-watcher #77684 (8/10) <!-- decay:2026-03-24 tier:cold rel:0.385 -->
+
+### PATTERN: Автоматизация сбора и публикации отзывов (8/10)
+
+- Pipeline: email/form trigger → AI sentiment analysis → auto-publish positive reviews to WordPress → flag negative reviews for manual review <!-- decay:2026-03-24 tier:cold rel:0.385 -->
+- WordPress integration: use WP REST API posts endpoint with custom post type "reviews" or standard post with category <!-- decay:2026-03-24 tier:cold rel:0.385 -->
+- Sentiment gate: only auto-publish if sentiment score > threshold (e.g., 0.8) — prevents negative review leakage <!-- decay:2026-03-24 tier:cold rel:0.385 -->
+- Source: feature-watcher #77729 (8/10) <!-- decay:2026-03-24 tier:cold rel:0.385 -->
+
+### PATTERN: YouTube видео → мультиплатформенный контент (8/10)
+
+- Pipeline: YouTube URL input → transcript extract (YouTube Data API or Whisper) → AI reformat → publish as blog post (WordPress) + social captions (Instagram/TG) + newsletter <!-- decay:2026-03-24 tier:cold rel:0.385 -->
+- Extends existing "Content repurposing pipeline" pattern — adds WordPress as output channel <!-- decay:2026-03-24 tier:cold rel:0.385 -->
+- Rate limit: YouTube Data API has 10,000 units/day quota — batch processing should check quota before running <!-- decay:2026-03-24 tier:cold rel:0.385 -->
+- Source: feature-watcher #77743 (8/10) <!-- decay:2026-03-24 tier:cold rel:0.385 -->
+
+<!-- triage:2026-04-23 — extracted from claudeclaw-features n8n-templates priority 8-9 -->
+
+### PATTERN: Автоматическое резервное копирование n8n в Google Drive (8/10)
+
+- Scheduled trigger в n8n → экспорт всех workflows через n8n REST API → загрузка JSON-файлов в Google Drive папку <!-- decay:2026-03-24 tier:cold rel:0.385 -->
+- OAuth2 Google Drive: один credential покрывает Drive API — создать dedicated service account, не личный аккаунт <!-- decay:2026-03-24 tier:cold rel:0.385 -->
+- Риск: скрипт очистки старых бэкапов может случайно удалить актуальные данные — использовать retention policy по дате, не по количеству <!-- decay:2026-03-24 tier:cold rel:0.385 -->
+- Integration: для VPS n8n (157.180.33.253) — бэкап через n8n API endpoint /api/v1/workflows, JWT auth <!-- decay:2026-03-24 tier:cold rel:0.385 -->
+- Source: feature-watcher #77936 (8/10) <!-- decay:2026-03-24 tier:cold rel:0.385 -->
+
+### PATTERN: Автоматизация нарезки видео для соцсетей через RenderIO + OpenAI (9/10)
+
+- Pipeline: исходное видео (Google Drive) → OpenAI (транскрипция + выделение ключевых моментов) → RenderIO (нарезка по таймкодам) → Google Drive (готовые клипы) <!-- decay:2026-03-24 tier:cold rel:0.385 -->
+- n8n-nodes-renderio: установить через npm в n8n instance (community node) — `npm install n8n-nodes-renderio` в container <!-- decay:2026-03-24 tier:cold rel:0.385 -->
+- Google Sheets как job queue: входящие видео → обработанные → ошибки; OAuth2 credential покрывает Sheets + Drive <!-- decay:2026-03-24 tier:cold rel:0.385 -->
+- Антипаттерн: не хранить API-ключи RenderIO в Set-нодах — только через n8n Credentials manager <!-- decay:2026-03-24 tier:cold rel:0.385 -->
+- Применимость: YouTube Shorts, Instagram Reels, TikTok — один workflow, разные output-профили через Switch node <!-- decay:2026-03-24 tier:cold rel:0.385 -->
+- Source: feature-watcher #77937 (9/10) <!-- decay:2026-03-24 tier:cold rel:0.385 -->
+
+## Distilled 2026-04-22
+
+### Infrastructure & Database Patterns
+
+- **GOTCHA: pgvector extension missing from default `postgres:15` image** — `CREATE EXTENSION pgvector` fails silently or errors. Fix: replace image with `pgvector/pgvector:pg15`. Collation warning after pgvector install (Debian version mismatch) is functionally harmless.
+- **GOTCHA: All embeddings fail (0 rows inserted) → wrong Gemini model or missing outputDimensionality** — incorrect model name (e.g., `gemini-embedding-001`) or missing `outputDimensionality` parameter causes silent failures. Fix: verify model name and set `outputDimensionality=768`.
+- **GOTCHA: Postgres tables owned by `postgres` user → app user lacks permissions** — after migration, `n8n_admin` cannot access tables owned by `postgres`. Fix: `GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO n8n_admin`.
+- **PATTERN: PostgreSQL LISTEN/NOTIFY event bus** — use `pg_notify` trigger on `INSERT` into an `events` table to broadcast new events; verify with a `LISTEN` smoke test before connecting consumers.
+- **PATTERN: Verify DB schema changes immediately after migration** — run direct queries and test inserts after any `CREATE TABLE`, `ADD COLUMN`, or trigger creation. Catches permission and trigger failures early.
+- **PATTERN: Verify embedding model name and output dimensionality** — when debugging embedding failures, explicitly log the model string and `outputDimensionality` parameter; incorrect values produce 0 rows with no error.
+
+### Workflow Reliability
+
+- **PATTERN: n8n dry runs before activation** — use manual dry runs with test events before activating workflows to catch configuration errors (wrong HTTP methods, expression syntax) without affecting production.
+- **PATTERN: Pass all data annotations between nodes** — fields annotated in early nodes (e.g., `_report_age_days` in Annotate Age) must be explicitly forwarded to downstream nodes (Build Gemini Prompt). Data transforms can silently drop annotation fields.
+- **PATTERN: Price verification step for real-time signal agents** — agents processing market prices must verify input price is within tolerance of current market price before generating signals, preventing signals based on stale or synthetic data.
+- **PATTERN: API endpoint fallback on IP ban** — when an API bans the VPS IP (e.g., Binance weight overload), switch to an alternative API with compatible format (e.g., Bybit public API for crypto prices). Update parsing to match new response schema.
+- **PATTERN: Group API records by entity before aggregate metrics** — when an API flattens records (e.g., CFTC returning individual items), group by entity (commodity) and sort by date before calculating rank or percentile metrics; otherwise calculations run on single-record windows.
+- **PATTERN: Handle multiple source datasets for same domain** — some data sources (CFTC) split data across multiple endpoints by instrument class (commodities vs financial futures). WF11 requires dual-dataset fetch with schema normalization.
+
+### Agent Signal Integrity
+
+- **FIX: PositioningAgent generated signal from stale COT data** — report age annotation was lost between nodes; downstream agent used 2022 data as if current. Fix: persist `_report_age_days` through all transforms; add age guard before signal emission.
+- **FIX: Telegram message showed empty `refs:` despite `knowledge_refs` populated** — `telegram_text` read `signal.knowledge_refs` (often `[]` from Gemini) instead of an `effective_refs` fallback. Fix: compute `effective_refs` variable from multiple sources before building `telegram_text`.
+
+
+### Extracted from claudeclaw-features triage (2026-04-23)
+
+- [PATTERN] **Автоматизация рекламных креативов (NanoBanana + OpenRouter)**: web-форма (сайт + логотип + фото продукта) → OpenRouter multi-model → NanoBanana image gen → Google Drive вывод. Ключи: Anthropic API + OpenRouter API + Google Drive OAuth2. Применимо для content-factory AiGeneration.
+- [PATTERN] **Лидогенерация через Apify + Claude + Gmail**: Apify scraper (сбор бизнесов по нише/гео) → Claude генерирует персонализированное письмо → Gmail отправка. Google Sheets как хранилище лидов. `scheduleTrigger → Apify → Claude → Gmail`. Риск: конфиденциальность данных, нужен opt-out механизм.
+- [PATTERN] **Контент-пакеты YouTube (OpenAI + Gmail)**: n8n workflow генерирует полный пакет (заголовок, описание, теги, thumbnail-prompt, сценарий) из темы/идеи → отправка пакета на email. Интеграция: OpenAI API + Gmail OAuth2.
+
+## Distilled 2026-04-24
+
+### n8n Workflow Fixes
+
+- **FIX: signals_v2 UNION + ORDER BY produced empty response** — UNION + ORDER BY interaction caused column aliasing/ordering conflict across union branches. Fix: separate into two independent queries.
+- **FIX: signals_v2 used wrong column name 'created_at' for events table** — events table uses 'ts' not 'created_at'. Fix: correct column name to 'ts'.
+- **FIX: n8n API execute endpoint disabled → Confluence Engine workflow untriggerable** — API execute endpoint was disabled in n8n settings, preventing manual trigger of workflows. Fix: re-enable execute endpoint in n8n API settings.
+- **FIX: Format Alert returned array instead of object in runOnceForEachItem mode** — Code node returned `[{json:...}]` instead of simple object. Fix: return plain object directly from Code node when `runOnceForEachItem` is active.
+- **FIX: Spam on subsequent ticks due to re-logging existing decisions** — alerts sent for already-logged decisions on every tick. Fix: implement dedup via `INSERT ... WHERE NOT EXISTS + RETURNING`; place Format Alert after Log node so it only fires for new decisions.
+- **FIX: MacroAgent received stale COT event payload without current FRED values** — event payload from 2 days prior lacked current market state; MacroAgent prompt contained only regime labels. Fix: add 'Fetch regime state' Postgres node to WF17; patch 'Build Gemini Prompt' to inject `CURRENT MARKET STATE`.
+- **FIX: WF6 Parse FRED lost series_id → indicator="" for all rows** — node did not pair items with their source series. Fix: indexed pairing `items[i]` with `$('FRED Series List').all()[i]` to restore series_id.
+- **FIX: Fetch FRED indicators emitted duplicate items** — caused inflated prompt token count. Fix: deduplication within Build Gemini Prompt Code node.
+
+### n8n Patterns
+
+- **PATTERN: Backfill script for historical data corrections** — when updating historical records in a DB, use a separate backfill script that directly fetches, recalculates, and overwrites records rather than relying on scheduled workflows with `ON CONFLICT DO NOTHING` logic.
+- **PATTERN: Dual-dataset fetch for split CFTC data** — CFTC splits COT data across multiple endpoints by instrument class (physical commodities vs financial futures). WF11 requires dynamic URL selection and dual-schema parsing logic within the same workflow.
+- **PATTERN: Simplify with Filter node over Check Existing + Dedupe** — when Code node `runOnceForAllItems` fails on empty input, replace `Check Existing` + `Dedupe` with a plain `Filter` node for immediate actionability. Defer complex deduplication to a later version.
+- **PATTERN: n8n scheduler refresh via deactivate/activate cycle** — to refresh an n8n scheduler's in-memory cron after workflow schema changes, perform a full deactivate/activate cycle (not just save). May require explicit 'deploy' action if production-guard is active.
+- **PATTERN: Defensive null/undefined checks in Code nodes** — add guard clauses for null/undefined inputs in Code nodes (e.g., `Format Alert`) to prevent crashes when upstream deduplication or filtering emits empty items.
+- **PATTERN: Build Confluence Engine as separate workflow** — when new agent signals have different characteristics (frequency, asset class, agent types) from existing 'Signal Brain' workflows, build a dedicated 'Confluence Engine' workflow rather than modifying existing ones.
+
+## Distilled 2026-04-25
+
+### n8n Error Handling
+
+- **PATTERN: Configure n8n native Error Workflow** — n8n failed executions are silent by default. Fix: configure a dedicated Error Workflow (Workflow Settings → Error Workflow) with a Telegram/email alert node to surface failures immediately.
+- **FIX: Format Alert node crashed on `d.action.toUpperCase()` for undefined** — Postgres node emitted empty item despite dedup. Fix: add defensive null check: `const action = d.action ?? ''; action.toUpperCase()`.
+- **FIX: MacroAgent prompt received only regime labels without FRED values** — `macro_indicators` table was empty; `regime_state` was populated but event was 2 days old. Fix: add 'Fetch regime state' Postgres node; patch 'Build Gemini Prompt' to inject `CURRENT MARKET STATE`.
+- **FIX: WF6 Parse FRED lost `series_id` — `indicator=""` for all rows** — `$input.all()` did not merge upstream series list. Fix: indexed pairing `items[i] ↔ $('FRED Series List').all()[i]` to restore series_id.
+- **FIX: Fetch FRED indicators emitted duplicate items** — 3 upstream sources × 8 indicators caused inflated prompt tokens. Fix: deduplication within Build Gemini Prompt Code node.
+
+### n8n Data Flow Patterns (from global-patterns 2026-04-25)
+
+- **PATTERN: Defensive null/undefined checks in Code nodes** — add guard clauses for undefined inputs (e.g., `d.action ?? ''`) to prevent crashes when upstream dedup or filtering emits empty items.
+- **PATTERN: LLM agent prompts need current state + historical context** — inject both: historical event context AND current state data (e.g., latest market indicators) in the same prompt. Missing current state = stale reasoning.
+- **PATTERN: Explicit index pairing for multi-upstream merges** — when merging data from multiple upstream n8n nodes, pair by index (`items[i] ↔ upstream.all()[i]`) or use unique identifiers. `$input.all()` does not merge upstream data automatically.
+
+## Distilled 2026-04-25 (from troubleshooting-current)
+
+### n8n Error & Config
+
+- **GOTCHA: GDELT API ETIMEDOUT** — 'GDELT Events' node in 'Trading: Geopolitical Monitor' timed out. Apply 'Retry on Fail' to affected node.
+- **GOTCHA: Broken Telegram credential ID** — 'ARKHOS: Error Alert (realtime)' workflow had incorrect Telegram credential ID '1'. Fix: update credential reference to correct ID.
+- **FIX: Gemini HTTP 400 Bad Request in Trading workflows** — Gemini API key was hardcoded in workflow JSON, causing 400 errors. Fix: migrate to n8n credential, remove hardcoded key.
+- **NOTE: Gemini HTTP 400 in Weekly/Daily Macro Reports** — structural API call error; requires detailed investigation of prompt/node configuration.
+
+## Distilled 2026-04-25 (from global-patterns)
+
+### n8n Operational Patterns
+
+- **PATTERN: Categorize n8n failures before fixing** — when workflow failures detected, categorize by root cause (transient, obsolete, structural) before applying fixes.
+- **PATTERN: Backup + deactivate before patching** — always create backups, then deactivate affected workflows before applying patches.
+- **PATTERN: Migrate hardcoded API keys to credentials** — hardcoded keys in workflow JSON cause 400 errors and are a security risk. Migrate to dedicated n8n credentials.
+- **PATTERN: Retry on Fail + Continue on Fail for transient APIs** — apply 'Retry on Fail' and 'Continue on Fail' settings to nodes hitting unreliable external APIs (e.g., GDELT).
+
+## Distilled 2026-04-28
+
+### n8n Workflow Fixes & Gotchas
+
+- **FIX: Trading Decision Engine — missing HTTP method on AI node** — 'Claude/Gemini Analysis' node sent GET instead of POST. Fix: set `method: POST` explicitly on HTTP Request node. Updated via PUT API.
+- **FIX: n8n error-workflow 'mzrUOgpYW8OVSWGl' deactivated** — SEO Audit and Analytics workflows failed when calling it. Fix: activate workflow via DB + restart Docker container. Sequence: `UPDATE workflow_entity SET active=true WHERE id='...'` → `docker restart n8n`.
+- **GOTCHA: n8n PUT API requires minimal payload** — when updating workflow via PUT, include only `id`, `name`, `nodes`, `connections`, `settings`, `staticData`. Extra or missing required fields cause 400.
+- **PATTERN: Audit all related workflows after fixing one** — when fixing deprecated API model or missing HTTP method, grep all workflows for the same pattern (`gemini-2.0`, missing method). Latent siblings fail silently on their own schedule.
+- **PATTERN: gemini-2.0-flash deprecated 2026-04-13** — any n8n node with URL containing `gemini-2.0` will fail. Replace with `gemini-2.5-flash`. Check: `grep -r "gemini-2.0" workflow JSON`.
+
+## Distilled 2026-05-03
+
+### n8n Infra & Code Node Fixes
+
+- **PATTERN: Pre-deploy discovery before any n8n upgrade or modification** — before upgrading n8n or making structural changes, run a comprehensive discovery phase: check encryption key presence, list installed community nodes, verify DB version, read breaking-changes docs for all skipped minor versions. Prevents silent data loss and broken community nodes.
+- **GOTCHA: Untagged Docker image → silent `:latest` pull** — `image: n8nio/n8n` in docker-compose.yml will silently update to `:latest` on next `docker-compose pull`. Fix: always pin to a specific version tag (e.g., `image: n8nio/n8n:2.18.5`).
+- **GOTCHA: PostgreSQL index expression requires IMMUTABLE function** — `DATE_TRUNC('month', col)` is STABLE, not IMMUTABLE; PostgreSQL rejects it in index expressions. Fix: use a simple btree index on the column directly (e.g., `CREATE INDEX ON table (created_at DESC)`).
+- **FIX: n8n IF node blocking error** — after fixing IF node type errors, also upgrade `typeVersion` field and add `onError` handling to HTTP nodes in the same pass to prevent related failures.
+- **GOTCHA: n8n idempotency broken by non-deterministic pillar selection** — using `Math.random()` for pillar selection generates different SHA256 keys on retries → duplicate entries bypass idempotency filter. Fix: use a deterministic seed (e.g., timestamp-based or content hash) for any value included in the dedup key.
+- **GOTCHA: ffmpeg not available in n8n container** — n8n official Docker image does not include ffmpeg. Workflows depending on ffmpeg-stitch.js or audio conversion will fail. Fix: install ffmpeg in container via Dockerfile extension or mount binary; create stubs for dev/test environments.
+- **GOTCHA: n8n Code nodes use `$helpers.httpRequest`, not `this.helpers.httpRequest`** — `this.helpers.httpRequest` is undefined in n8n task runner sandbox. Fix: always use `$helpers.httpRequest` for HTTP calls inside Code nodes.
+
+## Distilled 2026-05-04
+
+### n8n Sandbox Gotchas (2026-05-03)
+
+- **GOTCHA: `fs.readFileSync` не работает в n8n Code nodes** — Code nodes работают в песочнице, не имеют доступа к файловой системе. Заменять на built-in nodes или переработать логику без FS.
+- **GOTCHA: `this.helpers.httpRequest` не работает** — правильный синтаксис для HTTP запросов в Code nodes: `$helpers.httpRequest`. Исправить синтаксис.
+- **GOTCHA: optional chaining `?.` не поддерживается в n8n expressions** — n8n expressions не поддерживают синтаксис optional chaining. Переписать без `?.`.
+- **GOTCHA: `require('crypto')` blocked by task-runner sandbox** — добавить `NODE_FUNCTION_ALLOW_BUILTIN=crypto` в env + restart n8n.
+- **GOTCHA: global `fetch` blocked by sandbox** — добавить `NODE_FUNCTION_ALLOW_BUILTIN=https` в env + restart n8n.
+- **GOTCHA: `executeCommand` disabled in n8n sandbox** — заменить с Code node stub; для shell-команд используй SSH node на хосте.
+- **GOTCHA: n8n Code nodes require node name, not ID, for `$('node-name')` references** — batch fix all `jsonBody` to use display names.
+- **GOTCHA: PostgREST returns `[]` which n8n HTTP node auto-splits, stopping workflow** — wrap Supabase GETs with Code nodes to handle empty arrays or use `alwaysOutputData` with size check.
+- **GOTCHA: `brand_voice` with `\n` breaks JSON interpolation in expressions** — use `JSON.stringify` in expressions for values containing newlines.
+
+### Kie.ai & External API Gotchas (2026-05-03)
+
+- **GOTCHA: Kie.ai Imagen `google/imagen4-fast` returns 500 'internal error'** — service-side error, не исправляется со стороны клиента. Переключиться на working slug `google/nano-banana`.
+- **GOTCHA: Kling slugs `kling-3.0-omni` gave 422** — working slug: `kling-2.6/image-to-video`. Всегда probe slugs через `/api/v1/jobs/createTask` если получен 422 или 500.
+- **GOTCHA: Imagen poll node returned 1 item instead of 4** — fixed by adjusting Aggregate node configuration for per-item processing.
+- **GOTCHA: Gemini API `maxOutputTokens` too low truncating output** — для structured JSON ответов установить `maxOutputTokens ≥ 4096`.
+- **PATTERN: When service-side 500 for specific slug — probe alternatives** — formTrigger → HTTP probe POST with incremented slugs → log `recordInfo?taskId` for status. Applies to Kie.ai, Kling, Imagen.
+
+### n8n Infrastructure Patterns (2026-05-03)
+
+- **GOTCHA: n8n Alpine hardened image lacks apt/apk** — ffmpeg нельзя установить напрямую в контейнер. Паттерн: SSH node → команда на хосте (ffmpeg уже установлен), volume mount `/data/output` для обмена файлами.
+- **GOTCHA: workflow idempotency-hit on existing failed record with same daily_key** — clean failed records before re-running idempotent workflows.
+- **GOTCHA: n8n workflow timeout (30s) for long-running tasks** — monitor execution status via n8n API (`mcp__n8n-mcp__n8n_executions`) for background processing; не ждать синхронного ответа.
+- **GOTCHA: TG preview referenced a deleted stub** — validate all node references after WF restructuring; test end-to-end before deploy.
+- **GOTCHA: SSH stderr hidden, making debugging difficult** — capture stderr explicitly in SSH node output; add error-log step before notify.
+
+### Telegram Webhook Gotchas (2026-05-03)
+
+- **GOTCHA: Telegram webhook automatically reset to `url: ""` by ClaudeClaw** — ClaudeClaw on VPS polls `lagedi_bot` (8009187517) in polling mode, which auto-deletes webhook. Fixed by migrating to dedicated `@StudiokookBot`. Verify webhook after any service restart with `getWebhookInfo`.
+- **GOTCHA: IF node `skip != true` evaluates FALSE when value is undefined** — использовать явную проверку action-значения: `action == 'skip'` вместо negation на undefined.

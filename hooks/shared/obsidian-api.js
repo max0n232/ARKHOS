@@ -218,6 +218,7 @@ function callAnthropic(model, systemPrompt, userMessage, maxTokens = 1500) {
                 'content-length': Buffer.byteLength(body)
             }
         }, res => {
+            res.setEncoding('utf8');
             let data = '';
             res.on('data', chunk => data += chunk);
             res.on('end', () => {
@@ -272,6 +273,7 @@ function callGemini(systemPrompt, userMessage, maxTokens = 2048, model = 'gemini
             method: 'POST',
             headers: { 'content-type': 'application/json', 'content-length': Buffer.byteLength(body) }
         }, res => {
+            res.setEncoding('utf8');
             let data = '';
             res.on('data', chunk => data += chunk);
             res.on('end', () => {
@@ -350,6 +352,7 @@ function sendTelegram(chatId, message) {
             method: 'POST',
             headers: { 'content-type': 'application/json', 'content-length': Buffer.byteLength(body) }
         }, res => {
+            res.setEncoding('utf8');
             let data = '';
             res.on('data', chunk => data += chunk);
             res.on('end', () => resolve(res.statusCode));

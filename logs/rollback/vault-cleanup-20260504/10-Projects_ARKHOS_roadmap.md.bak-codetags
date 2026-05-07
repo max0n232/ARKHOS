@@ -1,0 +1,289 @@
+---
+type: roadmap
+created: 2026-03-29
+updated: 2026-03-29
+tags:
+  - arkhos
+  - roadmap
+  - meta
+---
+
+# ARKHOS Roadmap
+
+Живой документ развития системы. DataviewJS рендерит dashboard, агенты ищут через QMD.
+
+## How to use
+
+**Добавить фичу:** вставь блок в нужную секцию:
+```
+#### Feature Name
+[feature:: Name] [status:: planned] [domain:: infra] [priority:: P2]
+Описание фичи для агентов и поиска.
+```
+
+**Статусы:** `done` | `active` | `planned` | `idea`
+**Домены:** `infra` | `studiokook` | `ai-gen` | `cross`
+**Приоритеты:** `P0` (critical) | `P1` (high) | `P2` (medium) | `P3` (low)
+
+---
+
+## Dashboard
+
+```dataviewjs
+const content = await dv.io.load(dv.current().file.path);
+const lines = content.split('\n');
+const features = [];
+const re = /\[feature:: (.+?)\].*\[status:: (.+?)\].*\[domain:: (.+?)\].*\[priority:: (.+?)\]/;
+const dateRe = /\[completed:: (.+?)\]/;
+
+let inCodeBlock = false;
+for (const line of lines) {
+  if (line.trim().startsWith('```')) { inCodeBlock = !inCodeBlock; continue; }
+  if (inCodeBlock) continue;
+  const m = line.match(re);
+  if (m) {
+    const d = line.match(dateRe);
+    features.push({ feature: m[1], status: m[2], domain: m[3], priority: m[4], completed: d ? d[1] : '' });
+  }
+}
+
+const active = features.filter(f => f.status === 'active').sort((a,b) => a.priority.localeCompare(b.priority));
+const planned = features.filter(f => f.status === 'planned').sort((a,b) => a.priority.localeCompare(b.priority));
+const ideas = features.filter(f => f.status === 'idea');
+const done = features.filter(f => f.status === 'done').sort((a,b) => (b.completed || '').localeCompare(a.completed || ''));
+const recent = done.filter(f => {
+  if (!f.completed) return false;
+  const diff = (Date.now() - new Date(f.completed).getTime()) / 86400000;
+  return diff <= 30;
+});
+
+dv.header(3, `🔨 Active (${active.length})`);
+if (active.length) dv.table(['Feature', 'Domain', 'P'], active.map(f => [f.feature, f.domain, f.priority]));
+else dv.paragraph('*No active features*');
+
+dv.header(3, `📋 Planned (${planned.length})`);
+if (planned.length) dv.table(['Feature', 'Domain', 'P'], planned.map(f => [f.feature, f.domain, f.priority]));
+else dv.paragraph('*No planned features*');
+
+dv.header(3, `💡 Ideas (${ideas.length})`);
+if (ideas.length) dv.table(['Feature', 'Domain', 'P'], ideas.map(f => [f.feature, f.domain, f.priority]));
+
+dv.header(3, `✅ Done recently (${recent.length}/${done.length} total)`);
+if (recent.length) dv.table(['Feature', 'Domain', 'Date'], recent.map(f => [f.feature, f.domain, f.completed]));
+```
+
+---
+
+## Features
+
+---
+
+### Core Infrastructure
+
+#### Ghost Session Memory
+
+[feature:: Ghost Session Memory] [status:: done] [domain:: infra] [priority:: P0] [completed:: 2026-03-19]
+Система памяти между сессиями. Ghost CLI + MCP deep_search. Хранит decisions, mistakes, knowledge, strategies. Автоматический inject релевантного контекста в новые сессии по file overlap.
+
+#### Session Audit Pipeline
+
+[feature:: Session Audit Pipeline] [status:: done] [domain:: infra] [priority:: P0] [completed:: 2026-03-19]
+PreCompact hook: Sonnet 4.6 анализирует транскрипт → errors в vault troubleshooting, patterns в vault global-patterns, facts в MEMORY.md. Upsert по ключам, без дубликатов. 424 turns обработано в первый запуск.
+
+#### Hooks Pipeline v2
+
+[feature:: Hooks Pipeline v2] [status:: done] [domain:: infra] [priority:: P0] [completed:: 2026-03-29]
+12 активных hooks: SessionStart, Stop (trace-collector + pattern-detector + output-critic enforcement), PreCompact (session-audit + ghost-finalize), UserPromptSubmit (compact-report-injector + auto-search), StopFailure, FileChanged, TaskCreated. Shared modules в hooks/shared/.
+
+#### Output-Critic Enforcement
+
+[feature:: Output-Critic Enforcement] [status:: done] [domain:: infra] [priority:: P0] [completed:: 2026-03-28]
+Stop hook type:prompt — отдельная модель оценивает output, возвращает `{ok: false}` если critic не применён. Единственный надёжный enforcement mechanism в Claude Code.
+
+#### QMD Semantic Search
+
+[feature:: QMD Semantic Search] [status:: done] [domain:: infra] [priority:: P1] [completed:: 2026-03-20]
+BM25 search по vault и ghost коллекциям. Auto-search worker при каждом промпте (timeout 3s, min 25 chars). Fallback от vsearch (vector, CMake issues на VPS).
+
+#### Compact Report Delivery
+
+[feature:: Compact Report Delivery] [status:: done] [domain:: infra] [priority:: P1] [completed:: 2026-03-29]
+Отчёт session-audit доставляется через PENDING блок в MEMORY.md (native auto-memory). Claude видит, выводит в чат, удаляет. Dual delivery: file + MEMORY.md.
+
+#### Shared Hook Modules
+
+[feature:: Shared Hook Modules] [status:: done] [domain:: infra] [priority:: P2] [completed:: 2026-03-29]
+`hooks/shared/paths.js` (CLAUDE_DIR, VAULT_DIR, QMD) + `hooks/shared/obsidian-api.js` (callHaiku/callSonnet, appendToVault, sendTelegram). Устраняет дублирование кода между hooks.
+
+#### VPS Full Setup
+
+[feature:: VPS Full Setup] [status:: done] [domain:: infra] [priority:: P1] [completed:: 2026-03-28]
+Claude CLI 2.1.86 на Hetzner (157.180.33.253). Ghost hooks, MEMORY paths, permissions, UFW, FireCrawl MCP. tmux bridge с 4h auto-rotation.
+
+#### Tracker DB
+
+[feature:: Tracker DB] [status:: done] [domain:: infra] [priority:: P2] [completed:: 2026-03-19]
+better-sqlite3, `~/.claude/patterns/tracker.db`. trace-collector записывает tool traces, pattern-detector ищет error patterns. 7-day rotation + WAL checkpoint.
+
+---
+
+### Knowledge & Search
+
+#### Obsidian Vault Integration
+
+[feature:: Obsidian Vault Integration] [status:: done] [domain:: infra] [priority:: P1] [completed:: 2026-03-19]
+PARA structure, MCP server (mcp-obsidian via uvx), REST API port 27124. Knowledge Distillation cycle: troubleshooting → routing map → destination files.
+
+#### Smart Connections Upgrade
+
+[feature:: Smart Connections Upgrade] [status:: done] [domain:: infra] [priority:: P2] [completed:: 2026-03-21]
+nomic-embed-text-v1.5 (768d, multilingual) вместо bge-micro-v2 (384d EN-only). Omnisearch 1.28.2 для fuzzy search.
+
+#### Automatic Linker
+
+[feature:: Automatic Linker] [status:: done] [domain:: infra] [priority:: P3] [completed:: 2026-03-22]
+Plugin v4.2.0 с aliases из routing-map.md keywords. 11 destination files. excludeDirectories: youtube-notes/40-Archive/90-System.
+
+#### FireCrawl MCP
+
+[feature:: FireCrawl MCP] [status:: done] [domain:: infra] [priority:: P2] [completed:: 2026-03-28]
+Web scraping/search через firecrawl-mcp. 500 free credits/mo. Key в credentials/.
+
+#### ARKHOS Roadmap
+
+[feature:: ARKHOS Roadmap] [status:: done] [domain:: cross] [priority:: P1] [completed:: 2026-03-29]
+Этот файл. Гибрид: Dataview для визуала, inline fields для агентов, QMD для поиска.
+
+---
+
+### Video Pipeline
+
+#### YouTube → Obsidian Pipeline
+
+[feature:: YouTube → Obsidian Pipeline] [status:: done] [domain:: infra] [priority:: P1] [completed:: 2026-03-22]
+n8n workflow (23 nodes): Telegram bot → transcript (youtube-transcript-api/Whisper) → insight extraction (claude-sonnet-4-5) → 2 commits per video (raw + enriched). Auto-pull every 15min.
+
+#### Video Insight Router
+
+[feature:: Video Insight Router] [status:: done] [domain:: infra] [priority:: P2] [completed:: 2026-03-22]
+Post-pull classification: Haiku vs routing-map.md → append to vault destinations. Dedup ~56%. Idempotent via routed:true frontmatter.
+
+#### Pattern Analyzer
+
+[feature:: Pattern Analyzer] [status:: done] [domain:: infra] [priority:: P2] [completed:: 2026-03-22]
+Post-routing Sonnet analysis: convergence/gap/actionable/staleness/optimization patterns. Telegram alerts (critical), Obsidian tasks (medium). 7-day cooldown anti-spam.
+
+#### Video Service (VPS)
+
+[feature:: Video Service VPS] [status:: done] [domain:: infra] [priority:: P2] [completed:: 2026-03-22]
+Python HTTP sidecar port 3001. youtube-transcript-api + yt-dlp + Whisper API fallback. Systemd service, UFW docker-only.
+
+---
+
+### Studiokook
+
+#### SEO/AEO Audit Workflows
+
+[feature:: SEO/AEO Audit Workflows] [status:: done] [domain:: studiokook] [priority:: P1] [completed:: 2026-03-23]
+SEO Audit (14 nodes): 25 pages, CWV via PageSpeed, hreflang, translation coverage. AEO Audit (9 nodes): content depth, trends from Supabase. .md reports via Telegram.
+
+#### SK REST API
+
+[feature:: SK REST API] [status:: done] [domain:: studiokook] [priority:: P1] [completed:: 2026-03-19]
+Custom endpoints: elementor/{id} (read/write/replace/backup/restore), full-clear, deploy-file, update-seo. WP MCP adapter.
+
+#### Portfolio Design
+
+[feature:: Portfolio Design] [status:: done] [domain:: studiokook] [priority:: P1] [completed:: 2026-03-22]
+Snake layout + Playfair Display + designer narratives. 16 projects, unique alt-texts. Index: dark theme, parallax hero, 3-col masonry. User rated 8/10.
+
+#### Koogid Page Optimization
+
+[feature:: Koogid Page Optimization] [status:: done] [domain:: studiokook] [priority:: P2] [completed:: 2026-03-24]
+5 H2, 5 FAQ H3, FAQPage JSON-LD. Before: SEO 69 AEO 45. Expected: SEO 85 AEO 70.
+
+#### NGG Gallery Setup
+
+[feature:: NGG Gallery Setup] [status:: done] [domain:: studiokook] [priority:: P2] [completed:: 2026-03-22]
+Gallery 7: 105 photos (koogid), pages 3133+3010. 134 thumbnails with AI-generated captions.
+
+---
+
+### In Progress
+
+#### Brain Architecture Gaps
+
+[feature:: Brain Architecture Gaps] [status:: done] [domain:: infra] [priority:: P0] [completed:: 2026-04-30]
+9 архитектурных gaps по модели «мозг ↔ AI-агент». P0: memory consolidation, goal tracking. P1: proactive monitoring, health-check, рефлексия. План: [[brain-architecture-gaps]].
+Implementation is complete; operational metric verification remains tracked in [[system-state]] rather than as an active roadmap feature.
+
+#### Portfolio CPT Implementation
+
+[feature:: Portfolio CPT Implementation] [status:: active] [domain:: studiokook] [priority:: P1]
+sk_portfolio CPT с Elementor single/archive templates, NGG per-project galleries, process timeline. Дизайн утверждён, ждёт реализации.
+
+#### Plugin Major Updates
+
+[feature:: Plugin Major Updates] [status:: active] [domain:: studiokook] [priority:: P2]
+Deferred: Elementor 3.25→3.35, NGG 3.59→4.1, Seraphinite 2.22→2.28, Yoast 26→27. Backup at ~/backups/db-pre-update-20260322.sql.
+
+---
+
+### Planned
+
+#### Video Reader Module
+
+[feature:: Video Reader Module] [status:: planned] [domain:: ai-gen] [priority:: P2]
+Модуль для чтения/обработки видео файлов. Gemini Vision для frames + Whisper для audio.
+
+#### Morning Digest
+
+[feature:: Morning Digest] [status:: planned] [domain:: cross] [priority:: P3]
+Утренний дайджест: Ghost decisions за вчера, vault changes, pending tasks, audit warnings. Telegram delivery.
+
+#### WP Audit Issue Tracker
+
+[feature:: WP Audit Issue Tracker] [status:: planned] [domain:: studiokook] [priority:: P2]
+29 issues tracked (10 fixed, 12 open, 7 new). Нужна автоматизация: n8n workflow + vault note + status tracking.
+
+---
+
+### Ideas
+
+#### Librarian Agent
+
+[feature:: Librarian Agent] [status:: done] [domain:: infra] [priority:: P2] [completed:: 2026-03-29]
+Hybrid: n8n health check workflow (elKR0OtsgcIajVOH, 6h schedule) мониторит GitHub commits. Claude Code subagent (agents/librarian.md) — on-demand distillation, routing review, vault maintenance. Без obsidian-headless — GitHub как транспорт.
+
+#### Auto-Deploy Pipeline
+
+[feature:: Auto-Deploy Pipeline] [status:: idea] [domain:: studiokook] [priority:: P3]
+Автоматический деплой Code Snippets и mu-plugins на WordPress через REST API с version control.
+
+#### Content Calendar Automation
+
+[feature:: Content Calendar Automation] [status:: idea] [domain:: ai-gen] [priority:: P3]
+Автоматическая генерация контент-плана на основе SEO trends, GSC data, и competitor analysis.
+
+---
+
+## Changelog
+
+| Date | Feature | Change |
+|------|---------|--------|
+| 2026-03-29 | Librarian Agent | Hybrid: n8n monitor + Claude Code subagent for vault ops |
+| 2026-03-29 | Hooks Pipeline | Removed save-state.js (dead code), added shared modules |
+| 2026-03-29 | Compact Report | Fixed: PENDING block preserved in MEMORY.md |
+| 2026-03-29 | Roadmap | Created this document |
+| 2026-03-28 | VPS | Full setup: CLI 2.1.86, Ghost, FireCrawl, permissions |
+| 2026-03-28 | Output-Critic | Stop hook enforcement activated |
+| 2026-03-24 | Koogid | SEO optimization with FAQ schema |
+| 2026-03-23 | Audit Workflows | SEO + AEO deep audit rewrite |
+| 2026-03-23 | Auto-Optimizer | DELETED — auto-applied changes without review |
+| 2026-03-22 | Video Pipeline | Full chain: Telegram → transcript → insights → vault |
+| 2026-03-22 | Portfolio | Design approved: snake layout, Playfair, narratives |
+| 2026-03-22 | WP Audit | 29 issues tracked, 6/14 plugins updated |
+| 2026-03-21 | Smart Connections | Upgraded to nomic-embed multilingual |
+| 2026-03-20 | QMD | Semantic search active, auto-search worker |
+| 2026-03-19 | Ghost | Session memory system launched |
+| 2026-03-19 | Session Audit | Knowledge extraction pipeline to vault |

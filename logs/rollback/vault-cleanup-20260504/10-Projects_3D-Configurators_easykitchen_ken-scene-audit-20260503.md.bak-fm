@@ -1,0 +1,125 @@
+# Ken scene audit - 2026-05-03
+
+## Source
+
+- Scene: `C:\Users\sorte\Desktop\Проекты\Ken\Scene.skp`
+- JSON audit: `C:/tmp/ek-scene-audit-20260503-ken.json`
+- Screenshots:
+  - `C:/tmp/ek-scene-audit-20260503-ken-active.png`
+  - `C:/tmp/ek-scene-audit-20260503-ken-top.png`
+  - `C:/tmp/ek-scene-audit-20260503-ken-iso.png`
+- Scene was inspected read-only.
+
+## Layout Pattern
+
+Compact L kitchen inside a room shell: left wall run length 3000, back/top wall run length 2405, room height 2750.
+
+This scene is important because the lower L corner is not represented by a normal `BG1` corner module. It is assembled from straight/lower modules, fillers/blends, and two straight countertop pieces meeting in the corner.
+
+Observed working rows:
+
+- Left run / appliance side:
+  - `PANEL-FACADE#3` full-height left side/cladding, 18mm.
+  - Standalone refrigerator component `Component#9`, bbox approx `X[0..809.8] Y[-2953..-2045] Z[0..1784]`.
+  - `PANEL-FACADE#12`, 120mm full-height vertical spacer/panel after fridge zone.
+  - `PH1`, 300mm tall/pantry module, full height 2720.
+  - `BD3`, cooktop lower base area, bbox approx `X[0..671] Y[-1664..-641] Z[0..870]`.
+
+- Back run / sink side:
+  - Corner/filler composition: `BP#2` 50mm, `BP#1` 50mm, `BJ` 200mm.
+  - `BD1#1` sink base, 600mm.
+  - `BI#1` dishwasher, 600mm.
+  - `PB1` right-end tall/open shelf pencil, width about 330 visible intent, bbox approx `X[2041..2471] Y[-595.6..-18] Z[0..2720]`.
+
+- Detached sample/island-like block:
+  - Separate from main kitchen, around `X[2604..3501] Y[-3904..-2704]`.
+  - Contains `BB1`, `BC#2`, `BD1_1`, `SIEMENS HB23AB520E`, facade/panel samples and multiple lighting profile instances.
+  - Treat as a separate evidence/sample block, not part of the main L row unless the project brief says otherwise.
+
+## Dimensions And Heights
+
+Dimension texts visible in scene include:
+
+- Wall/run: `3000`, `2405`, `2750`.
+- Left/fridge/tall sequence: `18`, `950`, `18`, `300`, `50`, `1221`, `442`.
+- Back/top sequence: `1241`, `800`, `353`, `330`.
+- Lower row sequence around corner: `1023+49`, `50+200`, `600`, `600`, `330`, `557`.
+- Height stack: `100`, `770`, `38`, `600`, `808`, `404`, `30`, `2620`.
+
+The main kitchen uses 38mm countertop: base top around `Z=870`, countertop top around `Z=908`. This is the older/standard laminate-like workflow, not the 20/30mm stone workflow.
+
+## Appliances
+
+- Standalone fridge is a real component and remains in scene. Use this as positive evidence for the clarified rule: generated/verification scenes should use an existing refrigerator component, not a proxy measuring object.
+- Cooktop: `Miele KM 6322 PowerFlex`, over `BD3` left run, bbox approx `X[45.9..559.9] Y[-1449.2..-834.2] Z[908..918]`.
+- Sink: `МОЙКА ZORG (под смеситель)#1`, over `BD1#1`, bbox approx `X[920..1370] Y[-554..-44] Z[681..911]`.
+- Dishwasher: `BI#1`, 600mm, next to sink base.
+- Oven: `SIEMENS HB23AB520E` exists in the detached block, not in the main L kitchen row.
+
+## Countertop And Backsplash
+
+- Main L countertop uses two horizontal `Столешница прямая` pieces:
+  - Left leg: approx `X[0..650] Y[-1663..0] Z[870..908]`.
+  - Back leg: approx `X[590..2041] Y[-650..0] Z[870..908]`.
+- Additional countertop-like vertical pieces at `Z[858..1508]` are backsplash/upstand panels, not worktops. This reinforces the extractor issue: countertop-kind must be classified by orientation and bbox, not only by component name.
+- Detached block has its own 38mm top at `Z[898..936]`.
+
+## Upper Row
+
+Back/top wall:
+
+- `TG3` upper corner/large upper module, approx `X[-12..1241] Y[-470..0] Z[1508..2720]`.
+- `TC2HF#1`, approx `X[1241..2041] Y[-470..0] Z[1508..2316]`.
+- Top band/antresol: `TC1HKi#1` and `TC1HKi`, `Z[2316..2720]`.
+
+Left/fridge wall:
+
+- `TB2#1` above fridge zone, approx `X[0..670] Y[-2982..-2032] Z[1830..2720]`.
+- `PH1` full-height 300mm module after fridge zone.
+
+Pattern: upper row is not a simple one-to-one mirror of lower modules; it is built by wall span, appliance zone, and corner treatment.
+
+## Lighting Pattern
+
+This scene must be used as lighting evidence.
+
+Top-level light/profile components include `Врезной профиль для подсветки` and nested `Подсветка врезного профиля`, `light_diffuser`, `4000k`, `5000k`, `6000k`, `7000k` variants.
+
+Main kitchen lighting/profile positions:
+
+- Back-wall under-upper profile: `Врезной профиль для подсветки`, bbox approx `X[32..2041] Y[-97.7..120] Z[1310..1514]`, length about 2005mm.
+- Left-leg under-upper profile: `Врезной профиль для подсветки#1`, bbox approx `X[-17.7..200] Y[-1664..-30] Z[1310..1514]`, length about 1630mm.
+- Right open-shelf/tall feature profile: `Врезной профиль для подсветки#2`, bbox approx `X[2066.6..2284.3] Y[-231.7..-27.7] Z[121.8..2709.8]`, vertical run about 2584mm.
+
+Detached block also contains multiple lighting profile instances; separate them from main-kitchen lighting during verification.
+
+Technical implication for templates: lighting is not only visual render setup. It is a componentized furniture/accessory system with profile body, diffuser, LED strip/temperature options, and placement relative to upper modules or open shelving.
+
+## Materials / Finish Notes
+
+Visible project text states:
+
+- `Karkass - U999 Egger`
+- `Uksed - H174 (vert)/U961 Egger`
+- `Tööpind/Tagasein - F187 Egger`
+- `Aventos HK top -> 22K2700`
+- `HF top -> 20F2800.05`
+- `Kaepidemed - Profil Gola Must`
+- `Klaas - Läbipaistev`
+
+Visible palette: dark carcass/panels, vertical wood fronts, dark concrete worktop/backsplash, black Gola/profile accents, transparent glass in right open shelf.
+
+## Template / Standards Takeaways
+
+- Add lighting section to both learning and generated-scene verification templates.
+- Detect lighting recursively by definition/material names: `подсвет`, `light`, `diffuser`, `4000k/5000k/6000k/7000k`, `Врезной профиль`.
+- Do not classify all top-level countertop components as worktops; split horizontal worktops from vertical backsplash/upstand by orientation and bbox.
+- Treat standalone fridge as real component evidence, not an EK module and not a measurement proxy.
+- Recognize L corners assembled without `BG1` when the finished project uses filler/blend/countertop joinery instead of a lower corner cabinet.
+- Keep detached sample/island blocks separate from main kitchen row analysis.
+
+## Open Checks
+
+- Need a cleaner extractor for Russian names: current PowerShell/JSON display still shows mojibake for some component names.
+- Need verify whether `PB1` is intended as bookshelf/open shelf pencil, glass cabinet, or mixed storage module from library semantics.
+- Need decide whether detached block is a presentation/sample block or part of the order in this project before using it as layout evidence.

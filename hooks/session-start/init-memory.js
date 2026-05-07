@@ -165,6 +165,33 @@ function main() {
             }
         }
     } catch {}
+
+    // logs/rollback/ (30 day TTL — n8n WF backups, EK script .bak, GPU/registry snapshots)
+    try {
+        const rbDir = path.join(CLAUDE_DIR, 'logs', 'rollback');
+        if (fs.existsSync(rbDir)) {
+            for (const f of fs.readdirSync(rbDir)) {
+                const fp = path.join(rbDir, f);
+                const stat = fs.statSync(fp);
+                if (now - stat.mtimeMs > 30 * DAY) {
+                    if (stat.isDirectory()) fs.rmSync(fp, { recursive: true, force: true });
+                    else fs.unlinkSync(fp);
+                }
+            }
+        }
+    } catch {}
+
+    // scheduled_tasks.lock cleanup — stale if pid not alive OR acquired >1h ago
+    try {
+        const lockPath = path.join(CLAUDE_DIR, '.claude', 'scheduled_tasks.lock');
+        if (fs.existsSync(lockPath)) {
+            const lock = JSON.parse(fs.readFileSync(lockPath, 'utf8'));
+            const ageMs = now - (lock.acquiredAt || 0);
+            let pidAlive = false;
+            try { process.kill(lock.pid, 0); pidAlive = true; } catch { pidAlive = false; }
+            if (!pidAlive || ageMs > 3600000) fs.unlinkSync(lockPath);
+        }
+    } catch {}
 }
 
 main();

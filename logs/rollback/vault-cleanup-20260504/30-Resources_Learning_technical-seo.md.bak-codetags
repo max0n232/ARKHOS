@@ -1,0 +1,206 @@
+---
+tags: [seo, technical, performance]
+aliases: [Open Graph, robots.txt, Core Web Vitals, LCP optimization, INP metric, CLS layout shift, canonical URL, generateMetadata]
+project: cross-project
+source: Desktop/Studiokook/.claude/skills/seo-aeo/resources/technical-seo.md
+updated: 2026-03-17
+---
+
+# Technical SEO Checklist
+
+Essential technical SEO elements for modern web applications.
+
+## Metadata
+
+### Title Tags
+
+- Unique per page <!-- decay:2026-03-17 tier:cold rel:0.28 -->
+- 50-60 characters <!-- decay:2026-03-17 tier:cold rel:0.28 -->
+- Primary keyword near the beginning <!-- decay:2026-03-17 tier:cold rel:0.28 -->
+- Brand name at the end (optional) <!-- decay:2026-03-17 tier:cold rel:0.28 -->
+
+### Meta Descriptions
+
+- Unique per page <!-- decay:2026-03-17 tier:cold rel:0.28 -->
+- 150-160 characters <!-- decay:2026-03-17 tier:cold rel:0.28 -->
+- Include call-to-action <!-- decay:2026-03-17 tier:cold rel:0.28 -->
+- Contain relevant keywords <!-- decay:2026-03-17 tier:cold rel:0.28 -->
+
+### Open Graph
+
+```html
+<meta property="og:title" content="Page Title" />
+<meta property="og:description" content="Description" />
+<meta property="og:image" content="https://example.com/image.jpg" />
+<meta property="og:url" content="https://example.com/page" />
+<meta property="og:type" content="article" />
+```
+
+### Sanity + Next.js Implementation
+
+```typescript
+export async function generateMetadata({ params }): Promise<Metadata> {
+  const { data } = await sanityFetch({
+    query: PAGE_QUERY,
+    stega: false,  // Critical: no stega in metadata
+  })
+  
+  return {
+    title: data.seo?.title || data.title,
+    description: data.seo?.description,
+    openGraph: {
+      images: data.seo?.image ? [{
+        url: urlFor(data.seo.image).width(1200).height(630).url(),
+        width: 1200,
+        height: 630,
+      }] : [],
+    },
+    robots: data.seo?.noIndex ? 'noindex' : undefined,
+  }
+}
+```
+
+## Sitemaps
+
+Dynamic sitemap from CMS content:
+
+```typescript
+// app/sitemap.ts
+import { MetadataRoute } from 'next'
+
+export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
+  const pages = await client.fetch(`
+    *[_type in ["page", "post"] && defined(slug.current) && seo.noIndex != true]{
+      "url": select(
+        _type == "page" => "/" + slug.current,
+        _type == "post" => "/blog/" + slug.current
+      ),
+      _updatedAt
+    }
+  `)
+  
+  return pages.map(page => ({
+    url: `https://example.com${page.url}`,
+    lastModified: new Date(page._updatedAt),
+    changeFrequency: 'weekly',
+    priority: 0.8,
+  }))
+}
+```
+
+## Canonical URLs
+
+Prevent duplicate content issues:
+
+```typescript
+export async function generateMetadata({ params }): Promise<Metadata> {
+  return {
+    alternates: {
+      canonical: `https://example.com/${params.slug}`,
+    },
+  }
+}
+```
+
+## Redirects
+
+CMS-managed redirects:
+
+```typescript
+// next.config.ts
+async redirects() {
+  const redirects = await client.fetch(`
+    *[_type == "redirect" && isEnabled == true]{
+      source,
+      destination,
+      permanent
+    }
+  `)
+  return redirects
+}
+```
+
+## Performance
+
+[Core Web Vitals](https://web.dev/articles/defining-core-web-vitals-thresholds) impact rankings:
+
+- **LCP (Largest Contentful Paint):** < 2.5s <!-- decay:2026-03-17 tier:cold rel:0.28 -->
+- **INP (Interaction to Next Paint):** < 200ms <!-- decay:2026-03-17 tier:cold rel:0.28 -->
+- **CLS (Cumulative Layout Shift):** < 0.1 <!-- decay:2026-03-17 tier:cold rel:0.28 -->
+
+### Image Optimization (Next.js example)
+
+- Use `next/image` with Sanity URL builder <!-- decay:2026-03-17 tier:cold rel:0.28 -->
+- Serve WebP/AVIF formats <!-- decay:2026-03-17 tier:cold rel:0.28 -->
+- Implement LQIP blur placeholders <!-- decay:2026-03-17 tier:cold rel:0.28 -->
+- Set explicit dimensions <!-- decay:2026-03-17 tier:cold rel:0.28 -->
+
+### Font Loading (Next.js example)
+
+```typescript
+// Prevent layout shift
+import { Inter } from 'next/font/google'
+const inter = Inter({ subsets: ['latin'], display: 'swap' })
+```
+
+## Robots.txt
+
+```
+# public/robots.txt
+User-agent: *
+Allow: /
+Disallow: /api/
+Disallow: /studio/
+
+Sitemap: https://example.com/sitemap.xml
+```
+
+## Distilled 2026-03-24
+
+### Image Carousel SERP — Optimization Layers
+
+- SERP image carousel eligibility depends on multiple independent signals — tackle in sequence: <!-- decay:2026-03-24 tier:cold rel:0.385 -->
+  1. **Schema markup** — `ImageObject` with `contentUrl`, `description`, `thumbnail` (highest leverage, do first)
+  2. **Volume** — minimum ~8–10 indexed images per page/gallery recommended
+  3. **Metadata quality** — `alt` text descriptive and keyword-relevant, `title` attribute populated
+  4. **Re-indexing** — submit via IndexNow + Google Search Console after all above are in place
+- **Diagnostic approach**: if carousel absent after schema, check Coverage report for indexation status before assuming metadata problem. <!-- decay:2026-03-24 tier:cold rel:0.385 -->
+
+## Distilled 2026-03-26
+
+### CWV — Live Site Readings (studiokook.ee, 2026-03-25)
+
+- **LCP**: 2.1s ✅ good (threshold <2.5s) <!-- decay:2026-03-26 tier:cold rel:0.415 -->
+- **INP**: 180ms ⚠️ needs improvement (threshold <200ms — close to boundary, monitor) <!-- decay:2026-03-26 tier:cold rel:0.415 -->
+- **CLS**: 0.05 ✅ good (threshold <0.1) <!-- decay:2026-03-26 tier:cold rel:0.415 -->
+- Source: SEO Audit Weekly 2026-03-25 <!-- decay:2026-03-26 tier:cold rel:0.415 -->
+
+### Image Optimization Gotcha — Missing Explicit Dimensions
+
+- Images without `width`/`height` attributes cause CLS even when file is optimized <!-- decay:2026-03-26 tier:cold rel:0.415 -->
+- **Detected**: /koogid page — 3 images missing width/height <!-- decay:2026-03-26 tier:cold rel:0.415 -->
+- Fix: always set explicit dimensions on `<img>` tags (or `next/image` equivalent); prevents layout shift before image loads <!-- decay:2026-03-26 tier:cold rel:0.415 -->
+
+## Distilled 2026-04-25 (from troubleshooting-current + global-patterns)
+
+### Schema & Structured Data
+
+- **GOTCHA: robots.txt blocking JS/CSS** — `Disallow: /wp-content/plugins/` prevents Googlebot rendering. Managed via mu-plugin hooking `do_robotstxt` at `PHP_INT_MAX` priority with `exit` before `apply_filters`.
+- **GOTCHA: BreadcrumbList without @id** — Yoast WebPage references `#breadcrumb` but BreadcrumbList lacks `@id`, causing Google to see two entities. Fix: add `@id` to BreadcrumbList; remove conflicting `breadcrumb` reference from Yoast WebPage rather than relying on `@id` auto-merging.
+- **GOTCHA: Existing plugin overriding robots.txt** — fix: use `do_robotstxt` action with `PHP_INT_MAX` priority and `exit` to ensure new logic takes precedence.
+- **GOTCHA: Product Schema generated by post_meta (snippet 102), not Yoast** — mu-plugin must update `post_meta` directly and filter snippet 102 output, not just add new JSON-LD.
+- **GOTCHA: Product schema missing required fields** — HPL page lacked `image`, `offers` (price/priceCurrency), `review`, `aggregateRating`. Fix: draft mu-plugin `sk-pages-product-enricher.php`.
+- **GOTCHA: Avoid unconfirmed brand names in schema** — do not inject Technistone/Caesarstone; use confirmed manufacturer (Studioköök OÜ) to avoid Google spam policy violation.
+
+### Caching & Indexation
+
+- **GOTCHA: Seraphinite static cache served stale HTML** — Google fetched old version from CDN edge despite local verify showing clean HTML. Fix: POST empty meta update on affected posts to trigger `save_post` and invalidate Seraphinite cache.
+- **GOTCHA: Google Rich Results Test caches old results** — force fresh fetch by adding unique cache-bust parameter to URL (e.g., `?v=timestamp`) or clicking 'Test live URL' in RRT.
+- **GOTCHA: `wpseo_schema_webpage` filter scoped too narrowly** — limiting filter to `is_singular('sk_portfolio')` leaves regular pages without the BreadcrumbList fix ('Отсутствует поле itemListElement'). Fix: extend filter condition to `is_page() || is_singular()` to cover all pages. Apply the same broad scope to any Product schema patches.
+
+
+## Related
+<!-- auto-generated by vault-graph-builder 2026-04-26 -->
+- [[10-projects/studiokook/seo-strategy]]
+- [[10-projects/studiokook/20-areas/infrastructure/decisions-log]]
+- [[10-projects/studiokook/20-areas/n8n/workflow-patterns]]

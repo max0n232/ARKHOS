@@ -1,0 +1,284 @@
+## Distilled 2026-04-22
+
+- **FIX: n8n production-guard blocked MacroAgent workflow activation** — production-guard hook intercepted workflow activation as a production write. Fix: confirm deployment manually after reviewing changes; add activation step to deployment checklist.
+
+## Distilled 2026-04-24
+
+- **PATTERN: Rollback before diagnose** — when a module or script causes visible breakage, immediately revert to last working state (Ctrl+Z or git reset) before any further investigation. Only after stable baseline is restored: diagnose with specific tools (bounds-dump, breakpoint, diff).
+- **PATTERN: Grep for hardcoded paths before reorganizing files** — before moving or renaming files, `grep -r` for hardcoded paths in all dependent scripts. Catches path references that would silently break after reorganization.
+- **PATTERN: Prefer battle-tested solutions over custom development** — when integrating new tools (e.g., SketchUp MCP), prioritize existing community solutions (e.g., `mhyrr/sketchup-mcp`) over custom development, especially for cross-platform compatibility.
+- **PATTERN: Specific firewall rules over disabling firewall** — for new network services requiring localhost access, create specific firewall rules limited to localhost traffic only. Never disable the firewall entirely.
+
+## Distilled 2026-04-20
+
+### Methodology
+
+- **PATTERN: Librarian audit before vault restructuring** — perform a structured librarian audit first to identify oversized files, duplicate areas, PARA convention violations. Prioritize fixes by impact before executing moves.
+- **GOTCHA: Never delete files with programmatic consumers** — files like `Wiki/`, `youtube-notes/` have active code consumers. Document them as exceptions to restructuring rules rather than moving/deleting.
+- **GOTCHA: Verify claims before stating as fact** — do not assume plugin/service status without verification. State `unverified` explicitly or verify first.
+
+## Distilled 2026-04-19
+
+### Bot / Service Infrastructure Fixes
+
+- **FIX [2026-04-04]: Grammy /vault command not responding** — `bot.on('message:text')` registered BEFORE `bot.command('vault')` intercepted all messages. Fix: always register all `bot.command()` handlers BEFORE any `bot.on('message:text')` handler. <!-- decay:2026-04-04 tier:cold rel:0.655 -->
+- **FIX [2026-04-04]: PDF extraction failed on Windows** — no pdftoppm + pdf-parse API changed in Node 24. Fix: scp file to VPS, extract text via Python pdfminer/pdftotext. <!-- decay:2026-04-04 tier:cold rel:0.655 -->
+- **FIX [2026-04-04]: SMM Telegram handler crashed on plain text** — workflow expected only callback_query updates, threw Error on other types. Fix: replace `throw new Error()` with `return []` to silently ignore non-callback messages. <!-- decay:2026-04-04 tier:cold rel:0.655 -->
+
+## Distilled 2026-04-05
+
+### Pattern Generalization Principle
+
+- **PATTERN: Write debugging/fix patterns broadly, not narrowly** — записывать паттерн так, чтобы он срабатывал в большинстве похожих ситуаций (не под конкретный кейс). Narrow: "Grammy callback_query fix". Broad: "Telegram bot handler throws on unexpected update type → return empty array instead of throwing". Broad patterns reactivate on similar future bugs. <!-- decay:2026-04-05 tier:cold rel:0.67 -->
+
+## Distilled 2026-04-02
+
+### Zone.ee WordPress Staging — Fixes
+
+- **FIX [2026-04-01]: wp-config sed заменил DB_USER вместо DB_NAME** — команда sed без достаточно конкретного паттерна затронула строку DB_USER вместо DB_NAME; пользователь должен оставаться `d103930_new`. Fix: использовать отдельные команды sed с точными паттернами для каждого параметра (`sed -i "s/DB_NAME.*/DB_NAME', 'd103930_staging'/" wp-config.php`). <!-- decay:2026-04-01 tier:cold rel:0.61 -->
+
+- **PATTERN [2026-04-01]: Клонирование WordPress на Zone.ee shared hosting** — воспроизводимый порядок шагов: 1) экспорт БД через `mysqldump`, 2) создать БД + привилегии в панели Zone.ee, 3) импорт дампа, 4) `cp -r` файлов в новый DocumentRoot, 5) патч `wp-config.php` (DB_NAME отдельно от DB_USER), 6) `wp search-replace` старый URL → новый, 7) добавить `robots.txt` `Disallow: /` + `noindex` в wp-config для staging. <!-- decay:2026-04-01 tier:cold rel:0.61 -->
+
+## Distilled 2026-03-30
+
+### ARKHOS Infrastructure Fixes
+
+- **FIX [2026-03-29]: encodeURIComponent() encoding `/` as `%2F` → Obsidian REST API 404** — silent fallback to file write; root cause: full-path encoding treats `/` as reserved character. Fix: `split('/').map(encodeURIComponent).join('/')` — encode path segments individually. <!-- decay:2026-03-29 tier:cold rel:0.565 -->
+- **FIX [2026-03-29]: session-audit.js + Ghost both extracted decisions → duplication** — decisions extraction removed from session-audit.js; Ghost is the owner of decisions lifecycle. <!-- decay:2026-03-29 tier:cold rel:0.565 -->
+- **FIX [2026-03-29]: Haiku prompt too permissive → 9 non-system facts extracted** — prompt hardened with system-config-only constraint; `NEVER infer/fabricate` + `empty > wrong`. <!-- decay:2026-03-29 tier:cold rel:0.565 -->
+- **FIX [2026-03-29]: trace-collector.db unbounded growth** — added 7-day TTL + `PRAGMA wal_checkpoint(TRUNCATE)` to SQLite maintenance routine. <!-- decay:2026-03-29 tier:cold rel:0.565 -->
+- **FIX [2026-03-29]: Pending report disappearing after /compact** — compact-report-injector.js was deleting PENDING block before reading it; fix: save to MEMORY.md, Claude deletes after output. <!-- decay:2026-03-29 tier:cold rel:0.565 -->
+- **FIX [2026-03-29]: video-insight-router.js modified vault without commit → auto-pull blocked** — added auto-commit (`git add -A && git commit`) before git pull to avoid rebase conflicts. <!-- decay:2026-03-29 tier:cold rel:0.565 -->
+- **ENHANCEMENT [2026-03-29]: Duplicate code in 3 router files** — extracted shared module to `hooks/shared/`; import once, update once. <!-- decay:2026-03-29 tier:cold rel:0.565 -->
+- **FIX [2026-03-29]: Dataview TABLE FROM does not parse inline fields** — replaced with DataviewJS + regex; include `inCodeBlock` flag to skip lines inside fenced code blocks. <!-- decay:2026-03-29 tier:cold rel:0.565 -->
+- **FIX [2026-03-29]: session-audit with Haiku hallucinated facts** — replaced Haiku with claude-sonnet-4-6 for accuracy-critical extraction tasks. <!-- decay:2026-03-29 tier:cold rel:0.565 -->
+- **FIX [2026-03-30]: recall=0% on all eval queries → skills evicted from system prompt** — root cause: 15K SLASH_COMMAND_TOOL_CHAR_BUDGET limit too small; fix: increase to 50000 in settings.json. Diagnostic: check budget × number-of-skills × avg-description-size. <!-- decay:2026-03-30 tier:cold rel:0.58 -->
+- **FIX [2026-03-30]: Duplicates in troubleshooting/global-patterns passing dedup** — session-audit.js compared line cores exactly; different phrasings of same issue passed through; fix: normalize with trim + lowercase before comparison. <!-- decay:2026-03-30 tier:cold rel:0.58 -->
+
+## Distilled 2026-03-29
+
+### Infrastructure / Architecture Fixes
+
+- **FIX [2026-03-28]: save-state.js hardcoded path bypassed architecture** — `save-state.js` was writing to `hooks/pre-compact/session/capsule.json` instead of `memory/session/` — hardcoded path violated architecture rules. Fix: added `shared/paths.js` import to centralize path resolution. <!-- decay:2026-03-28 tier:cold rel:0.55 -->
+- **FIX [2026-03-28]: QMD path defined inconsistently across hooks** — `QMD` path was duplicated in multiple hook files with no single source of truth — maintenance risk and potential path resolution conflicts. Fix: centralized in `shared/paths.js` module. <!-- decay:2026-03-28 tier:cold rel:0.55 -->
+- **DELETED [2026-03-28]: stale capsule.json** — `hooks/pre-compact/session/capsule.json` was 71 bytes, last modified 2025-03-25 — dead data from a previously failed pre-compact hook. Deleted via `rm` command. <!-- decay:2026-03-28 tier:cold rel:0.55 -->
+- **FIX [2026-03-28]: strategic-critique.md exceeded 200-line skill limit** — file grew beyond the skill constraint boundary. Fix: reduced via output format consolidation and phase merging. <!-- decay:2026-03-28 tier:cold rel:0.55 -->
+- **FIX [2026-03-28]: settings.json missing deny rules for code injection** — `settings.json` was missing `deny_patterns` for dangerous shell patterns. Fix: added `curl|bash` and `wget|sh` to deny_patterns array. <!-- decay:2026-03-28 tier:cold rel:0.55 -->
+- **WORKAROUND [2026-03-29]: browser drag-drop upload blocked by security restrictions** — UI-level file upload blocked. Fix: used Kling File Upload API endpoint directly with `curl`. Signals general pattern: when browser-based upload blocked, switch to direct API endpoint. <!-- decay:2026-03-29 tier:cold rel:0.565 -->
+
+### Cross-Project Patterns
+
+- **ENHANCEMENT: Centralize config in shared/ modules** — store paths, credentials refs, and constants in `shared/` modules; import once, use everywhere. Reduces duplication and enables atomic updates across multiple dependents. <!-- decay:2026-03-29 tier:cold rel:0.565 -->
+- **PATTERN: Verify stale data via file modification times** — use `stat` command and compare timestamps against last known good state. Delete orphaned files explicitly rather than leaving them. <!-- decay:2026-03-29 tier:cold rel:0.565 -->
+- **PATTERN: Run smoke tests after architecture changes** — verify JSON syntax, import resolution, and dependent module execution after any structural refactor. Catches integration failures early. <!-- decay:2026-03-29 tier:cold rel:0.565 -->
+- **ENHANCEMENT: Use deny_patterns as security barrier** — maintain an allowlist of dangerous command patterns (`curl|bash`, `chmod 777`, etc.) in `settings.json`. Update constitution when new risk patterns emerge. <!-- decay:2026-03-29 tier:cold rel:0.565 -->
+
+---
+tags: [wordpress, problem-solving, patterns]
+aliases: [root cause analysis, 5 Whys, WORKAROUND pattern, ENHANCEMENT pattern, cleanup_after, lifecycle tracking]
+project: cross-project
+source: Desktop/Studiokook/.claude/skills/wp-problem-solver/references/solution-types.md
+updated: 2026-03-17
+---
+
+# Solution Types Classification
+
+## Overview
+
+Every code change must be classified. This determines lifecycle and cleanup requirements.
+
+## Types
+
+### FIX
+
+**Definition:** Addresses the ROOT CAUSE of the problem.
+
+**Characteristics:**
+- Eliminates the source, not just symptoms <!-- decay:2026-03-29 tier:cold rel:0.565 -->
+- Permanent solution (no cleanup_after) <!-- decay:2026-03-29 tier:cold rel:0.565 -->
+- Should not require future revisiting <!-- decay:2026-03-29 tier:cold rel:0.565 -->
+
+**Examples:**
+- Fixing N+1 query with proper JOIN <!-- decay:2026-03-29 tier:cold rel:0.565 -->
+- Adding missing dependency to wp_enqueue_script <!-- decay:2026-03-29 tier:cold rel:0.565 -->
+- Correcting incorrect hook priority <!-- decay:2026-03-29 tier:cold rel:0.565 -->
+
+**Registry entry:**
+```json
+{
+  "solution_type": "fix",
+  "status": "active",
+  "cleanup_after": null
+}
+```
+
+### WORKAROUND
+
+**Definition:** Treats symptoms because root cause cannot be fixed now.
+
+**Characteristics:**
+- Root cause is known but: <!-- decay:2026-03-29 tier:cold rel:0.565 -->
+  - Fixing requires more time/resources
+  - Depends on third-party (plugin update, hosting)
+  - Needs client approval for bigger change
+- MUST have cleanup_after date <!-- decay:2026-03-29 tier:cold rel:0.565 -->
+- Should be tracked for future fix <!-- decay:2026-03-29 tier:cold rel:0.565 -->
+
+**Examples:**
+- Adding CSS !important because theme update broke layout (waiting for proper child theme) <!-- decay:2026-03-29 tier:cold rel:0.565 -->
+- Caching API response because API is slow (waiting for async implementation) <!-- decay:2026-03-29 tier:cold rel:0.565 -->
+- Disabling feature because of plugin conflict (waiting for plugin update) <!-- decay:2026-03-29 tier:cold rel:0.565 -->
+
+**Registry entry:**
+```json
+{
+  "solution_type": "workaround",
+  "status": "temporary",
+  "cleanup_after": "2026-03-15",
+  "notes": "Remove after theme child migration"
+}
+```
+
+### ENHANCEMENT
+
+**Definition:** New functionality, not fixing a problem.
+
+**Characteristics:**
+- No existing problem being solved <!-- decay:2026-03-29 tier:cold rel:0.565 -->
+- Adding new feature or capability <!-- decay:2026-03-29 tier:cold rel:0.565 -->
+- Permanent unless explicitly deprecated <!-- decay:2026-03-29 tier:cold rel:0.565 -->
+
+**Examples:**
+- Adding new schema markup <!-- decay:2026-03-29 tier:cold rel:0.565 -->
+- Creating custom REST endpoint <!-- decay:2026-03-29 tier:cold rel:0.565 -->
+- Implementing new shortcode <!-- decay:2026-03-29 tier:cold rel:0.565 -->
+
+**Registry entry:**
+```json
+{
+  "solution_type": "enhancement",
+  "status": "active",
+  "cleanup_after": null
+}
+```
+
+## Decision Tree
+
+```
+Is there a problem to solve?
+├── NO → ENHANCEMENT
+└── YES
+    └── Do you know the root cause?
+        ├── NO → STOP. Do 5 Whys first.
+        └── YES
+            └── Can you fix root cause now?
+                ├── YES → FIX
+                └── NO → WORKAROUND (set cleanup_after!)
+```
+
+## Lifecycle
+
+```
+┌─────────────┐
+│ ENHANCEMENT │──────────────────────────────┐
+└─────────────┘                              │
+                                             ▼
+┌─────────────┐                        ┌──────────┐
+│    FIX      │───────────────────────►│  ACTIVE  │
+└─────────────┘                        └────┬─────┘
+                                            │
+                                     (no longer needed)
+                                            │
+                                            ▼
+┌─────────────┐   (cleanup_after)    ┌────────────┐
+│ WORKAROUND  │─────────────────────►│ DEPRECATED │
+└─────────────┘                      └─────┬──────┘
+      │                                    │
+      │                              (verified safe)
+      │                                    │
+      │                                    ▼
+      │                              ┌──────────┐
+      └─────(fixed properly)────────►│ DELETED  │
+                                     └──────────┘
+```
+
+## Workaround Tracking
+
+Check workarounds regularly:
+
+```bash
+# List active workarounds
+node .claude/snippets-manager.js workarounds
+
+# Check expired items
+node .claude/snippets-manager.js expired
+```
+
+When workaround expires:
+1. Check if root cause can now be fixed
+2. If yes → create proper FIX, deprecate workaround
+3. If no → extend cleanup_after, document why
+
+## Anti-Patterns
+
+### Permanent Workarounds
+
+```json
+{
+  "solution_type": "workaround",
+  "cleanup_after": null  // ❌ WRONG
+}
+```
+
+Every workaround MUST have cleanup date.
+
+### Mislabeled Fixes
+
+```json
+{
+  "solution_type": "fix",
+  "notes": "Added !important to override theme"  // ❌ This is workaround
+}
+```
+
+If it doesn't address root cause, it's not a fix.
+
+### Missing Root Cause
+
+```json
+{
+  "purpose": "Fixes the button color",
+  "root_cause": ""  // ❌ INCOMPLETE
+}
+```
+
+No root cause = no understanding = future problems.
+
+---
+
+## Связанные файлы
+
+- [[10-Projects/Studiokook/20-Areas/WordPress/_index|← WordPress (Studiokook)]] <!-- decay:2026-03-29 tier:cold rel:0.565 -->
+- [[10-Projects/Studiokook/20-Areas/WordPress/five-whys|5 Whys]] — методология root cause <!-- decay:2026-03-29 tier:cold rel:0.565 -->
+- [[10-Projects/Studiokook/20-Areas/WordPress/plugin-safety|Plugin Safety]] — безопасные операции <!-- decay:2026-03-29 tier:cold rel:0.565 -->
+- [[10-Projects/Studiokook/knowledge|Knowledge]] — архитектурные особенности <!-- decay:2026-03-29 tier:cold rel:0.565 -->
+
+<!-- source: YT-2026-03-24-oRnmHNVPrZ4_2026-03-24-18-52.md -->
+
+### PATTERN — Исправление ошибок
+
+AI-agent auto-analyzes logs and fixes errors without manual intervention during first 1-2 days
+
+
+## Related
+<!-- auto-generated by vault-graph-builder 2026-04-23 -->
+- [[10-projects/studiokook/20-areas/infrastructure/troubleshooting-current]] <!-- decay:2026-03-29 tier:cold rel:0.565 -->
+
+## Distilled 2026-04-25 (from global-patterns)
+
+### Debugging & Conflict Resolution
+
+- **PATTERN: Identify all report sources** — when fixing data consistency issues, identify ALL sources generating those reports (e.g., vault-audit for stdout, generate-moc.js for static markdown) and apply consistent logic to each.
+- **PATTERN: Audit existing configs for conflicts** — when debugging unexpected WP behavior, audit existing code snippets and mu-plugins to identify conflicting sources (e.g., Product Schema from post_meta vs. Yoast).
+- **PATTERN: When plan contradicts live system** — audit live system to understand actual state, update plan to reflect reality before proceeding. Priority: actual state over documentation.
+- **PATTERN: mu-plugin for centralized WP changes** — for WP changes affecting SEO/Schema, use mu-plugin for centralized management and easy deploy.

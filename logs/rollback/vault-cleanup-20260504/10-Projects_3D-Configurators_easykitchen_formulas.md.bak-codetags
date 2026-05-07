@@ -1,0 +1,186 @@
+---
+title: EasyKitchen — паттерны формул
+tags: [easykitchen, sketchup, formulas, reference]
+parent: "[[../_index]]"
+created: 2026-04-19
+---
+
+# EasyKitchen — Паттерны формул resize/position
+
+Формулы живут в `dynamic_attributes` под префиксными ключами:
+
+| Ключ | Что контролирует |
+|------|------------------|
+| `_lenx_formula` | Длина компонента по X (LenX) |
+| `_leny_formula` | Длина по Y (LenY, обычно глубина) |
+| `_lenz_formula` | Длина по Z (LenZ, высота) |
+| `_inst_x_formula` | Позиция X относительно родителя |
+| `_inst_y_formula` | Позиция Y |
+| `_inst_z_formula` | Позиция Z |
+| `_inst_roty_formula` | Поворот вокруг Y |
+| `_inst__iscollapsed_formula` | Видимость: `0` / `1` (скрыт) |
+| `_copies_formula` | Кол-во копий для массива |
+
+Соответствующие helper-ключи для UI: `_lenx_label`, `_lenx_error` (последнее вычисленное значение как HTML-фрагмент для DC inspector).
+
+## Ядровые паттерны
+
+### 1. Наследование bbox от родителя
+
+```
+LenX = parent!LenX
+LenY = parent!LenY
+LenZ = parent!LenZ
+```
+
+Используется в MAINFRAME, boundingbox, FRAME-контейнерах — все они заполняют родителя целиком.
+
+### 2. Override с fallback на дефолт
+
+```
+LenX = IF(x104>0, x104, parent!z201)
+```
+
+`x*` — локальная override-переменная. Если юзер задал `x104>0` — его значение, иначе вычисляемый дефолт `parent!z201`. Даёт ручной контроль без ломки параметризации.
+
+### 3. CHOOSE — switch режимов
+
+```
+LenX = CHOOSE(a102,
+              IF(x104>0, x104, parent!z201),    # ветка 1: параметрический
+              CURRENT("LenX")*2.54)              # ветка 2: freeze
+```
+
+`a102` — глобальный параметр режима (1=auto, 2=freeze). `CHOOSE` выбирает ветку. Стандартный EasyKitchen-паттерн для "параметрический vs вручную".
+
+### 4. Freeze через CURRENT
+
+```
+CURRENT("LenX")*2.54
+```
+
+Читает текущее значение LenX, умножает на 2.54 (inches → cm). Используется при freeze-режиме: формула возвращает текущий размер, чтобы при resize бокса вручную значение зафиксировалось.
+
+### 5. Композиция размера
+
+```
+LenY = a100 + x202 + x203
+```
+
+Корневой шкаф: глубина = `a100` (базовый параметр корпуса) + front offset + back offset.
+
+### 6. Панель как bbox минус толщины соседей
+
+```
+# Нижняя горизонтальная панель (PANEL_G):
+LenX = CHOOSE(a102, IF(x104>0, x104, parent!z201), CURRENT("LenX")*2.54)
+LenY = CHOOSE(a102, parent!k202, CURRENT("LenY")*2.54)
+LenZ = a101 + x302 + x303         # толщина ЛДСП + отступы
+```
+
+### 7. Кромка (edge_a/b/c/d)
+
+Четыре экземпляра `edge_*` по периметру панели. Толщина кромки в направлении нормали к панели, габарит в двух других — как у родителя:
+
+```
+# Для фасада (толщина кромки = parent!d101):
+edge_a: LenX = parent!d101, LenY = parent!z201, LenZ = 0
+edge_b: LenX = parent!d101, LenY = parent!z201, LenZ = 0
+edge_c: LenX = parent!d101, LenY = 0,           LenZ = parent!z203
+edge_d: LenX = parent!d101, LenY = 0,           LenZ = parent!z203
+```
+
+### 8. Ручка (HANDLE)
+
+```
+HANDLE_2046:                          # bbox под ручку
+  LenX = parent!z201                  # наследует ширину фасада
+  LenY = 0
+  LenZ = parent!z203
+
+  handle_body#8:                      # тело ручки
+    LenX = e203                       # длина = глобальный параметр
+    LenY = 4                          # фиксировано (inches)
+    LenZ = 1.4                        # фиксировано
+
+    handle_element_1:                 # декоративный элемент
+      LenX = parent!LenX + 4.7        # длина = тело + вылет
+      LenY = 1.4
+      LenZ = 1.4
+
+    handle_el_l:                      # крепёж
+      LenX = 1.1
+      LenY = parent!LenY - 0.7        # высота − отступ
+      LenZ = 1.1
+```
+
+Фурнитура = композиция магических чисел + привязка к `parent!*`.
+
+## Условная видимость
+
+```
+_inst__iscollapsed_formula = check         # 0 = видим, 1 = скрыт
+```
+
+Используется для toggle опций (с/без ручек, с/без стекла, глухой фасад vs ящик).
+
+Часто видимость завязана на глобальный LIST-параметр:
+
+```
+_inst__iscollapsed_formula = IF(e101=1, 1, 0)
+```
+
+## Массивы (copies)
+
+```
+_copies_formula = f101                     # n ящиков
+```
+
+SketchUp автоматически размножает компонент на `n` копий вдоль одной оси, позиция копии = `(index) * offset` + формулы для позиций конкретных копий.
+
+## Helper-переменные (`z*`, `x*`)
+
+Это не специальные синтаксические конструкции, а **обычные числовые параметры**, которые используются как промежуточные. Живут на том же уровне иерархии, что и `LenX/Y/Z`, но без UI (`access=NONE`) или невидимые.
+
+Пример:
+- `z201` = ширина панели (ширина корпуса − 2× толщина боковин)
+- `z202` = глубина панели (глубина корпуса − толщина задника)
+- `z203` = толщина панели (обычно = `a101`)
+
+В детях формулы ссылаются на `parent!z201` вместо пересчёта каждый раз. DRY.
+
+## Золотое правило при модификации
+
+**Никогда не ломать цепочку `parent!*`.** Если добавляешь новую панель — она должна читать размер от родителя через `parent!<helper>`. Если меняешь базовый параметр — он должен каскадом через helper-ы `z*` дойти до всех детей. Иначе при resize часть элементов не двинется.
+
+## Чек-лист генерации нового модуля
+
+1. Определить **родительский тип** (BD — base drawer, BC — base corner, TB — tall bottom, etc.)
+2. Скопировать скелет из ближайшего существующего модуля
+3. Корневые параметры: обязательные `a100`, `a101`, `a102`, `b100`, `b101`
+4. Локальные helpers `z*` — вывести из `a*` параметров
+5. Дети (панели, фасады, фурнитура) — все через `parent!<helper>` или `parent!LenX/Y/Z`
+6. Override-переменные `x*` для пользовательских "ручных размеров" — с `IF(x>0, x, default)` паттерном
+7. Проверить freeze-режим: `CHOOSE(a102, ..., CURRENT("LenX")*2.54)` на всех размерных формулах корня
+
+## Distilled from _index.md (2026-04-26)
+
+### Formula Syntax Gotchas
+
+- **GOTCHA: CHOOSE with nested IF/comma arguments fails to parse** — EK DC parser chokes on nested commas inside CHOOSE arguments. Fix: rewrite with IF-predicates (`IF(cond, val, IF(cond2, val2, default))`).
+- **GOTCHA: `>=` operator always evaluates to true in EK DC formulas** — replace `>=N` with `>(N-1)` to correctly implement "greater than or equal to" in EK formula context.
+- **GOTCHA: Door animation rotated inwards** — RotZ formula needed negative value (`-door_angle`) to swing outwards.
+- **GOTCHA: Animated door scaled in inches instead of cm** — `formulaunits` for cross-parent reference did not work. Fix: change formula to explicit conversion (`parent.width_mm / 25.4`).
+- **GOTCHA: Formulas returned incorrect dimensions in children** — `wall_thick` stored in inches, formula divided by 2.54 again. Fix: store custom dim params in CM, divide by 2.54 once.
+
+### Sibling References
+
+- **PATTERN: `mm!key` requires sibling component named 'mm'** — `mm!key` is standard SU DC `<sibling_name>!<key>` syntax; `mm!key` resolves from a sibling component named 'mm'. Without it, value resolves from unexpected source.
+- **GOTCHA: `mm!key` returned 16mm with missing sibling** — `mm!key` is standard SU DC `<sibling_name>!<key>` syntax; correct parsing requires sibling component named 'mm'.
+
+
+## Related
+<!-- auto-generated by vault-graph-builder 2026-05-03 -->
+- [[10-projects/3d-configurators/easykitchen/dc-mechanics]]
+- [[10-projects/3d-configurators/easykitchen/minimal-dc-build]]
+- [[10-projects/3d-configurators/easykitchen/tg1-architecture]]
