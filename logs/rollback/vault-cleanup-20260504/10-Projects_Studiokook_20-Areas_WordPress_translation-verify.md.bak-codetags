@@ -1,0 +1,249 @@
+---
+tags: [wordpress, translatepress, verification, pattern]
+aliases: [translation verification, negative-match, confirmation bias, scope narrowing, TRP segmentation, Estonian patterns, visual verification]
+project: studiokook
+source: .claude/patterns/translation-verification.md
+updated: 2026-03-17
+---
+
+# Translation Verification Patterns ([[TranslatePress]])
+
+> **Critical patterns from FAQ translation incident (2026-03-09)**
+> Claimed "done" twice. User found 21+ untranslated strings.
+
+---
+
+## ❌ ЗАПРЕЩЁННЫЕ ПАТТЕРНЫ
+
+### 1. Positive-Match Verification — NEVER
+
+**What it looks like:**
+```bash
+# ❌ WRONG: "Let me check that translations are there"
+curl .../ru/faq/ | grep "бесплатн|гарант|гибк"
+# Found 8 matches → "All translated!"
+```
+
+**Why it fails:**
+- Finds translated strings but IGNORES untranslated ones <!-- decay:2026-03-17 tier:cold rel:0.28 -->
+- 8 out of 23 answers translated → still reports "success" <!-- decay:2026-03-17 tier:cold rel:0.28 -->
+- Classic confirmation bias: searching for evidence of success <!-- decay:2026-03-17 tier:cold rel:0.28 -->
+
+**Incident:**
+Deployed 34 of 57 strings. Grep found translated subset → marked "done".
+User found 9 titles + 12 answers + 3 hero/CTA strings still in Estonian.
+
+---
+
+### 2. Cherry-Pick Translation Scope — NEVER
+
+**What it looks like:**
+```
+Page has 57 translatable strings.
+Script translates 34 "key" strings.
+Never counts total to check coverage.
+→ 23 strings silently dropped.
+```
+
+**Why it fails:**
+- "Key strings" is subjective — what's "key" to the developer isn't what's visible to the user <!-- decay:2026-03-17 tier:cold rel:0.28 -->
+- No completeness metric = no way to detect gaps <!-- decay:2026-03-17 tier:cold rel:0.28 -->
+- Scope silently narrows from "translate page" to "translate what I noticed" <!-- decay:2026-03-17 tier:cold rel:0.28 -->
+
+---
+
+### 3. Scope Narrowing on Todos — NEVER
+
+**What it looks like:**
+```
+Original task: "Translate FAQ page to RU/EN/FI"
+Sub-task: "Update translations for softened answers"
+→ Marks sub-task done → Marks parent done
+→ Ignores the 23 strings that weren't softened
+```
+
+**Why it fails:**
+- Sub-task completion ≠ parent task completion <!-- decay:2026-03-17 tier:cold rel:0.28 -->
+- "Changed answers translated" ≠ "all answers translated" <!-- decay:2026-03-17 tier:cold rel:0.28 -->
+- Todo items must be verified against ORIGINAL scope <!-- decay:2026-03-17 tier:cold rel:0.28 -->
+
+---
+
+## ✅ ПРАВИЛЬНЫЕ ПАТТЕРНЫ
+
+### Translation Deployment Checklist
+
+```
+BEFORE deploying translations:
+
+1. ENUMERATE all strings on ET page:
+   - Titles: curl ET | grep toggle-title | count
+   - Answers: curl ET | grep '<p>' in toggle | count
+   - Headings: curl ET | grep heading-title | count
+   - Buttons: curl ET | grep button-text | count
+   - Text blocks: curl ET | grep text-editor | count
+   → Record TOTAL count
+
+2. DEPLOY translations for ALL enumerated strings
+
+3. VERIFY via NEGATIVE match (search for REMAINING Estonian):
+   for lang in ru en fi; do
+     echo "=== $lang ==="
+     # Check titles
+     curl .../$lang/faq/ | grep toggle-title | grep -P "[õüäö]" | grep -v brand-names
+     # Check answers
+     curl .../$lang/faq/ | grep '<p>' | grep -P "\b(soovitame|kasutame|pakume|teeme|saame|vältige)\b"
+     # Check headings, buttons, text blocks
+     curl .../$lang/faq/ | grep -oP ">[^<]+" | grep -P "Estonian-specific-words"
+   done
+   → ZERO matches = actually done
+
+4. VERIFY visually:
+   Open each language version in browser.
+   Scroll through ENTIRE page.
+   → No Estonian blocks visible = confirmed
+```
+
+### Negative-Match Verification (The Core Pattern)
+
+```bash
+# ✅ RIGHT: Search for FAILURES, not successes
+# Estonian-specific patterns that don't appear in RU/EN/FI:
+# õ, ü (not in RU), Estonian verbs, Estonian sentence patterns
+
+# For titles:
+curl .../ru/faq/ | grep toggle-title | sed 's/.*>//' | grep -v "^\." | grep -cP "[õü]"
+# Must be 0
+
+# For answers:
+curl .../ru/faq/ | grep '<p>' | grep -cP "\b(soovitame|kasutame|pakume|teeme|saame|pühkige|vältige|köögi|tööpind|fassaad|furnituur)\b"
+# Must be 0
+
+# For all text:
+curl .../ru/faq/ | grep -oP ">[^<]+" | grep -cP "Oleme|Võtke|aitame|leidnud|Pakume|Kasutame"
+# Must be 0
+```
+
+### TRP String Segmentation Rules
+
+[[TranslatePress]] splits translatable text at HTML boundaries:
+
+```html
+<p>Text before <a href="...">link text</a> text after</p>
+```
+→ Creates 3 separate TRP strings:
+1. `Text before` (or full text without link)
+2. `link text` (the anchor text)
+3. `text after` (including leading punctuation)
+
+**Implications:**
+- One visible paragraph may be 1-3 TRP strings <!-- decay:2026-03-17 tier:cold rel:0.28 -->
+- After deploying new content, MUST load page in all languages to trigger TRP string detection <!-- decay:2026-03-17 tier:cold rel:0.28 -->
+- Then query `wp_trp_original_strings` to find ALL detected strings <!-- decay:2026-03-17 tier:cold rel:0.28 -->
+- Check each has status=2 translations in all `wp_trp_dictionary_*` tables <!-- decay:2026-03-17 tier:cold rel:0.28 -->
+
+```bash
+# Trigger TRP detection for new content:
+for lang in ru en fi; do
+  curl -s "https://site.com/$lang/page/" > /dev/null
+done
+
+# Then check for untranslated (status=0):
+wp eval-file /tmp/check-untranslated.php
+# Script: SELECT * FROM wp_trp_dictionary_* WHERE status = 0 AND original_id IN (page's string IDs)
+```
+
+### Full Translation Audit Script Template
+
+```php
+<?php
+// Audit: find all untranslated strings for a page
+global $wpdb;
+$page_url = '/faq/'; // adjust
+$langs = [
+    'ru' => 'wp_trp_dictionary_et_ru_ru',
+    'en' => 'wp_trp_dictionary_et_en_gb',
+    'fi' => 'wp_trp_dictionary_et_fi',
+];
+
+// Get page content strings (detected by TRP)
+$originals = $wpdb->get_results(
+    "SELECT os.id, os.original FROM wp_trp_original_strings os
+     WHERE os.original IN (
+         SELECT d.original FROM wp_trp_dictionary_et_ru_ru d
+         WHERE d.original_id = os.id
+     )"
+);
+
+foreach ($langs as $code => $table) {
+    $untranslated = $wpdb->get_var(
+        "SELECT COUNT(*) FROM {$table} WHERE status = 0 OR translated = ''"
+    );
+    echo "$code: $untranslated untranslated\n";
+}
+```
+
+---
+
+## Detection Rules
+
+### When to apply this pattern:
+
+1. Any [[TranslatePress]] translation task
+2. Any multilingual content deployment
+3. Any Elementor page with translations
+4. After ANY content change on translated pages (new text = new TRP strings)
+
+### Red flags during translation work:
+
+| Red flag | What it means |
+|----------|---------------|
+| "I translated the key strings" | Scope narrowed — what about non-key? |
+| Grep finds N translated strings | But how many TOTAL strings exist? |
+| "Translations deployed, done" | Did you check for REMAINING source text? |
+| Todo marked complete after sub-task | Verify against ORIGINAL task scope |
+| No browser visual check | Grep misses what eyes catch instantly |
+
+---
+
+## Summary Rules
+
+1. ❌ **NEVER** verify by searching for translated text (confirmation bias)
+2. ❌ **NEVER** translate a subset without counting the total
+3. ❌ **NEVER** mark "done" without negative-match verification
+4. ✅ **ALWAYS** enumerate ALL translatable strings first, record count
+5. ✅ **ALWAYS** verify by searching for REMAINING source-language text (must be 0)
+6. ✅ **ALWAYS** open translated pages in browser and scroll through
+7. ✅ **ALWAYS** check TRP string segmentation (one paragraph ≠ one string)
+8. ✅ **ALWAYS** verify todo completion against ORIGINAL task scope
+
+**Default verification:** `grep -cP "Estonian-unique-patterns"` on translated page → must return 0.
+
+---
+
+## Related
+
+- `logs/post-mortem/2026-03-09-faq-translations.md` — Incident analysis <!-- decay:2026-03-17 tier:cold rel:0.28 -->
+- `patterns/wordpress-plugins.md` — WordPress safety patterns <!-- decay:2026-03-17 tier:cold rel:0.28 -->
+- `verification-before-completion` skill — General verification discipline <!-- decay:2026-03-17 tier:cold rel:0.28 -->
+
+---
+
+## Связанные файлы
+
+- [[10-Projects/Studiokook/20-Areas/WordPress/_index|← WordPress (Studiokook)]] <!-- decay:2026-03-17 tier:cold rel:0.28 -->
+- [[10-Projects/Studiokook/20-Areas/WordPress/translatepress|TranslatePress Internals]] — внутренняя архитектура TRP <!-- decay:2026-03-17 tier:cold rel:0.28 -->
+- [[10-Projects/Studiokook/20-Areas/WordPress/five-whys|5 Whys]] — root cause при проблемах с переводами <!-- decay:2026-03-17 tier:cold rel:0.28 -->
+- [[30-Resources/API-Reference/studiokook-examples|API Examples]] — [[translatepress|trp-search]], [[translatepress|trp-add]], trp-update-by-id <!-- decay:2026-03-17 tier:cold rel:0.28 -->
+
+## Distilled 2026-03-26
+
+### Translation Coverage Snapshot (2026-03-25)
+
+| Language | Coverage | Missing pages |
+|----------|----------|---------------|
+| ET | 100% | — |
+| RU | 94% | /teenused, /galerii |
+| EN | 87% | /kontakt, /teenused, /galerii |
+- Source: SEO Audit Weekly 2026-03-25 <!-- decay:2026-03-26 tier:cold rel:0.415 -->
+- Action: run TRP string audit on missing pages for RU + EN <!-- decay:2026-03-26 tier:cold rel:0.415 -->

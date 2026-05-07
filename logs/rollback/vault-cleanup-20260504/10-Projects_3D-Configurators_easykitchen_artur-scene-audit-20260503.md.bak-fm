@@ -1,0 +1,121 @@
+# Artur scene audit - 2026-05-03
+
+## Source
+
+- Scene: `C:\Users\sorte\Desktop\Проекты\Artur\Scene.skp`
+- JSON audit: `C:/tmp/ek-scene-audit-20260503-artur.json`
+- Screenshots:
+  - `C:/tmp/ek-scene-audit-20260503-artur-active.png`
+  - `C:/tmp/ek-scene-audit-20260503-artur-top.png`
+  - `C:/tmp/ek-scene-audit-20260503-artur-iso.png`
+- Scene was inspected read-only.
+
+## Key Exception
+
+This scene has a non-standard lower-row working height by client request.
+
+Observed height stack:
+
+- `160` plinth/support zone.
+- `770` lower cabinet/body zone.
+- `20` countertop thickness.
+- Working height: `950`.
+
+Do not normalize this project back to the common `100/770/38 -> 908` or `100/770/30 -> 900` pattern. Here the lower body still reads as a 770 module family. The module carcass/body must not be stretched; the total working height is raised by increasing the support/plinth zone to 160 and using the 20mm stone top.
+
+Because the countertop is 20mm, classify it as stone.
+
+## Layout Pattern
+
+Compact L kitchen in a room shell:
+
+- Room/run dimensions: back wall about `2890`, left wall about `2888`, room height `2297`.
+- L corner uses real lower corner module `BG1#3`, bbox approx `X[0..1071] Y[-670..0] Z[0..930]`.
+- Left leg sequence:
+  - `PANEL-FACADE#9` full-height side/end panel, 19.3mm.
+  - `BJ`, narrow/filler module, bbox approx `X[0..671] Y[-2200..-1973.5] Z[0..930]`.
+  - `BD3#2`, 704mm cooktop-side drawer/base module.
+  - `BD3#1`, 704mm base module before corner.
+  - `BG1#3` corner.
+- Back row sequence:
+  - `BG1#3` corner return.
+  - `BD1`, sink base, 600mm.
+  - `BI#1`, dishwasher, 600mm.
+  - `PD1_6#1`, oven/micro pencil, 600mm, full height to `Z=2267`.
+  - `PANEL-FACADE#8`, right full-height pencil side cladding, 19.3mm.
+
+Dimension texts for lower row include `150`, `704`, `704+50`, `479`, `600`, `600`, `600`. The `479` visible size corresponds to the free/visible part around the corner after the corner/filler geometry, not a standalone standard module width.
+
+## Appliances
+
+- Cooktop: `Miele KM 6322 PowerFlex`, over left-leg `BD3` zone, bbox approx `X[38..552] Y[-2005.5..-1390.5] Z[941..951]`.
+- Sink: `МОЙКА ZORG (под смеситель)#1`, on `BD1`, bbox approx `X[1127..1577] Y[-600..-90] Z[700..950]`.
+- Dishwasher: `BI#1`, 600mm, between sink base and pencil.
+- Oven: `SIEMENS HB23AB520E`, in `PD1_6#1`, bbox approx `X[2273..2869] Y[-670..-70] Z[726..1314]`.
+- Microwave/upper appliance: `Bosch_1`, in `PD1_6#1`, bbox approx `X[2271..2871] Y[-670..-270] Z[1316..1712]`.
+- Water/communication component `water pipes v3` sits in sink-base zone near `X[1453..1593] Y[-95..0] Z[0..212]`.
+
+## Countertop And Backsplash
+
+Main worktops:
+
+- Left leg: `Столешница прямая#1`, approx `X[0..650] Y[-2200..0] Z[930..950]`, 20mm stone.
+- Back leg: `Столешница прямая#2`, approx `X[600..2252] Y[-650..0] Z[930..950]`, 20mm stone.
+
+Backsplash/upstand pieces:
+
+- `Столешница прямая#3`, approx `X[-203..50] Y[-768..150] Z[1020..1030]`, vertical/wall-zone piece.
+- `Столешница прямая#4`, approx `X[0..1680] Y[-50..203] Z[1020..1030]`, vertical/wall-zone piece.
+
+Extractor implication: `Столешница прямая` can mean worktop or backsplash/upstand. Classify by orientation, `Z`, and relation to wall/work zone.
+
+## Upper Row
+
+Default vertical relation: upper cabinet bottom / wall-panel top = countertop surface + 600mm. In Artur: 950 + 600 = 1550.
+
+- Upper start is around `Z=1550`, consistent with raised 950mm worktop plus the default 600mm wall-panel/backsplash gap. Upper cabinets are tied to countertop surface height, not to an absolute global Z.
+- Left upper sequence:
+  - `TB2-H3`, approx `X[0..470] Y[-2200.3..-1264.3] Z[1550..2267]`, width/span 936.
+  - `TB1#4`, approx `X[0..470] Y[-1264.3..-796.3] Z[1550..2267]`, span 468.
+  - `PANEL-FACADE#3` upper end panel, 19.3mm.
+- Back/right upper sequence:
+  - `TB1#2`, approx `X[1709..2252] Y[-470..0] Z[1550..2267]`, span 543.
+  - Upper side/end panels `PANEL-FACADE#7` and `PANEL-FACADE#5` finish the gaps around upper/pencil zone.
+- Above left tall/end zone: `TB1#1`, approx `X[0..670] Y[-2869.3..-2219.3] Z[1967..2267]`, height 300.
+
+## Lighting Pattern
+
+This scene has two top-level recessed lighting profile components:
+
+- `Врезной профиль для подсветки`, approx `X[-118.1..99.7] Y[-2198.3..-794.3] Z[1352.5..1556.5]`, run about 1404mm along the left side.
+- `Врезной профиль для подсветки#1`, approx `X[1709..2252] Y[-78.9..138.8] Z[1352.5..1556.5]`, run about 543mm along the back/right upper zone.
+
+Nested light components again include `light_diffuser`, `Подсветка врезного профиля`, and color-temperature variants `4000k/5000k/6000k/7000k` plus `_open` variants.
+
+## Materials / Finish Notes
+
+Visible scene text:
+
+- `Karkass - Tume Hall`
+- `Uksed: H3730/Ncs s 7000 N poolmatt`
+
+Observed material names include:
+
+- `NCS-S-7000-N` for dark fronts/panels.
+- `H3730 Гикори натуральный` for wood doors/panels.
+- `Q750 Statuario Classic 7722x3861` for 20mm stone countertop/backsplash.
+
+## Template / Standards Takeaways
+
+- Add explicit custom-height handling: store the declared/observed height stack instead of forcing standard lower-row heights. Raise/lower the working height through supports/plinth, not by changing the cabinet body height.
+- For 20mm/30mm countertops: classify as stone, then compute target working height from client/project rule, not from a fixed base standard.
+- `160 + 770 + 20 = 950` is a valid observed finished-project pattern when client-requested: 160 support/plinth, 770 module body, 20 stone top.
+- Upper start height and backsplash/profiles must be evaluated relative to the raised worktop height.
+- Real corner module `BG1#3` can have bbox height `930` when the lower row is raised; do not compare corner height to standard scenes without accounting for plinth/top stack.
+- Keep lighting audit section: even scenes without visible render lights may use recessed profile components with nested diffuser/LED variants.
+
+## Open Checks
+
+- Confirm whether the 160mm support is modeled as plinth, legs, or combined platform in BOM/export logic.
+- Confirm whether `Q750 Statuario Classic` should be mapped as the canonical stone material class for this project.
+- Extractor still needs non-ASCII normalization for Russian component names in JSON/PowerShell output.

@@ -23,8 +23,34 @@ const HOST = 'n8n.studiokook.ee';
 const TG_CHAT = '804465999';
 
 function loadState() {
-  try { return JSON.parse(fs.readFileSync(STATE_FILE, 'utf8')); }
-  catch { return { lastRun: 0, alerted: [], wfNames: {} }; }
+  try {
+    const s = JSON.parse(fs.readFileSync(STATE_FILE, 'utf8'));
+    if (!s.signatures) s.signatures = {};
+    return s;
+  }
+  catch { return { lastRun: 0, alerted: [], wfNames: {}, signatures: {} }; }
+}
+
+function sigOf(workflowId, nodeName, message) {
+  const m = String(message || '').slice(0, 120).replace(/\s+/g, ' ').trim();
+  return `${workflowId}::${nodeName || '?'}::${m}`;
+}
+
+async function getErrorSignature(execId, key, workflowId) {
+  try {
+    const det = await apiGet(`/api/v1/executions/${execId}?includeData=true`, key);
+    const raw = det && det.data;
+    let parsed = raw;
+    if (typeof raw === 'string') {
+      try { parsed = JSON.parse(raw); } catch { parsed = null; }
+    }
+    const rd = parsed && (parsed.resultData || (parsed.data && parsed.data.resultData));
+    const err = rd && rd.error;
+    const message = err && (err.message || err.description) || '';
+    const nodeName = (err && err.node && (err.node.name || err.node)) || rd && rd.lastNodeExecuted || '';
+    if (!message && !nodeName) return null;
+    return sigOf(workflowId, nodeName, message);
+  } catch { return null; }
 }
 
 function saveState(s) { fs.writeFileSync(STATE_FILE, JSON.stringify(s, null, 2)); }
@@ -76,19 +102,20 @@ async function run() {
   const cutoff = now - WINDOW_HOURS * 3600 * 1000;
   const alerted = new Set(state.alerted);
   const wfNames = state.wfNames || {};
+  const signatures = state.signatures || {};
 
-  const fresh = (resp.data || []).filter(e => {
+  const candidates = (resp.data || []).filter(e => {
     if (alerted.has(e.id)) return false;
     const t = new Date(e.stoppedAt || e.startedAt).getTime();
     return t >= cutoff;
   });
 
-  if (fresh.length === 0) {
-    saveState({ ...state, lastRun: now });
+  if (candidates.length === 0) {
+    saveState({ ...state, lastRun: now, signatures });
     return;
   }
 
-  const newWfIds = [...new Set(fresh.map(f => f.workflowId).filter(id => !wfNames[id]))];
+  const newWfIds = [...new Set(candidates.map(f => f.workflowId).filter(id => !wfNames[id]))];
   for (const wfId of newWfIds) {
     try {
       const wf = await apiGet(`/api/v1/workflows/${wfId}`, key);
@@ -96,16 +123,47 @@ async function run() {
     } catch { wfNames[wfId] = wfId; }
   }
 
+  const fresh = [];
+  let suppressed = 0;
+  for (const e of candidates) {
+    const sig = await getErrorSignature(e.id, key, e.workflowId);
+    if (sig && signatures[sig]) {
+      signatures[sig].count++;
+      signatures[sig].lastId = e.id;
+      signatures[sig].lastSeen = now;
+      suppressed++;
+    } else {
+      if (sig) signatures[sig] = { firstId: e.id, lastId: e.id, count: 1, lastSeen: now };
+      fresh.push(e);
+    }
+  }
+
+  const sigEntries = Object.entries(signatures);
+  if (sigEntries.length > 100) {
+    sigEntries.sort((a, b) => (b[1].lastSeen || 0) - (a[1].lastSeen || 0));
+    const trimmed = {};
+    for (const [k, v] of sigEntries.slice(0, 100)) trimmed[k] = v;
+    Object.keys(signatures).forEach(k => delete signatures[k]);
+    Object.assign(signatures, trimmed);
+  }
+
+  if (fresh.length === 0) {
+    if (suppressed > 0) console.log(`[N8N-MONITOR] ${suppressed} duplicate failure(s) suppressed`);
+    const newAlerted = [...alerted, ...candidates.map(f => f.id)].slice(-200);
+    saveState({ lastRun: now, alerted: newAlerted, wfNames, signatures });
+    return;
+  }
+
   const groups = {};
   for (const e of fresh) {
-    const key = e.workflowId;
-    if (!groups[key]) groups[key] = { name: wfNames[key] || key, count: 0, lastTime: '' };
-    groups[key].count++;
+    const k = e.workflowId;
+    if (!groups[k]) groups[k] = { name: wfNames[k] || k, count: 0, lastTime: '' };
+    groups[k].count++;
     const t = new Date(e.stoppedAt || e.startedAt);
     const hhmm = `${String(t.getUTCHours()).padStart(2,'0')}:${String(t.getUTCMinutes()).padStart(2,'0')}`;
-    if (!groups[key].lastTime || t.getTime() > new Date(groups[key].lastTime).getTime()) {
-      groups[key].lastTime = t.toISOString();
-      groups[key].lastHHMM = hhmm;
+    if (!groups[k].lastTime || t.getTime() > new Date(groups[k].lastTime).getTime()) {
+      groups[k].lastTime = t.toISOString();
+      groups[k].lastHHMM = hhmm;
     }
   }
 
@@ -114,13 +172,14 @@ async function run() {
     .map(([id, g]) => `• ${g.name} × ${g.count} (last ${g.lastHHMM} UTC)`)
     .join('\n');
 
-  const msg = `⚠️ n8n failures (${fresh.length} new, last ${WINDOW_HOURS}h)\n\n${lines}`;
-  console.log(`[N8N-MONITOR] ${fresh.length} new failure(s) in ${Object.keys(groups).length} workflow(s)`);
+  const suppressNote = suppressed > 0 ? `\n\n(${suppressed} duplicate root cause suppressed)` : '';
+  const msg = `⚠️ n8n failures (${fresh.length} new, last ${WINDOW_HOURS}h)\n\n${lines}${suppressNote}`;
+  console.log(`[N8N-MONITOR] ${fresh.length} new failure(s) in ${Object.keys(groups).length} workflow(s)${suppressed ? `, ${suppressed} dup suppressed` : ''}`);
 
   try { await sendTelegram(TG_CHAT, msg); } catch {}
 
-  const newAlerted = [...alerted, ...fresh.map(f => f.id)].slice(-200);
-  saveState({ lastRun: now, alerted: newAlerted, wfNames });
+  const newAlerted = [...alerted, ...candidates.map(f => f.id)].slice(-200);
+  saveState({ lastRun: now, alerted: newAlerted, wfNames, signatures });
 }
 
 run().catch(e => process.stderr.write(`[n8n-monitor] fatal: ${e.message}\n`));

@@ -1,0 +1,404 @@
+---
+tags: [studiokook, seo, strategy, keywords]
+aliases: [SMM strategy, Google Ads, Meta Ads, content automation, email marketing, CRO conversion, keyword strategy]
+project: studiokook
+source: Desktop/Studiokook/.claude/skills/seo-aeo/resources/studiokook-seo.md
+updated: 2026-03-17
+---
+
+# Studiokook.ee -- SEO, SMM & Marketing
+
+Studiokook-specific SEO strategy, SMM calendar, paid ads, CRO, and automation.
+Merged from `seo-smm` skill (2026-03-08).
+
+## Keywords (ET + RU + EN)
+
+- **ET:** köök, köögimööbel, köögid Tallinnas, köögimööbel Eestis, köögi disain <!-- decay:2026-03-17 tier:cold rel:0.28 -->
+- **RU:** kuhnya tallinn, kuhonnaya mebel' estoniya, kuhni na zakaz <!-- decay:2026-03-17 tier:cold rel:0.28 -->
+- **EN:** custom kitchen Estonia, kitchen furniture Tallinn <!-- decay:2026-03-17 tier:cold rel:0.28 -->
+
+## On-page SEO Checklist
+
+1. Title tag: keyword + city + brand (<=60 chars)
+2. Meta description: CTA + uniqueness (<=155 chars)
+3. H1: one per page, contains target keyword
+4. Alt texts: descriptive, with keywords (NGG alttext)
+5. Internal links: >=3 per page, keyword-rich anchors
+6. Schema.org: JSON-LD in header
+
+## Meta Description Template
+
+```
+/seo-smm meta [URL] [ET/RU]
+-> 155-160 chars, with CTA and keywords
+```
+
+## Tools
+
+- [[infrastructure|Yoast SEO]] (WordPress) <!-- decay:2026-03-17 tier:cold rel:0.28 -->
+- Google Search Console <!-- decay:2026-03-17 tier:cold rel:0.28 -->
+- [[TranslatePress]] (ET/RU) <!-- decay:2026-03-17 tier:cold rel:0.28 -->
+- WordPress MCP (direct content management) <!-- decay:2026-03-17 tier:cold rel:0.28 -->
+
+## Technical SEO References
+
+- **Audit:** `skills/marketing/seo-audit.md` -- meta tags, headings, speed, links <!-- decay:2026-03-17 tier:cold rel:0.28 -->
+- **Schema.org:** `skills/marketing/schema-markup.md` -- Product, LocalBusiness, FAQ, Review <!-- decay:2026-03-17 tier:cold rel:0.28 -->
+- **Programmatic SEO:** `skills/marketing/programmatic-seo.md` -- bulk landing pages <!-- decay:2026-03-17 tier:cold rel:0.28 -->
+- **AEO:** see other files in this `resources/` directory <!-- decay:2026-03-17 tier:cold rel:0.28 -->
+- **[[technical-seo|Core Web Vitals]]:** wp-performance skill -- LCP, FID, CLS <!-- decay:2026-03-17 tier:cold rel:0.28 -->
+
+---
+
+## SMM -- Instagram @studiokook.ee
+
+### Content Schedule
+
+| Day | Format |
+|-----|--------|
+| Mon | Project of the week (photo + description) |
+| Wed | Tip / lifehack (carousel) |
+| Fri | Before/After or material of the week |
+| Sun | Stories poll / Q&A |
+
+### Posting Rules
+
+- Hashtags: 15-20, mix EE/RU/EN <!-- decay:2026-03-17 tier:cold rel:0.28 -->
+- Frequency: 3-4 posts per week <!-- decay:2026-03-17 tier:cold rel:0.28 -->
+- Stories: daily (behind the scenes, process) <!-- decay:2026-03-17 tier:cold rel:0.28 -->
+
+### Post Template
+
+```
+Project: [description]
+Materials: [Egger F-series, Fenix...]
+Dimensions: [...]
+Budget: from [X] EUR
+Location: Tallinn
+
+#koook #kooogimooobel #kooogid #tallinn #kooogiideed
+#kuhnya #kuhnyamechty #kuhnyaanazakaz #tallinn
+```
+
+### Visual Content
+
+- Midjourney (подписка) + Leonardo.ai (free tier) + kie.ai — generation of kitchen photos <!-- decay:2026-03-17 tier:cold rel:0.28 -->
+- Video: Kling AI (kie.ai) — Reels, Stories <!-- decay:2026-03-17 tier:cold rel:0.28 -->
+- `skills/marketing/social-content.md` -- content guidelines <!-- decay:2026-03-17 tier:cold rel:0.28 -->
+
+---
+
+## Paid Ads
+
+### Google Ads
+
+- Search: kooogimooobel, custom kitchen Tallinn <!-- decay:2026-03-17 tier:cold rel:0.28 -->
+- Display: remarketing site visitors <!-- decay:2026-03-17 tier:cold rel:0.28 -->
+- Reference: `skills/marketing/paid-ads.md` <!-- decay:2026-03-17 tier:cold rel:0.28 -->
+
+### Meta Ads (Instagram + Facebook)
+
+- Radius: 50km from Tallinn <!-- decay:2026-03-17 tier:cold rel:0.28 -->
+- Audience: homeowners, 28-55, renovation interest <!-- decay:2026-03-17 tier:cold rel:0.28 -->
+- A/B tests: `skills/marketing/ab-test-setup.md` <!-- decay:2026-03-17 tier:cold rel:0.28 -->
+
+### Competitor Analysis
+
+- `skills/marketing/competitor-alternatives.md` -- comparison pages <!-- decay:2026-03-17 tier:cold rel:0.28 -->
+- competitive-ads-extractor -- competitor ad monitoring <!-- decay:2026-03-17 tier:cold rel:0.28 -->
+
+---
+
+## CRO (Conversion Rate Optimization)
+
+- `skills/marketing/page-cro.md` -- catalog page optimization <!-- decay:2026-03-17 tier:cold rel:0.28 -->
+- `skills/marketing/form-cro.md` -- "Kuesi pakkumist" form <!-- decay:2026-03-17 tier:cold rel:0.28 -->
+- `skills/marketing/popup-cro.md` -- exit-intent, newsletter <!-- decay:2026-03-17 tier:cold rel:0.28 -->
+- `skills/marketing/signup-flow-cro.md` -- visit-to-lead funnel <!-- decay:2026-03-17 tier:cold rel:0.28 -->
+
+## Email Marketing
+
+- `skills/marketing/email-sequence.md` <!-- decay:2026-03-17 tier:cold rel:0.28 -->
+- Welcome sequence (after lead submission) <!-- decay:2026-03-17 tier:cold rel:0.28 -->
+- Post-consultation follow-up <!-- decay:2026-03-17 tier:cold rel:0.28 -->
+- Seasonal campaigns (spring/autumn -- renovation season) <!-- decay:2026-03-17 tier:cold rel:0.28 -->
+- Re-engagement (cold leads) <!-- decay:2026-03-17 tier:cold rel:0.28 -->
+
+## Copywriting
+
+- `skills/marketing/copywriting.md` -- landing pages, homepage <!-- decay:2026-03-17 tier:cold rel:0.28 -->
+- `skills/marketing/copy-editing.md` -- editing existing content <!-- decay:2026-03-17 tier:cold rel:0.28 -->
+- content-research-writer -- blog posts, material guides <!-- decay:2026-03-17 tier:cold rel:0.28 -->
+
+---
+
+## Automation (n8n)
+
+All workflows via `skills/n8n-expert/` + n8n MCP:
+
+| Workflow | Trigger | Action |
+|----------|---------|--------|
+| New lead | CF7 webhook | Telegram + email + CRM |
+| New post | Schedule | Instagram + Facebook + Telegram |
+| SEO report | Weekly cron | Google Analytics -> Telegram |
+| Project photo | Manual | fal upscale -> site + Instagram |
+| Competitor monitoring | Weekly | ad library -> report |
+| AI Overviews SEO | Weekly cron | Google Custom Search → OpenAI → структурированный контент → CMS update |
+
+## AI Overviews / AEO (2026-04-22)
+
+- [PATTERN] **SEO для Google AI Overviews**: Автоматизация через n8n — Google Custom Search API (мониторинг AI snippet видимости) → OpenAI (генерация FAQ/Q&A структурированного контента) → Google Sheets (лог позиций) → CMS update (структурированный контент + schema.org FAQ). Цель: попасть в AI-сводки Google.
+- [GOTCHA] API Google Custom Search + OpenAI требуют отдельных ключей; доступ к CMS через REST API. Риск: изменения алгоритма AI Overviews ломают стратегию.
+- Применимость для Studiokook: структурированные FAQ по кухням (ET/RU) → повышение видимости в локальных AI-ответах Google EE.
+
+## KPIs
+
+| Metric | Target | Source |
+|--------|--------|--------|
+| Organic traffic | +20% / quarter | Search Console |
+| Instagram followers | +100 / month | Meta Business |
+| Conversion rate (leads) | >2% | GA4 |
+| Branded search | +30% / quarter | Search Console |
+| Email open rate | >25% | Email platform |
+
+<!-- source: [[YT-2026-03-22-xUQ1BAH1vtw_2026-03-22-08-45]].md -->
+
+### PATTERN — Use cases для маркетологов
+
+Competitor analysis (offers, copy, pricing), review monitoring, niche research, SEO competitor analysis, lead database building.
+
+<!-- source: [[YT-2026-03-22-xUQ1BAH1vtw_2026-03-22-08-45]].md -->
+
+### PATTERN — Use cases для предпринимателей
+
+Competitor/partner analysis, market report automation, content base creation, niche discovery, data-driven decisions, automated monitoring.
+
+## Distilled 2026-03-24
+
+### Re-Indexing Protocol
+
+- **Dual-channel submission** for fastest coverage: <!-- decay:2026-03-24 tier:cold rel:0.385 -->
+  - **IndexNow API** → instant submission to Bing and Yandex (single API call, no OAuth)
+  - **Google Search Console** → manual URL inspection + "Request Indexing" for Google coverage
+- **Token management**: Google OAuth tokens expire in approximately 1 week–30 days depending on consent screen configuration — document token creation date and set calendar reminder for refresh. <!-- decay:2026-03-24 tier:cold rel:0.385 -->
+- Use after: new page publish, SEO metadata update, hreflang change, schema markup change. <!-- decay:2026-03-24 tier:cold rel:0.385 -->
+
+<!-- source: YT-2026-03-24-oRnmHNVPrZ4_2026-03-24-18-52.md -->
+
+### PATTERN — Монетизация навыка
+
+Package AI-agent setup as service for freelancers/agencies, ~$23/mth infra cost, high margin
+
+<!-- source: YT-2026-03-24-oRnmHNVPrZ4_2026-03-24-18-52.md -->
+
+### PATTERN — Масштабирование
+
+Setup once, replicate for clients, ~$23/mth per-customer infra cost, high margin service
+
+## Distilled 2026-03-26
+
+### Keyword Rankings (2026-03-25)
+
+| Keyword | Position | Change |
+|---------|----------|--------|
+| köögimööbel | 4 | +1 |
+| köök tellimus | 7 | -2 |
+| köögi planeerimine | 12 | new entry |
+- Source: SEO Audit Weekly 2026-03-25 <!-- decay:2026-03-26 tier:cold rel:0.415 -->
+
+<!-- source: YT-2026-03-29-56KZASHPkV8_2026-03-29.md -->
+
+### PATTERN — Система обучения AI на личном стиле
+
+• Export 30-50 posts → build Obsidian graph → train AI agent on style patterns
+• After 5-7 corrections, AI achieves 80%+ style accuracy
+• Document each correction as permanent rule for agent
+
+<!-- source: YT-2026-03-29-56KZASHPkV8_2026-03-29.md -->
+
+### PATTERN — Итеративное улучшение качества
+
+• Request 3 post variants from AI, select best
+• Provide specific feedback with reasons ("fewer English words", "personal tone")
+• Agent saves patterns as rules; max accuracy by 10th post
+
+<!-- source: YT-2026-03-29-56KZASHPkV8_2026-03-29.md -->
+
+### GOTCHA — Проблемы стандартного подхода
+
+• Generic prompts produce template content without individuality
+• Copying copywriter skills fails; need brand voice first (10-15 manual posts)
+• First 5-10 AI posts require manual correction
+
+<!-- source: YT-2026-03-29-56KZASHPkV8_2026-03-29.md -->
+
+### PATTERN — Применение на разных платформах
+
+• Train AI on one platform (Telegram) → extract patterns for others (Threads, Instagram, TikTok)
+• Use same Obsidian knowledge base; adapt format, preserve brand voice
+
+<!-- source: YT-2026-03-29-56KZASHPkV8_2026-03-29.md -->
+
+### PATTERN — Структура хранения контента
+
+• Organize Obsidian by platform (Telegram, Instagram, Threads, TikTok)
+• Each post = separate Markdown file with metadata
+
+<!-- source: YT-2026-03-29-56KZASHPkV8_2026-03-29.md -->
+
+### PATTERN — Граф связей для контекстного поиска
+
+• AI creates link system by keywords → enables contextual search without full archive scan
+• Saves tokens; agent accesses only relevant notes
+• Separate text and video content for precise matching
+
+<!-- source: YT-2026-03-29-56KZASHPkV8_2026-03-29.md -->
+
+### PATTERN — Автоматическое обогащение базы
+
+• Send screenshot/text to AI → auto-adds post to Obsidian with metadata
+• After 3-7 days add reaction metrics
+• AI learns to identify successful content types via metrics
+
+<!-- source: YT-2026-03-29-56KZASHPkV8_2026-03-29.md -->
+
+### PATTERN — Процесс экспорта контента
+
+• Open channel in Telegram Desktop → Menu → Export chat history
+• Format: JSON, all messages from beginning
+• Pass JSON file to AI agent for parsing
+
+<!-- source: YT-2026-03-29-56KZASHPkV8_2026-03-29.md -->
+
+### GOTCHA — Альтернативное использование
+
+Can export other users' Telegram channels if you lack own brand voice; create content based on their style
+
+<!-- source: YT-2026-03-29-56KZASHPkV8_2026-03-29.md -->
+
+### PATTERN — Работа с AI-агентом
+
+• Pass JSON export to AI → parse content → place in Obsidian
+• Auto-create knowledge graph
+• Agent handles parsing/saving without intervention
+
+<!-- source: YT-2026-03-29-56KZASHPkV8_2026-03-29.md -->
+
+### PATTERN — Будущая автоматизация мониторинга
+
+Plan: embed AI agent in Telegram channel for auto-tracking reactions, updating metrics in real-time, analyzing effectiveness without manual input
+
+<!-- source: YT-2026-03-29-56KZASHPkV8_2026-03-29.md -->
+
+### FACT — Целевая аудитория
+
+Content creators, bloggers, Telegram channel owners, AI users for social media content generation
+
+<!-- source: YT-2026-03-29-56KZASHPkV8_2026-03-29.md -->
+
+### PATTERN — Стартовая последовательность
+
+Stage 1: Download materials, define brand voice (or write 15 posts), install tools
+Stage 2: Export Telegram JSON, create Obsidian folder structure, send to AI
+Stage 3-5: AI builds files + graph, request 3 variants, iterate, scale to other platforms
+
+<!-- source: YT-2026-03-29-56KZASHPkV8_2026-03-29.md -->
+
+### PATTERN — Экономия ресурсов
+
+• Tokens: graph loads only relevant content, not entire archive
+• Time: automate parsing, saving, structuring
+• Quality: AI learns from success metrics (likes, views, comments)
+
+<!-- source: YT-2026-03-29-56KZASHPkV8_2026-03-29.md -->
+
+### GOTCHA — Необходимые условия успеха
+
+✓ Clear brand voice (or willingness to develop one) ✓ Min 30-50 content samples ✓ 5-10 feedback iterations ✓ Regular reaction metrics; ✗ Without these = template content only
+
+<!-- source: YT-2026-03-29-56KZASHPkV8_2026-03-29.md -->
+
+### PATTERN — Обучение через примеры
+
+Show real examples of your content, not copywriter skills. Use concrete examples + patterns, not generic instructions. Continuous learning via feedback, not one-time setup.
+
+<!-- source: YT-2026-03-29-56KZASHPkV8_2026-03-29.md -->
+
+### GOTCHA — Финальное предупреждение
+
+System reproduces existing brand voice; does not create one. Requires pre-existing voice to work effectively.
+
+<!-- triage:2026-04-19 — extracted from claudeclaw-features n8n-templates priority 8-9 -->
+
+## SEO Automation Patterns (n8n)
+
+### PATTERN: Автопубликация SEO-постов через n8n + WordPress REST API (9/10)
+
+- Pipeline: SerpAPI (new keywords/topics) → OpenRouter LLM (generate post) → Google Gemini (generate featured image) → WordPress REST API (publish with RankMath meta fields) <!-- decay:2026-03-26 tier:cold rel:0.415 -->
+- RankMath meta fields require PHP registration in functions.php/studiokook-seo.php: `register_meta('post', 'rank_math_focus_kw', ...)` <!-- decay:2026-03-26 tier:cold rel:0.415 -->
+- Risk: LLM without editorial review can publish irrelevant content — add Telegram approval step before publication <!-- decay:2026-03-26 tier:cold rel:0.415 -->
+- Source: feature-watcher #77682 (9/10) <!-- decay:2026-03-26 tier:cold rel:0.415 -->
+
+### PATTERN: Автопубликация SEO-постов из Google News (8/10)
+
+- Pipeline: Google News RSS/SerpAPI → filter by keyword relevance → OpenRouter LLM rewrite → WordPress REST API publish <!-- decay:2026-03-26 tier:cold rel:0.415 -->
+- Integration point: RankMath meta fields need PHP registration (same as above pattern) <!-- decay:2026-03-26 tier:cold rel:0.415 -->
+- Differentiation from 77682: source is Google News trends, not custom keyword research <!-- decay:2026-03-26 tier:cold rel:0.415 -->
+- Source: feature-watcher #77681 (8/10) <!-- decay:2026-03-26 tier:cold rel:0.415 -->
+
+### PATTERN: Автоматизация SEO-отчётов GSC + GPT-4o-mini → Gmail (8/10)
+
+- n8n workflow: OAuth2 Google Search Console → fetch keyword/click/impression data → GPT-4o-mini analysis → Gmail formatted report <!-- decay:2026-03-26 tier:cold rel:0.415 -->
+- Credential setup: one Google OAuth2 credential in n8n covers both GSC API and Gmail API <!-- decay:2026-03-26 tier:cold rel:0.415 -->
+- Config node pattern: store site URL, email recipient, date range in a single "Config" Set node — do not hardcode across workflow <!-- decay:2026-03-26 tier:cold rel:0.415 -->
+- Source: feature-watcher #77691 (8/10) <!-- decay:2026-03-26 tier:cold rel:0.415 -->
+
+### PATTERN: Анализатор контентных пробелов конкурентов (8/10)
+
+- n8n workflow: target domain input → FireCrawl/HTTP scrape competitor pages → GPT-4o-mini gap analysis vs own sitemap → Slack/email report <!-- decay:2026-03-26 tier:cold rel:0.415 -->
+- Risk: scraping can break on JS-heavy sites — use FireCrawl for dynamic pages, raw HTTP for static <!-- decay:2026-03-26 tier:cold rel:0.415 -->
+- Integration: studiokook-seo.php can consume gap analysis output to prioritize content calendar <!-- decay:2026-03-26 tier:cold rel:0.415 -->
+- Source: feature-watcher #77692 (8/10) <!-- decay:2026-03-26 tier:cold rel:0.415 -->
+
+### PATTERN: SEO-чат-бот на базе Google Sheets + GPT-4o-mini (8/10)
+
+- Architecture: Google Sheets as knowledge base (FAQ tab + Chat Log tab) → n8n webhook receives question → GPT-4o-mini answers using sheet data → returns response <!-- decay:2026-03-26 tier:cold rel:0.415 -->
+- Google Sheets as KB advantage: non-technical team can update FAQ without touching n8n <!-- decay:2026-03-26 tier:cold rel:0.415 -->
+- Risk: answer quality degrades if FAQ sheet has incomplete/contradictory entries — periodic audit required <!-- decay:2026-03-26 tier:cold rel:0.415 -->
+- Source: feature-watcher #77705 (8/10) <!-- decay:2026-03-26 tier:cold rel:0.415 -->
+
+### PATTERN: ASEO — анализ видимости сайта в AI-поисковиках (8/10)
+
+- Sub-workflow pattern: separate "ASEO checker" sub-workflow called via Execute Workflow node from parent <!-- decay:2026-03-26 tier:cold rel:0.415 -->
+- Tests visibility across 5 AI search engines by sending branded queries to: OpenAI, Anthropic, DeepSeek, Perplexity APIs <!-- decay:2026-03-26 tier:cold rel:0.415 -->
+- API keys needed: OpenAI, Anthropic, DeepSeek, Perplexity (4 separate credentials in n8n) <!-- decay:2026-03-26 tier:cold rel:0.415 -->
+- Output: visibility score per engine → Google Sheets or Slack report <!-- decay:2026-03-26 tier:cold rel:0.415 -->
+- Source: feature-watcher #77710 (8/10) <!-- decay:2026-03-26 tier:cold rel:0.415 -->
+
+### PATTERN: AI-генератор SEO-контента и маркетинговых текстов с Serper + SendGrid (8/10)
+
+<!-- triage:2026-04-21 — extracted from claudeclaw-features #77812 -->
+- Pipeline: Serper API (keyword research + SERP data) → LLM (SEO-optimised text generation) → SendGrid (email delivery to client) <!-- decay:2026-03-26 tier:cold rel:0.415 -->
+- Google Sheets as job queue and logging: OAuth2 credential covers both Sheets and Gmail in same n8n instance <!-- decay:2026-03-26 tier:cold rel:0.415 -->
+- Integration point for Studiokook: feed Serper with ET/RU kitchen keywords → generate blog posts → auto-publish via WordPress REST API <!-- decay:2026-03-26 tier:cold rel:0.415 -->
+- Risk: LLM without editorial gate can produce off-brand content — add Telegram approval step before publish <!-- decay:2026-03-26 tier:cold rel:0.415 -->
+- Source: feature-watcher #77812 (8/10) <!-- decay:2026-03-26 tier:cold rel:0.415 -->
+
+<!-- triage:2026-04-23 — extracted from claudeclaw-features n8n-templates priority 9 -->
+
+### PATTERN: Автоматизация SEO для Google AI Overviews (9/10)
+
+- n8n pipeline: Google Custom Search API (мониторинг AI Overview появления для ключевых запросов) → OpenAI (анализ структуры ответа + рекомендации по оптимизации контента) → Google Sheets (лог видимости по датам) <!-- decay:2026-03-26 tier:cold rel:0.415 -->
+- Стратегия оптимизации под AI Overviews: структурированный контент (FAQ-блоки, нумерованные списки), Schema.org markup (FAQPage, HowTo), авторитетные внешние ссылки <!-- decay:2026-03-26 tier:cold rel:0.415 -->
+- Интеграция для Studiokook: studiokook-seo.php добавить FAQ-блоки на страницы кухонных категорий; формат «Вопрос — короткий ответ — развёрнутый абзац» повышает шанс попасть в AI Overview <!-- decay:2026-03-26 tier:cold rel:0.415 -->
+- API setup: Google Custom Search JSON API (бесплатно 100 запросов/день) + Programmable Search Engine ID — отдельный от GSC credential <!-- decay:2026-03-26 tier:cold rel:0.415 -->
+- Риск: Google AI Overviews API нестабилен и может измениться — добавить error branch с Telegram-уведомлением при сбое <!-- decay:2026-03-26 tier:cold rel:0.415 -->
+- Source: feature-watcher #77939 (9/10) <!-- decay:2026-03-26 tier:cold rel:0.415 -->
+
+### PATTERN: Автоматизация лидогенерации и email-рассылок (8/10)
+
+- Pipeline: Apify (сбор данных о бизнесах/лидах) → Claude (генерация персонализированных писем) → Gmail (отправка) + Google Sheets (хранение лидов и статусов) <!-- decay:2026-03-26 tier:cold rel:0.415 -->
+- n8n integration: добавить nodes для Apify + Claude API + Gmail OAuth2; Google Sheets как CRM-лайт для трекинга <!-- decay:2026-03-26 tier:cold rel:0.415 -->
+- Применимость для Studiokook: сбор контактов потенциальных b2b-клиентов (ремонт/дизайн студии) → автоматические холодные письма <!-- decay:2026-03-26 tier:cold rel:0.415 -->
+- Риски: конфиденциальность данных клиентов (GDPR/PDPA); ошибки в интеграции могут привести к потере лидов — логировать все операции в Sheets <!-- decay:2026-03-26 tier:cold rel:0.415 -->
+- Source: feature-watcher #77978 (8/10) <!-- decay:2026-03-26 tier:cold rel:0.415 -->

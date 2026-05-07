@@ -1,0 +1,586 @@
+{
+  "updatedAt": "2026-05-01T03:48:48.939Z",
+  "createdAt": "2026-04-12T13:16:45.122Z",
+  "id": "YsAYLa99vkpze3cA",
+  "name": "Trading: Macro Regime Detector",
+  "description": null,
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 8 * * *"
+            }
+          ]
+        }
+      },
+      "id": "sched1",
+      "name": "Daily 08:00",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH latest AS (\n  SELECT DISTINCT ON (indicator) indicator, value, previous_value, change_pct, timestamp\n  FROM macro_indicators\n  WHERE timestamp > NOW() - INTERVAL '3 days'\n  ORDER BY indicator, timestamp DESC\n),\nprev_regime AS (\n  SELECT macro_regime, risk_sentiment, fed_phase\n  FROM regime_state\n  ORDER BY timestamp DESC\n  LIMIT 1\n)\nSELECT \n  json_agg(json_build_object('indicator', l.indicator, 'value', l.value, 'prev', l.previous_value, 'chg', l.change_pct)) as indicators,\n  (SELECT row_to_json(p) FROM prev_regime p) as prev_regime\nFROM latest l;",
+        "options": {}
+      },
+      "id": "pg1",
+      "name": "Read Latest Indicators",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        220,
+        0
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "TradingPostgres1",
+          "name": "Trading Postgres"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const row = $input.first().json;\nconst indicators = row.indicators || [];\nconst prevRegime = row.prev_regime || {};\n\n// Build indicator map\nconst m = {};\nfor (const ind of indicators) {\n  m[ind.indicator] = { value: parseFloat(ind.value), prev: parseFloat(ind.prev), chg: parseFloat(ind.chg) };\n}\n\n// === REGIME CLASSIFICATION ===\n\n// 1. Yield curve spread (10Y - 2Y)\nconst yieldSpread = m['YIELD_CURVE_SPREAD']?.value ?? (m['US_10Y']?.value && m['US_2Y']?.value ? m['US_10Y'].value - m['US_2Y'].value : null);\nconst yieldSignal = yieldSpread === null ? 'unknown' : yieldSpread < 0 ? 'inverted' : yieldSpread < 0.5 ? 'flat' : 'normal';\n\n// 2. VIX level\nconst vix = m['VIX']?.value || m['VIX_RT']?.value || null;\nlet vixSignal = 'unknown';\nif (vix !== null) {\n  if (vix < 15) vixSignal = 'complacency';\n  else if (vix < 25) vixSignal = 'normal';\n  else if (vix < 35) vixSignal = 'fear';\n  else vixSignal = 'panic';\n}\n\n// 3. DXY trend\nconst dxy = m['DXY'];\nlet dxyTrend = 'flat';\nif (dxy && dxy.chg !== null) {\n  if (dxy.chg > 0.3) dxyTrend = 'rising';\n  else if (dxy.chg < -0.3) dxyTrend = 'falling';\n}\n\n// 4. CPI (inflation gauge)\nconst cpi = m['CPI'];\nlet inflationTrend = 'stable';\nif (cpi && cpi.chg !== null) {\n  if (cpi.chg > 0.1) inflationTrend = 'rising';\n  else if (cpi.chg < -0.1) inflationTrend = 'falling';\n}\n\n// 5. Fed phase\nconst fedRate = m['FED_RATE'];\nlet fedPhase = 'pausing';\nif (fedRate && fedRate.prev !== null) {\n  if (fedRate.value > fedRate.prev) fedPhase = 'hiking';\n  else if (fedRate.value < fedRate.prev) fedPhase = 'cutting';\n}\n\n// 6. SPY trend (growth proxy)\nconst spy = m['SPY'];\nlet growthSignal = 'neutral';\nif (spy && spy.chg !== null) {\n  if (spy.chg > 1) growthSignal = 'strong';\n  else if (spy.chg < -1) growthSignal = 'weak';\n}\n\n// === MACRO REGIME ===\nlet macroRegime;\nif (inflationTrend === 'rising' && growthSignal !== 'weak') {\n  macroRegime = 'inflation_growth';\n} else if (inflationTrend === 'rising' && growthSignal === 'weak') {\n  macroRegime = 'inflation_stagnation';\n} else if (inflationTrend === 'falling' && growthSignal !== 'weak') {\n  macroRegime = 'deflation_growth';\n} else if (inflationTrend === 'falling' && growthSignal === 'weak') {\n  macroRegime = 'deflation_stagnation';\n} else {\n  macroRegime = 'neutral';\n}\n\n// === RISK SENTIMENT ===\nlet riskSentiment;\nif (vixSignal === 'panic' || vixSignal === 'fear') {\n  riskSentiment = 'risk_off';\n} else if (vixSignal === 'complacency' && dxyTrend === 'falling') {\n  riskSentiment = 'risk_on';\n} else if (dxyTrend === 'rising' && yieldSignal === 'inverted') {\n  riskSentiment = 'risk_off';\n} else {\n  riskSentiment = 'neutral';\n}\n\n// === CONFIDENCE ===\nconst dataPoints = Object.keys(m).length;\nconst confidence = Math.min(100, Math.round(dataPoints / 8 * 100));\n\n// === REASONING ===\nconst reasons = [];\nif (vix !== null) reasons.push(`VIX: ${vix.toFixed(1)} (${vixSignal})`);\nif (yieldSpread !== null) reasons.push(`Yield spread: ${yieldSpread.toFixed(2)}bp (${yieldSignal})`);\nreasons.push(`DXY: ${dxyTrend}`);\nreasons.push(`CPI: ${inflationTrend}`);\nreasons.push(`Fed: ${fedPhase}`);\nreasons.push(`SPY momentum: ${growthSignal}`);\nconst reasoning = reasons.join('; ');\n\n// === REGIME CHANGE DETECTION ===\nconst regimeChanged = prevRegime.macro_regime && prevRegime.macro_regime !== macroRegime;\nconst sentimentChanged = prevRegime.risk_sentiment && prevRegime.risk_sentiment !== riskSentiment;\n\nreturn [{\n  json: {\n    macro_regime: macroRegime,\n    risk_sentiment: riskSentiment,\n    fed_phase: fedPhase,\n    yield_curve_spread: yieldSpread,\n    vix_level: vix,\n    dxy_trend: dxyTrend,\n    confidence,\n    reasoning,\n    regime_changed: regimeChanged || sentimentChanged,\n    prev_regime: prevRegime.macro_regime || 'none',\n    prev_sentiment: prevRegime.risk_sentiment || 'none',\n    timestamp: new Date().toISOString()\n  }\n}];"
+      },
+      "id": "code1",
+      "name": "Classify Regime",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        440,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO regime_state (macro_regime, risk_sentiment, fed_phase, yield_curve_spread, vix_level, dxy_trend, confidence, reasoning, timestamp) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id;",
+        "options": {
+          "queryReplacement": "={{ [$json.macro_regime, $json.risk_sentiment, $json.fed_phase, $json.yield_curve_spread, $json.vix_level, $json.dxy_trend, $json.confidence, $json.reasoning, $json.timestamp] }}"
+        }
+      },
+      "id": "pg2",
+      "name": "Save Regime",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        660,
+        0
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "TradingPostgres1",
+          "name": "Trading Postgres"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "regime-changed",
+              "leftValue": "={{ $('Classify Regime').first().json.regime_changed }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              }
+            }
+          ]
+        }
+      },
+      "id": "if1",
+      "name": "Regime Changed?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        880,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "chatId": "804465999",
+        "text": "=🚨 *REGIME CHANGE DETECTED*\n\n*Previous:* {{ $('Classify Regime').first().json.prev_regime }} / {{ $('Classify Regime').first().json.prev_sentiment }}\n*Current:* {{ $('Classify Regime').first().json.macro_regime }} / {{ $('Classify Regime').first().json.risk_sentiment }}\n\n*Fed Phase:* {{ $('Classify Regime').first().json.fed_phase }}\n*VIX:* {{ $('Classify Regime').first().json.vix_level }}\n*Yield Spread:* {{ $('Classify Regime').first().json.yield_curve_spread }}\n*DXY:* {{ $('Classify Regime').first().json.dxy_trend }}\n*Confidence:* {{ $('Classify Regime').first().json.confidence }}%\n\n_{{ $('Classify Regime').first().json.reasoning }}_",
+        "additionalFields": {
+          "parse_mode": "Markdown"
+        }
+      },
+      "id": "tg1",
+      "name": "Alert Regime Change",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1100,
+        -50
+      ],
+      "credentials": {
+        "telegramApi": {
+          "id": "TradingTelegramBot",
+          "name": "Trading Bot"
+        }
+      },
+      "webhookId": "2bba3d29-7795-430d-85b8-7a5f1f4d6d84"
+    },
+    {
+      "parameters": {
+        "chatId": "804465999",
+        "text": "=🟢 *Daily Regime Status*\n\n*Regime:* {{ $('Classify Regime').first().json.macro_regime }}\n*Sentiment:* {{ $('Classify Regime').first().json.risk_sentiment }}\n*Fed:* {{ $('Classify Regime').first().json.fed_phase }}\n*Confidence:* {{ $('Classify Regime').first().json.confidence }}%\n\n_{{ $('Classify Regime').first().json.reasoning }}_",
+        "additionalFields": {
+          "parse_mode": "Markdown"
+        }
+      },
+      "id": "tg2",
+      "name": "Daily Status",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1100,
+        100
+      ],
+      "credentials": {
+        "telegramApi": {
+          "id": "TradingTelegramBot",
+          "name": "Trading Bot"
+        }
+      },
+      "webhookId": "9d38a1ed-5db1-458f-b635-7d871d6ffeb9",
+      "disabled": true
+    },
+    {
+      "id": "emit-event",
+      "name": "Emit macro event",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        1600,
+        100
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "TradingPostgres1",
+          "name": "Trading Postgres"
+        }
+      },
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO events (type, source, instrument, payload)\nVALUES ('macro', 'wf10-regime', NULL,\n  jsonb_build_object(\n    'regime_new', '{{ $json.macro_regime }}',\n    'regime_prev', '{{ $json.prev_regime }}',\n    'risk_sentiment_new', '{{ $json.risk_sentiment }}',\n    'risk_sentiment_prev', '{{ $json.prev_sentiment }}',\n    'fed_phase', '{{ $json.fed_phase }}',\n    'vix', {{ $json.vix_level === null ? 'null' : $json.vix_level }},\n    'yield_curve_spread', {{ $json.yield_curve_spread === null ? 'null' : $json.yield_curve_spread }},\n    'dxy_trend', '{{ $json.dxy_trend }}',\n    'confidence', {{ $json.confidence }},\n    'reasoning', {{ JSON.stringify($json.reasoning) }}\n  )\n) RETURNING id;",
+        "options": {}
+      }
+    }
+  ],
+  "connections": {
+    "Daily 08:00": {
+      "main": [
+        [
+          {
+            "node": "Read Latest Indicators",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Latest Indicators": {
+      "main": [
+        [
+          {
+            "node": "Classify Regime",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Classify Regime": {
+      "main": [
+        [
+          {
+            "node": "Save Regime",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Regime": {
+      "main": [
+        [
+          {
+            "node": "Regime Changed?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Regime Changed?": {
+      "main": [
+        [
+          {
+            "node": "Alert Regime Change",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Emit macro event",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Daily Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false,
+    "errorWorkflow": "mzrUOgpYW8OVSWGl"
+  },
+  "staticData": {
+    "node:Daily 08:00": {
+      "recurrenceRules": []
+    }
+  },
+  "meta": null,
+  "pinData": null,
+  "versionId": "36b9d295-85d1-46fc-8bd0-6a4490a6ca47",
+  "activeVersionId": "36b9d295-85d1-46fc-8bd0-6a4490a6ca47",
+  "versionCounter": 43,
+  "triggerCount": 1,
+  "shared": [
+    {
+      "updatedAt": "2026-04-12T13:16:45.122Z",
+      "createdAt": "2026-04-12T13:16:45.122Z",
+      "role": "workflow:owner",
+      "workflowId": "YsAYLa99vkpze3cA",
+      "projectId": "PufDuNtXpreUjA3o",
+      "project": {
+        "updatedAt": "2025-12-05T21:25:37.247Z",
+        "createdAt": "2025-11-04T19:43:55.674Z",
+        "id": "PufDuNtXpreUjA3o",
+        "name": "Maksim Parve <maksim@studiokook.ee>",
+        "type": "personal",
+        "icon": null,
+        "description": null,
+        "creatorId": "3462e3d2-f46b-4d98-acea-93ac07713bf5"
+      }
+    }
+  ],
+  "tags": [],
+  "activeVersion": {
+    "updatedAt": "2026-05-01T03:48:48.941Z",
+    "createdAt": "2026-05-01T03:48:48.941Z",
+    "versionId": "36b9d295-85d1-46fc-8bd0-6a4490a6ca47",
+    "workflowId": "YsAYLa99vkpze3cA",
+    "nodes": [
+      {
+        "parameters": {
+          "rule": {
+            "interval": [
+              {
+                "field": "cronExpression",
+                "expression": "0 8 * * *"
+              }
+            ]
+          }
+        },
+        "id": "sched1",
+        "name": "Daily 08:00",
+        "type": "n8n-nodes-base.scheduleTrigger",
+        "typeVersion": 1.2,
+        "position": [
+          0,
+          0
+        ]
+      },
+      {
+        "parameters": {
+          "operation": "executeQuery",
+          "query": "WITH latest AS (\n  SELECT DISTINCT ON (indicator) indicator, value, previous_value, change_pct, timestamp\n  FROM macro_indicators\n  WHERE timestamp > NOW() - INTERVAL '3 days'\n  ORDER BY indicator, timestamp DESC\n),\nprev_regime AS (\n  SELECT macro_regime, risk_sentiment, fed_phase\n  FROM regime_state\n  ORDER BY timestamp DESC\n  LIMIT 1\n)\nSELECT \n  json_agg(json_build_object('indicator', l.indicator, 'value', l.value, 'prev', l.previous_value, 'chg', l.change_pct)) as indicators,\n  (SELECT row_to_json(p) FROM prev_regime p) as prev_regime\nFROM latest l;",
+          "options": {}
+        },
+        "id": "pg1",
+        "name": "Read Latest Indicators",
+        "type": "n8n-nodes-base.postgres",
+        "typeVersion": 2.5,
+        "position": [
+          220,
+          0
+        ],
+        "credentials": {
+          "postgres": {
+            "id": "TradingPostgres1",
+            "name": "Trading Postgres"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "jsCode": "const row = $input.first().json;\nconst indicators = row.indicators || [];\nconst prevRegime = row.prev_regime || {};\n\n// Build indicator map\nconst m = {};\nfor (const ind of indicators) {\n  m[ind.indicator] = { value: parseFloat(ind.value), prev: parseFloat(ind.prev), chg: parseFloat(ind.chg) };\n}\n\n// === REGIME CLASSIFICATION ===\n\n// 1. Yield curve spread (10Y - 2Y)\nconst yieldSpread = m['YIELD_CURVE_SPREAD']?.value ?? (m['US_10Y']?.value && m['US_2Y']?.value ? m['US_10Y'].value - m['US_2Y'].value : null);\nconst yieldSignal = yieldSpread === null ? 'unknown' : yieldSpread < 0 ? 'inverted' : yieldSpread < 0.5 ? 'flat' : 'normal';\n\n// 2. VIX level\nconst vix = m['VIX']?.value || m['VIX_RT']?.value || null;\nlet vixSignal = 'unknown';\nif (vix !== null) {\n  if (vix < 15) vixSignal = 'complacency';\n  else if (vix < 25) vixSignal = 'normal';\n  else if (vix < 35) vixSignal = 'fear';\n  else vixSignal = 'panic';\n}\n\n// 3. DXY trend\nconst dxy = m['DXY'];\nlet dxyTrend = 'flat';\nif (dxy && dxy.chg !== null) {\n  if (dxy.chg > 0.3) dxyTrend = 'rising';\n  else if (dxy.chg < -0.3) dxyTrend = 'falling';\n}\n\n// 4. CPI (inflation gauge)\nconst cpi = m['CPI'];\nlet inflationTrend = 'stable';\nif (cpi && cpi.chg !== null) {\n  if (cpi.chg > 0.1) inflationTrend = 'rising';\n  else if (cpi.chg < -0.1) inflationTrend = 'falling';\n}\n\n// 5. Fed phase\nconst fedRate = m['FED_RATE'];\nlet fedPhase = 'pausing';\nif (fedRate && fedRate.prev !== null) {\n  if (fedRate.value > fedRate.prev) fedPhase = 'hiking';\n  else if (fedRate.value < fedRate.prev) fedPhase = 'cutting';\n}\n\n// 6. SPY trend (growth proxy)\nconst spy = m['SPY'];\nlet growthSignal = 'neutral';\nif (spy && spy.chg !== null) {\n  if (spy.chg > 1) growthSignal = 'strong';\n  else if (spy.chg < -1) growthSignal = 'weak';\n}\n\n// === MACRO REGIME ===\nlet macroRegime;\nif (inflationTrend === 'rising' && growthSignal !== 'weak') {\n  macroRegime = 'inflation_growth';\n} else if (inflationTrend === 'rising' && growthSignal === 'weak') {\n  macroRegime = 'inflation_stagnation';\n} else if (inflationTrend === 'falling' && growthSignal !== 'weak') {\n  macroRegime = 'deflation_growth';\n} else if (inflationTrend === 'falling' && growthSignal === 'weak') {\n  macroRegime = 'deflation_stagnation';\n} else {\n  macroRegime = 'neutral';\n}\n\n// === RISK SENTIMENT ===\nlet riskSentiment;\nif (vixSignal === 'panic' || vixSignal === 'fear') {\n  riskSentiment = 'risk_off';\n} else if (vixSignal === 'complacency' && dxyTrend === 'falling') {\n  riskSentiment = 'risk_on';\n} else if (dxyTrend === 'rising' && yieldSignal === 'inverted') {\n  riskSentiment = 'risk_off';\n} else {\n  riskSentiment = 'neutral';\n}\n\n// === CONFIDENCE ===\nconst dataPoints = Object.keys(m).length;\nconst confidence = Math.min(100, Math.round(dataPoints / 8 * 100));\n\n// === REASONING ===\nconst reasons = [];\nif (vix !== null) reasons.push(`VIX: ${vix.toFixed(1)} (${vixSignal})`);\nif (yieldSpread !== null) reasons.push(`Yield spread: ${yieldSpread.toFixed(2)}bp (${yieldSignal})`);\nreasons.push(`DXY: ${dxyTrend}`);\nreasons.push(`CPI: ${inflationTrend}`);\nreasons.push(`Fed: ${fedPhase}`);\nreasons.push(`SPY momentum: ${growthSignal}`);\nconst reasoning = reasons.join('; ');\n\n// === REGIME CHANGE DETECTION ===\nconst regimeChanged = prevRegime.macro_regime && prevRegime.macro_regime !== macroRegime;\nconst sentimentChanged = prevRegime.risk_sentiment && prevRegime.risk_sentiment !== riskSentiment;\n\nreturn [{\n  json: {\n    macro_regime: macroRegime,\n    risk_sentiment: riskSentiment,\n    fed_phase: fedPhase,\n    yield_curve_spread: yieldSpread,\n    vix_level: vix,\n    dxy_trend: dxyTrend,\n    confidence,\n    reasoning,\n    regime_changed: regimeChanged || sentimentChanged,\n    prev_regime: prevRegime.macro_regime || 'none',\n    prev_sentiment: prevRegime.risk_sentiment || 'none',\n    timestamp: new Date().toISOString()\n  }\n}];"
+        },
+        "id": "code1",
+        "name": "Classify Regime",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          440,
+          0
+        ]
+      },
+      {
+        "parameters": {
+          "operation": "executeQuery",
+          "query": "INSERT INTO regime_state (macro_regime, risk_sentiment, fed_phase, yield_curve_spread, vix_level, dxy_trend, confidence, reasoning, timestamp) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id;",
+          "options": {
+            "queryReplacement": "={{ [$json.macro_regime, $json.risk_sentiment, $json.fed_phase, $json.yield_curve_spread, $json.vix_level, $json.dxy_trend, $json.confidence, $json.reasoning, $json.timestamp] }}"
+          }
+        },
+        "id": "pg2",
+        "name": "Save Regime",
+        "type": "n8n-nodes-base.postgres",
+        "typeVersion": 2.5,
+        "position": [
+          660,
+          0
+        ],
+        "credentials": {
+          "postgres": {
+            "id": "TradingPostgres1",
+            "name": "Trading Postgres"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "conditions": {
+            "options": {
+              "caseSensitive": true,
+              "leftValue": "",
+              "typeValidation": "strict"
+            },
+            "conditions": [
+              {
+                "id": "regime-changed",
+                "leftValue": "={{ $('Classify Regime').first().json.regime_changed }}",
+                "rightValue": true,
+                "operator": {
+                  "type": "boolean",
+                  "operation": "true"
+                }
+              }
+            ]
+          }
+        },
+        "id": "if1",
+        "name": "Regime Changed?",
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 2.2,
+        "position": [
+          880,
+          0
+        ]
+      },
+      {
+        "parameters": {
+          "chatId": "804465999",
+          "text": "=🚨 *REGIME CHANGE DETECTED*\n\n*Previous:* {{ $('Classify Regime').first().json.prev_regime }} / {{ $('Classify Regime').first().json.prev_sentiment }}\n*Current:* {{ $('Classify Regime').first().json.macro_regime }} / {{ $('Classify Regime').first().json.risk_sentiment }}\n\n*Fed Phase:* {{ $('Classify Regime').first().json.fed_phase }}\n*VIX:* {{ $('Classify Regime').first().json.vix_level }}\n*Yield Spread:* {{ $('Classify Regime').first().json.yield_curve_spread }}\n*DXY:* {{ $('Classify Regime').first().json.dxy_trend }}\n*Confidence:* {{ $('Classify Regime').first().json.confidence }}%\n\n_{{ $('Classify Regime').first().json.reasoning }}_",
+          "additionalFields": {
+            "parse_mode": "Markdown"
+          }
+        },
+        "id": "tg1",
+        "name": "Alert Regime Change",
+        "type": "n8n-nodes-base.telegram",
+        "typeVersion": 1.2,
+        "position": [
+          1100,
+          -50
+        ],
+        "credentials": {
+          "telegramApi": {
+            "id": "TradingTelegramBot",
+            "name": "Trading Bot"
+          }
+        },
+        "webhookId": "2bba3d29-7795-430d-85b8-7a5f1f4d6d84"
+      },
+      {
+        "parameters": {
+          "chatId": "804465999",
+          "text": "=🟢 *Daily Regime Status*\n\n*Regime:* {{ $('Classify Regime').first().json.macro_regime }}\n*Sentiment:* {{ $('Classify Regime').first().json.risk_sentiment }}\n*Fed:* {{ $('Classify Regime').first().json.fed_phase }}\n*Confidence:* {{ $('Classify Regime').first().json.confidence }}%\n\n_{{ $('Classify Regime').first().json.reasoning }}_",
+          "additionalFields": {
+            "parse_mode": "Markdown"
+          }
+        },
+        "id": "tg2",
+        "name": "Daily Status",
+        "type": "n8n-nodes-base.telegram",
+        "typeVersion": 1.2,
+        "position": [
+          1100,
+          100
+        ],
+        "credentials": {
+          "telegramApi": {
+            "id": "TradingTelegramBot",
+            "name": "Trading Bot"
+          }
+        },
+        "webhookId": "9d38a1ed-5db1-458f-b635-7d871d6ffeb9",
+        "disabled": true
+      },
+      {
+        "id": "emit-event",
+        "name": "Emit macro event",
+        "type": "n8n-nodes-base.postgres",
+        "typeVersion": 2.5,
+        "position": [
+          1600,
+          100
+        ],
+        "credentials": {
+          "postgres": {
+            "id": "TradingPostgres1",
+            "name": "Trading Postgres"
+          }
+        },
+        "parameters": {
+          "operation": "executeQuery",
+          "query": "INSERT INTO events (type, source, instrument, payload)\nVALUES ('macro', 'wf10-regime', NULL,\n  jsonb_build_object(\n    'regime_new', '{{ $json.macro_regime }}',\n    'regime_prev', '{{ $json.prev_regime }}',\n    'risk_sentiment_new', '{{ $json.risk_sentiment }}',\n    'risk_sentiment_prev', '{{ $json.prev_sentiment }}',\n    'fed_phase', '{{ $json.fed_phase }}',\n    'vix', {{ $json.vix_level === null ? 'null' : $json.vix_level }},\n    'yield_curve_spread', {{ $json.yield_curve_spread === null ? 'null' : $json.yield_curve_spread }},\n    'dxy_trend', '{{ $json.dxy_trend }}',\n    'confidence', {{ $json.confidence }},\n    'reasoning', {{ JSON.stringify($json.reasoning) }}\n  )\n) RETURNING id;",
+          "options": {}
+        }
+      }
+    ],
+    "connections": {
+      "Daily 08:00": {
+        "main": [
+          [
+            {
+              "node": "Read Latest Indicators",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Read Latest Indicators": {
+        "main": [
+          [
+            {
+              "node": "Classify Regime",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Classify Regime": {
+        "main": [
+          [
+            {
+              "node": "Save Regime",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Save Regime": {
+        "main": [
+          [
+            {
+              "node": "Regime Changed?",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Regime Changed?": {
+        "main": [
+          [
+            {
+              "node": "Alert Regime Change",
+              "type": "main",
+              "index": 0
+            },
+            {
+              "node": "Emit macro event",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Daily Status",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "authors": "Maksim Parve",
+    "name": null,
+    "description": null,
+    "autosaved": false,
+    "workflowPublishHistory": [
+      {
+        "createdAt": "2026-05-01T03:48:48.967Z",
+        "id": 933,
+        "workflowId": "YsAYLa99vkpze3cA",
+        "versionId": "36b9d295-85d1-46fc-8bd0-6a4490a6ca47",
+        "event": "deactivated",
+        "userId": "3462e3d2-f46b-4d98-acea-93ac07713bf5"
+      },
+      {
+        "createdAt": "2026-05-01T03:48:48.980Z",
+        "id": 934,
+        "workflowId": "YsAYLa99vkpze3cA",
+        "versionId": "36b9d295-85d1-46fc-8bd0-6a4490a6ca47",
+        "event": "activated",
+        "userId": "3462e3d2-f46b-4d98-acea-93ac07713bf5"
+      },
+      {
+        "createdAt": "2026-05-01T03:48:49.055Z",
+        "id": 935,
+        "workflowId": "YsAYLa99vkpze3cA",
+        "versionId": "36b9d295-85d1-46fc-8bd0-6a4490a6ca47",
+        "event": "deactivated",
+        "userId": "3462e3d2-f46b-4d98-acea-93ac07713bf5"
+      },
+      {
+        "createdAt": "2026-05-01T03:48:49.171Z",
+        "id": 936,
+        "workflowId": "YsAYLa99vkpze3cA",
+        "versionId": "36b9d295-85d1-46fc-8bd0-6a4490a6ca47",
+        "event": "activated",
+        "userId": "3462e3d2-f46b-4d98-acea-93ac07713bf5"
+      }
+    ]
+  }
+}

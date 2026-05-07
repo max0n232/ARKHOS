@@ -1,0 +1,138 @@
+# Lisi scene audit - 2026-05-03
+
+## Source
+
+- Scene: `C:\Users\sorte\Desktop\Проекты\Lisi\Кухня\Scene.skp`
+- JSON audit: `C:/tmp/ek-scene-audit-20260503-lisi.json`
+- Screenshots:
+  - `C:/tmp/ek-scene-audit-20260503-lisi-active.png`
+  - `C:/tmp/ek-scene-audit-20260503-lisi-top.png`
+  - `C:/tmp/ek-scene-audit-20260503-lisi-iso.png`
+- Scene was inspected read-only.
+
+## Layout Pattern
+
+Compact L kitchen in a low room shell:
+
+- Room/run dimensions: left run about `2410`, back run about `1984`, room height `2190`.
+- Main lower sequence on left leg:
+  - `PANEL-FACADE#4` side/end panel, 19.3mm.
+  - `BD3#1`, 450mm drawer/cooktop-side base.
+  - `BI#1`, dishwasher zone, visually 450mm; module bbox `X[20..670] Y[-1942..-1492]` includes side allowance.
+  - `BD1`, sink base, 450mm.
+  - `BG1`, lower corner, bbox approx `X[0..670] Y[-1042..0] Z[0..888]`.
+- Back/right sequence:
+  - `BG1` corner return.
+  - `BC`, 600mm oven/cooktop base.
+  - `BB1`, narrow 141/226.5mm filler/openable base between oven zone and fridge pencil.
+  - `PB2F`, 600mm integrated fridge pencil, full height to about `Z=2185`.
+  - `PANEL-FACADE#5`, right full-height pencil side panel, 19.3mm.
+
+Important row width dimensions include `450`, `450`, `400+50`, `19+600`, `141`, `600`, `19`.
+
+## Heights And Surface Stack
+
+Observed height stack:
+
+- `118` support/plinth zone.
+- `770` lower cabinet body.
+- `12` countertop/top thickness.
+- Working height: `900`.
+
+This confirms another custom stack variant: the body remains 770; the final work height comes from support/plinth plus top thickness. Here the top is 12mm, not the 20/30mm stone rule.
+
+Upper/wall panel relation:
+
+- Countertop top: `Z=900`.
+- Wall panel/default backsplash height: `600`, from `Z=900` to `Z=1500`.
+- Upper modules start at `Z=1500`.
+- Upper module height visible as `660`, from `Z=1500` to `Z=2160`.
+
+## Appliances
+
+- Sink: `МОЙКА ZORG (под смеситель)#1`, over `BD1`, bbox approx `X[65..575] Y[-1486..-1036] Z[658..900]`.
+- Cooktop: `Summit SINC2220`, over `BC`, bbox approx `X[766.5..1055.5] Y[-550.7..-39.3] Z[823.8..906.4]`.
+- Oven: `SIEMENS HB23AB520E`, in `BC`, bbox approx `X[613..1209] Y[-670..-70] Z[374.9..830]`.
+- Fridge: `PB2F` integrated fridge pencil, 600mm; this is not standalone-fridge workflow.
+- Communications: `water pipes v3` in/near sink-base/corner zone.
+
+## Countertop And Backsplash
+
+Main worktops:
+
+- Left leg: `Столешница прямая#1`, approx `X[0..650] Y[-2410..-300] Z[888..900]`, 12mm.
+- Back/right leg: `Столешница прямая#2`, approx `X[0..1333] Y[-650..0] Z[888..900]`, 12mm.
+
+Backsplash/wall-zone pieces:
+
+- `Столешница прямая#4`, vertical/left wall zone, approx `X[0..4] Y[-2410..-12] Z[850..1103]`.
+- `Столешница прямая#3`, vertical/back wall zone, approx `X[0..1333] Y[-12..0] Z[850..1500]`.
+
+Again: `Столешница прямая` must be classified by orientation and placement. Here countertop-like definitions include both horizontal worktops and vertical backsplash/wall panels.
+
+## Upper Row
+
+- `TB1#1`, 438mm upper at left of upper row, `Z[1500..2160]`.
+- `TB2-H3`, 876mm upper with two visible 438mm facades, `Z[1500..2160]`.
+- `PANEL-FACADE#6` upper side/end panel, 19.3mm.
+- `PANEL_G_CUT_SLOT#6` top of backsplash/slot panel near `Z[1500..1516]`.
+
+Upper span dimension chain: `19 + 438 + 876 + 19 + 600 + 19`, where the 600 segment belongs to the integrated fridge pencil zone.
+
+## Door / Opening Direction
+
+This scene is important for explicit opening-direction audit.
+
+Verified hardware markers:
+
+- `BG1` has `HINGES_BLUM#3` with dynamic name `Петля под фальшпанель Blum (С доводчиком)` on `FACADE1#4`.
+- `PB2F` has hinge-related components on `FACADE1#9` / `FACADE2#3`, with `Петля внешняя Blum (С доводчиком)`.
+- `TB2-H3` has hinge-related components on upper facades, with `Петля внешняя Blum (С доводчиком)`.
+- `TB1#1` has hinge-related components on `FACADE1#7`, with `Петля внешняя Blum (С доводчиком)`.
+- `BB1` has hinge-related components on `FACADE1#5`, with `Петля внешняя Blum (С доводчиком)`.
+
+Functional interpretation:
+
+- Drawer modules (`BD3#1`, drawer fronts) are pull-out/front-opening, not side-hinged doors.
+- Dishwasher front (`BI#1`) opens downward/front; treat as appliance clearance, not a normal hinged cabinet door.
+- `BG1` corner door is a hinged facade with false-panel hinge hardware; opening direction must be validated against corner access and adjacent row, not inferred from bbox only.
+- `PB2F` integrated fridge pencil has two stacked front sections and real hinge hardware; generated scenes must preserve hinge side/opening clearance against the right end panel and wall.
+- `TB2-H3` upper uses two facades in one wide upper module; do not collapse it into a single 876mm door without checking hardware/opening intent.
+
+Template implication: opening direction must be audited from actual hardware/opening markers (`HINGES_BLUM`, `HINGE`, `HINGE_CUP`, `CUP_MARK`, `OPENING`, appliance type) and then cross-checked visually for wall/panel conflicts.
+
+## Lighting Pattern
+
+One top-level recessed lighting profile is present:
+
+- `Врезной профиль для подсветки`, approx `X[0..1342] Y[-94.1..123.7] Z[1302..1506]`, run about 1342mm along the back/upper work zone.
+
+Nested lighting definitions are present in the model library/materials (`light_diffuser`, `4000k/5000k/6000k/7000k` variants), but the main kitchen evidence here is a single profile run.
+
+## Materials / Finish Notes
+
+Visible scene text:
+
+- `Karkass - Hele Hall`
+- `Uksed - Ncs s 3502-Y poolmatt`
+- `Tööpind/Tagasein - 0834 Fundermax`
+
+Observed materials include:
+
+- `NCS-S-3502-Y` for door/front finish.
+- `R520 Астраханские пески 14090x7046` and Fundermax note for top/back panel finish.
+
+## Template / Standards Takeaways
+
+- Add `Door / Opening Direction` as a mandatory audit section.
+- Classify opening by function first: drawer pull-out, appliance fold/down, hinged cabinet, lift/upper hardware, integrated fridge door.
+- Verify hinge side and conflicts with actual hardware markers where possible; visual inference alone is weaker evidence.
+- `PB2F` integrated fridge is the canonical module approach for integrated refrigeration; do not apply standalone fridge component rule here.
+- 12mm top workflow exists: `118 + 770 + 12 = 900` and is distinct from 20/30mm stone and 38mm standard top workflows.
+- Default vertical relation still holds: countertop top `900`, wall panel `600`, upper start `1500`.
+
+## Open Checks
+
+- Need map `LIFT_SWAP`/`OPENING` generic subcomponents to actual door-animation semantics; they appear under many facade objects and should not be blindly interpreted as Aventos/lift hardware.
+- Need improve extractor to summarize hinge side from `HINGES_BLUM` formulas and transformed positions.
+- Need normalize non-ASCII names in JSON/PowerShell display.

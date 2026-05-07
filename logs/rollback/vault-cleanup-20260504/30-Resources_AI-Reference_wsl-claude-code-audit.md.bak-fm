@@ -1,0 +1,641 @@
+# Аудит: WSL + Claude Code на Windows
+
+Полный чеклист для проверки локальной среды разработки.
+Каждый блок содержит: что проверить, команду, ожидаемый результат, как починить.
+
+---
+
+## 1. WSL — Базовая конфигурация
+
+### 1.1 Версия WSL
+
+```powershell
+# PowerShell (Windows)
+wsl --version
+```
+- **Ожидание:** WSL 2 (не WSL 1). WSL 2 = полное ядро Linux, WSL 1 = трансляция syscalls
+- **Если WSL 1:** `wsl --set-default-version 2`
+
+### 1.2 Дистрибутив
+
+```powershell
+wsl --list --verbose
+```
+- **Ожидание:** Ubuntu (или Debian), версия 2, состояние Running
+- **Красные флаги:** несколько дистрибутивов (путаница), WSL версия 1
+
+### 1.3 Ресурсы WSL
+
+```powershell
+# Проверить файл конфигурации
+cat C:\Users\sorte\.wslconfig
+```
+- **Если файла нет — создать:**
+```ini
+[wsl2]
+memory=8GB
+processors=4
+swap=4GB
+localhostForwarding=true
+```
+- **Зачем:** без лимитов WSL может сожрать всю RAM
+
+### 1.4 systemd
+
+```bash
+# Внутри WSL
+cat /etc/wsl.conf
+```
+- **Ожидание:**
+```ini
+[boot]
+systemd=true
+
+[interop]
+appendWindowsPath=false
+```
+- **appendWindowsPath=false** — критически важно! Без этого Windows PATH попадает в WSL и создаёт конфликты (какой `node`, `git`, `npm` запускается)
+
+### 1.5 Синхронизация времени
+
+```bash
+date
+timedatectl status 2>/dev/null | grep -E "Local|synchronized"
+```
+- **Проблема:** WSL после suspend/resume уходит в clock drift → ломает SSL handshake, JWT, git, `npm install` (invalid cert times)
+- **Ожидание:** разница с Windows < 1 сек, `System clock synchronized: yes`
+- **Фикс:** `sudo hwclock -s` (одноразово) или включить systemd-timesyncd
+
+### 1.6 Locale UTF-8
+
+```bash
+locale
+echo $LANG
+```
+- **Ожидание:** `LANG=C.UTF-8` или `en_US.UTF-8` или `ru_RU.UTF-8` — везде UTF-8
+- **Красный флаг:** `POSIX` / `C` без UTF-8 → битые русские пути, плохие diff'ы, сломанный `less`
+- **Фикс:** `sudo locale-gen en_US.UTF-8 ru_RU.UTF-8 && sudo update-locale LANG=en_US.UTF-8`
+
+---
+
+## 2. Файловая система
+
+### 2.1 Где лежат проекты
+
+```bash
+# Внутри WSL
+pwd
+ls ~/projects/ 2>/dev/null || echo "Нет папки projects"
+```
+- **Правило:** проекты для Claude Code должны лежать в нативной FS WSL (`~/projects/`), НЕ в `/mnt/c/`
+- **Почему:** `/mnt/c/` = кросс-ФС, в 3-10x медленнее для git, npm, file watch
+
+### 2.2 Права доступа
+
+```bash
+ls -la ~/projects/
+stat -c "%a %U:%G" ~/projects/*/ 2>/dev/null
+```
+- **Ожидание:** владелец = твой юзер, права 755 для папок
+- **Красный флаг:** root как владелец, 777 права
+
+### 2.3 Доступ к Windows-файлам
+
+```bash
+ls /mnt/c/Users/sorte/Desktop/ | head -5
+```
+- **Должно работать.** Если нет — проблема с mount
+
+### 2.4 Симлинки (опционально)
+
+```bash
+# Удобный доступ к Windows-папкам из WSL
+ls -la ~/win-desktop 2>/dev/null
+```
+- **Рекомендация:** создать симлинк `ln -s /mnt/c/Users/sorte/Desktop ~/win-desktop` для удобства
+
+---
+
+## 3. Git — Конфигурация
+
+### 3.1 Git в WSL
+
+```bash
+git --version
+git config --global user.name
+git config --global user.email
+git config --global core.autocrlf
+git config --global core.eol
+```
+- **Ожидание:**
+  - `user.name` и `user.email` — установлены
+  - `core.autocrlf` = `input` (конвертирует CRLF→LF при коммите, не трогает при checkout)
+  - `core.eol` = `lf`
+
+### 3.2 Git в Windows (PowerShell)
+
+```powershell
+git --version
+git config --global core.autocrlf
+```
+- **Сравнить:** версии и настройки не должны конфликтовать
+- **Красный флаг:** `autocrlf=true` в Windows + `autocrlf=input` в WSL = мусор в диффах
+
+### 3.3 Credential manager
+
+```bash
+git config --global credential.helper
+```
+- **Рекомендация:** `/mnt/c/Program\ Files/Git/mingw64/bin/git-credential-manager.exe` — использовать Windows credential manager из WSL
+- **Или:** настроить SSH (см. п.4)
+
+### 3.4 .gitattributes в проектах
+
+```bash
+cat ~/projects/*/.gitattributes 2>/dev/null
+```
+- **Рекомендация:** в каждом проекте:
+```
+* text=auto eol=lf
+*.{cmd,bat} text eol=crlf
+```
+
+### 3.5 Windows Git не течёт в WSL (критично)
+
+```bash
+which -a git
+```
+- **Ожидание:** одна строка — `/usr/bin/git` (или `/usr/local/bin/git`)
+- **Красный флаг:** `/mnt/c/Program Files/Git/cmd/git` в выдаче — Windows Git тащится в WSL через PATH → ломает permissions, кодировки, производительность
+- **Фикс:** `appendWindowsPath=false` в `/etc/wsl.conf` (см. §1.4), затем `wsl --shutdown` из PowerShell
+
+---
+
+## 4. SSH-ключи
+
+### 4.1 SSH в WSL
+
+```bash
+ls -la ~/.ssh/
+ssh -T git@github.com 2>&1
+```
+- **Ожидание:** `id_ed25519` (или `id_rsa`), `config`, правильный fingerprint GitHub
+
+### 4.2 SSH в Windows
+
+```powershell
+ls $env:USERPROFILE\.ssh\
+ssh -T git@github.com
+```
+- **Вопрос:** ключи в двух местах или в одном?
+- **Рекомендация:** хранить в WSL `~/.ssh/`, из Windows использовать ssh-agent forwarding или копию
+
+### 4.3 Права на ключи
+
+```bash
+stat -c "%a" ~/.ssh/id_* ~/.ssh/config 2>/dev/null
+```
+- **Ожидание:** `600` для ключей, `644` для config
+- **Если неправильно:** `chmod 600 ~/.ssh/id_*`
+
+---
+
+## 5. Node.js / npm / bun
+
+### 5.1 Где установлен Node
+
+```bash
+which node
+which npm
+node --version
+npm --version
+```
+- **Ожидание:** путь внутри WSL (`/usr/bin/node` или `~/.nvm/…`), НЕ `/mnt/c/Program Files/nodejs/…`
+- **Красный флаг:** Node из Windows PATH попадает в WSL
+
+### 5.2 nvm (рекомендация)
+
+```bash
+nvm --version 2>/dev/null || echo "nvm не установлен"
+nvm ls
+```
+- **Рекомендация:** использовать nvm для управления версиями Node в WSL
+
+### 5.3 Global packages
+
+```bash
+npm ls -g --depth=0
+```
+- **Проверить:** нет ли дублей того, что стоит и в Windows
+
+### 5.4 bun (если используется)
+
+```bash
+which bun
+bun --version
+```
+
+### 5.5 npm global prefix (без sudo)
+
+```bash
+npm config get prefix
+```
+- **Ожидание:** `~/.npm-global` (или аналог в `$HOME`); если используется nvm — префикс внутри nvm-дерева
+- **Красный флаг:** `/usr` или `/usr/local` — глобальная установка пакетов требует sudo, это антипаттерн (перманентные EACCES)
+- **Фикс:**
+```bash
+mkdir -p ~/.npm-global
+npm config set prefix ~/.npm-global
+echo 'export PATH=~/.npm-global/bin:$PATH' >> ~/.bashrc
+source ~/.bashrc
+```
+
+### 5.6 corepack / pnpm / yarn
+
+```bash
+corepack --version 2>/dev/null || echo "corepack не активирован"
+pnpm --version 2>/dev/null
+yarn --version 2>/dev/null
+```
+- **Рекомендация:** `corepack enable` — управляет pnpm/yarn по `packageManager` в `package.json`, не нужно ставить глобально
+- **Красный флаг:** одновременно установлены глобальный `pnpm` (через npm) и через corepack — версия становится непредсказуемой
+
+---
+
+## 6. Claude Code — Конфигурация
+
+### 6.1 Установка
+
+```bash
+which claude
+claude --version
+```
+- **Должен быть в WSL PATH**
+
+### 6.2 Settings
+
+```bash
+cat ~/.claude/settings.json 2>/dev/null | python3 -m json.tool
+```
+- **Проверить:**
+  - `permissions.allow` — не слишком ли открыто?
+  - `hooks` — все хуки валидны?
+  - `mcpServers` — все серверы доступны?
+
+### 6.3 Skills
+
+```bash
+ls ~/.claude/skills/ 2>/dev/null
+ls .claude/skills/ 2>/dev/null  # в проекте
+```
+- **Вопрос:** скиллы глобальные или проектные?
+
+### 6.4 CLAUDE.md
+
+```bash
+cat CLAUDE.md 2>/dev/null | head -20
+```
+- **Должен быть в корне проекта**
+
+### 6.5 MCP серверы
+
+```bash
+# Проверить что MCP серверы запускаются
+cat ~/.claude/settings.json | python3 -c "import sys,json; d=json.load(sys.stdin); print(json.dumps(d.get('mcpServers',{}), indent=2))"
+```
+
+---
+
+## 7. VS Code — Интеграция
+
+### 7.1 WSL Extension
+
+```powershell
+code --list-extensions | findstr "remote-wsl"
+```
+- **Ожидание:** `ms-vscode-remote.remote-wsl` установлен
+
+### 7.2 Открытие проекта через WSL
+
+```bash
+# Из WSL-терминала:
+cd ~/projects/my-project && code .
+```
+- **Ожидание:** VS Code открывается с пометкой "WSL: Ubuntu" в левом нижнем углу
+- **Красный флаг:** открывается без WSL-метки = работает в Windows-режиме
+
+### 7.3 Терминал в VS Code
+
+- **Проверить:** дефолтный терминал = WSL Bash, не PowerShell
+- Settings → Terminal → Default Profile → Ubuntu (WSL)
+
+### 7.4 Extensions в WSL
+
+```bash
+# Из WSL:
+code --list-extensions
+```
+- **Важно:** некоторые расширения нужно ставить отдельно в WSL-режиме
+
+---
+
+## 8. Производительность
+
+### 8.1 Тест скорости FS
+
+```bash
+# Нативная WSL FS
+time (cd /tmp && mkdir test-perf && cd test-perf && for i in $(seq 1 1000); do touch "file$i"; done && rm -rf /tmp/test-perf)
+
+# Windows FS через mount
+time (cd /mnt/c/tmp 2>/dev/null && mkdir test-perf && cd test-perf && for i in $(seq 1 1000); do touch "file$i"; done && rm -rf /mnt/c/tmp/test-perf)
+```
+- **Ожидание:** нативная FS в 3-10x быстрее
+
+### 8.2 RAM
+
+```bash
+free -h
+```
+- **Проверить:** WSL не использует всю RAM (см. `.wslconfig`)
+
+### 8.3 Диск
+
+```bash
+df -h /
+df -h /mnt/c
+```
+- **Проверить:** достаточно места в обоих FS
+
+### 8.4 Windows Defender exclusions (критично)
+
+```powershell
+# PowerShell as Admin
+Get-MpPreference | Select-Object -ExpandProperty ExclusionPath
+Get-MpPreference | Select-Object -ExpandProperty ExclusionProcess
+```
+- **Ожидание:** в ExclusionPath — `\\wsl$\Ubuntu` (или путь к VHDX: `%USERPROFILE%\AppData\Local\Packages\CanonicalGroupLimited*`). В ExclusionProcess — `wsl.exe`, `wslhost.exe`, `docker.exe`, `node.exe`
+- **Почему:** Defender real-time сканирует ext4 VHDX → 3-5x замедление npm/git/file watch. Часто скрытая причина "WSL тормозит"
+- **Фикс (PowerShell as Admin):**
+```powershell
+Add-MpPreference -ExclusionPath "\\wsl$\Ubuntu"
+Add-MpPreference -ExclusionPath "$env:LOCALAPPDATA\Packages\CanonicalGroupLimited.UbuntuonWindows*"
+Add-MpPreference -ExclusionProcess "wsl.exe"
+Add-MpPreference -ExclusionProcess "wslhost.exe"
+Add-MpPreference -ExclusionProcess "node.exe"
+```
+
+---
+
+## 9. Безопасность
+
+### 9.1 Чувствительные файлы
+
+```bash
+find ~ -name ".env" -o -name "*.pem" -o -name "*.key" -o -name "credentials*" 2>/dev/null | head -20
+```
+- **Проверить:** не лежат ли секреты в открытом виде
+
+### 9.2 Git — исключения
+
+```bash
+cat ~/.gitignore_global 2>/dev/null
+```
+- **Рекомендация:** глобальный gitignore:
+```
+.env
+.env.*
+*.pem
+*.key
+credentials.json
+node_modules/
+```
+
+### 9.3 SSH agent
+
+```bash
+ssh-add -l
+```
+- **Ожидание:** ключ загружен, не нужно вводить пароль каждый раз
+
+---
+
+## 10. Сетевое взаимодействие
+
+### 10.1 Доступ к VPS
+
+```bash
+ssh -o ConnectTimeout=5 root@ваш-vps-ip echo "OK" 2>&1
+```
+- **Или через config:**
+```bash
+cat ~/.ssh/config | grep -A5 hetzner
+```
+
+### 10.2 Порты
+
+```bash
+# Если локально крутятся сервисы
+ss -tlnp 2>/dev/null || netstat -tlnp 2>/dev/null
+```
+
+### 10.3 DNS
+
+```bash
+cat /etc/resolv.conf
+nslookup n8n.studiokook.ee
+```
+- **Красный флаг:** DNS от Windows может работать медленно в WSL
+
+---
+
+## 11. Бэкапы
+
+### 11.1 Что бэкапить
+
+- `~/.claude/` — настройки Claude Code
+- `~/.ssh/` — SSH-ключи
+- `~/.gitconfig` — Git конфигурация
+- Проекты в `~/projects/`
+
+### 11.2 Экспорт WSL (на случай переустановки)
+
+```powershell
+# PowerShell
+wsl --export Ubuntu C:\Backups\wsl-ubuntu-backup.tar
+```
+
+---
+
+## 12. Скрипт автоматического аудита
+
+Запустить одной командой внутри WSL:
+
+```bash
+#!/bin/bash
+echo "=== WSL AUDIT ==="
+echo ""
+echo "--- System ---"
+uname -a
+cat /etc/os-release | grep PRETTY_NAME
+echo ""
+
+echo "--- WSL Config ---"
+cat /etc/wsl.conf 2>/dev/null || echo "No wsl.conf"
+echo ""
+
+echo "--- Git ---"
+git --version
+echo "user.name: $(git config --global user.name)"
+echo "user.email: $(git config --global user.email)"
+echo "autocrlf: $(git config --global core.autocrlf)"
+echo "eol: $(git config --global core.eol)"
+echo "git paths: $(which -a git | tr '\n' ' ')"
+echo ""
+
+echo "--- Time / Locale ---"
+echo "date: $(date)"
+echo "LANG: $LANG"
+echo ""
+
+echo "--- Node ---"
+echo "path: $(which node 2>/dev/null || echo 'NOT FOUND')"
+echo "version: $(node --version 2>/dev/null || echo 'N/A')"
+echo "npm: $(npm --version 2>/dev/null || echo 'N/A')"
+echo "npm prefix: $(npm config get prefix 2>/dev/null)"
+echo "corepack: $(corepack --version 2>/dev/null || echo 'not enabled')"
+echo ""
+
+echo "--- Python ---"
+echo "python3 path: $(which python3 2>/dev/null || echo 'NOT FOUND')"
+echo "python3 version: $(python3 --version 2>/dev/null || echo 'N/A')"
+echo "pyenv: $(pyenv --version 2>/dev/null || echo 'not installed')"
+echo ""
+
+echo "--- Docker ---"
+echo "docker: $(docker --version 2>/dev/null || echo 'not installed')"
+echo "context: $(docker context show 2>/dev/null || echo 'N/A')"
+echo ""
+
+echo "--- Claude Code ---"
+echo "path: $(which claude 2>/dev/null || echo 'NOT FOUND')"
+echo "version: $(claude --version 2>/dev/null || echo 'N/A')"
+echo ""
+
+echo "--- SSH ---"
+ls ~/.ssh/ 2>/dev/null || echo "No .ssh dir"
+ssh -T git@github.com 2>&1 | head -1
+echo ""
+
+echo "--- Memory ---"
+free -h | head -2
+echo ""
+
+echo "--- Disk ---"
+df -h / /mnt/c 2>/dev/null | tail -2
+echo ""
+
+echo "--- PATH check ---"
+echo "Windows paths in WSL PATH: $(echo $PATH | tr ':' '\n' | grep -c '/mnt/c')"
+echo ""
+
+echo "--- Projects ---"
+ls ~/projects/ 2>/dev/null || echo "No ~/projects/"
+echo ""
+
+echo "=== DONE ==="
+```
+
+---
+
+## 13. Docker Desktop + WSL2
+
+### 13.1 Установка и backend
+
+```powershell
+docker --version
+docker context ls
+```
+- **Ожидание:** Docker Desktop использует WSL2 backend (не Hyper-V)
+- Settings → Resources → WSL Integration → галочка на Ubuntu
+
+### 13.2 Доступ из WSL
+
+```bash
+which docker
+docker ps
+docker context show
+```
+- **Ожидание:** `docker` работает из WSL без ошибок, context = `default` (Docker Desktop пробрасывает socket)
+- **Красный флаг:** `permission denied` → добавить юзера в группу `docker` (если не Docker Desktop): `sudo usermod -aG docker $USER`
+
+### 13.3 Ресурсы Docker
+
+- Docker Desktop использует память через WSL2, лимиты берутся из `.wslconfig` (см. §1.3)
+- **Красный флаг:** Docker ест 10+ ГБ RAM — уменьшить `memory` в `.wslconfig` или остановить лишние контейнеры (`docker ps -a`, `docker container prune`)
+
+### 13.4 Размер VHDX Docker
+
+```powershell
+# Размер виртуального диска Docker
+Get-ChildItem "$env:LOCALAPPDATA\Docker\wsl\data\ext4.vhdx" | Select-Object Length
+```
+- **Проблема:** VHDX не ужимается автоматически. Если разрастётся — `docker system prune -a --volumes` и компактизация через `Optimize-VHD` (Hyper-V) или `wsl --export/import`
+
+---
+
+## 14. Python / pyenv
+
+### 14.1 Python в WSL
+
+```bash
+which python3
+python3 --version
+which pip3
+```
+- **Ожидание:** `python3` в WSL (`/usr/bin/python3` или pyenv), НЕ `/mnt/c/…`
+
+### 14.2 pyenv (рекомендация для проектов)
+
+```bash
+pyenv --version 2>/dev/null || echo "pyenv не установлен"
+pyenv versions
+pyenv which python
+```
+- **Рекомендация:** pyenv для управления версиями Python per-project. Системный `python3` не трогать — на нём висят утилиты OS
+
+### 14.3 Виртуальные окружения
+
+```bash
+# venv должны быть внутри проекта
+ls ~/projects/*/venv 2>/dev/null
+ls ~/projects/*/.venv 2>/dev/null
+```
+- **Правило:** venv внутри проекта (`.venv/`), добавлен в `.gitignore`, не глобально
+
+### 14.4 pip без sudo
+
+```bash
+pip3 config get global.user 2>/dev/null
+```
+- **Ожидание:** работа внутри venv ИЛИ `pip install --user`
+- **Красный флаг:** установка пакетов в `/usr/lib/python3/…` → требует sudo, ломает системный Python
+- **Фикс:** всегда работать через venv или `pip install --user`
+
+---
+
+## Приоритеты исправлений
+
+| Приоритет | Что | Почему |
+|---|---|---|
+| 🔴 P0 | `appendWindowsPath=false` в wsl.conf | Без этого — конфликты PATH (Windows git/node/npm текут в WSL) |
+| 🔴 P0 | `core.autocrlf=input` в git | Без этого — мусор в коммитах |
+| 🔴 P0 | Windows Defender exclusions | Без этого — WSL FS тормозит в 3-5x (скрытая причина) |
+| 🟡 P1 | `.wslconfig` с лимитами RAM | WSL может сожрать всю память |
+| 🟡 P1 | SSH-ключи в одном месте | Иначе путаница при push/pull |
+| 🟡 P1 | Node/npm только в WSL, prefix `~/.npm-global` | Дубли = конфликты версий + EACCES без sudo |
+| 🟡 P1 | Docker Desktop через WSL2 backend | Единый ресурс-пул, нет двойной виртуализации |
+| 🟢 P2 | Проекты в нативной FS | Скорость, но не критично |
+| 🟢 P2 | VS Code WSL extension | Комфорт, не must-have |
+| 🟢 P2 | Глобальный .gitignore | Защита от утечки секретов |
+| 🟢 P2 | pyenv + venv per-project | Изоляция Python-версий |

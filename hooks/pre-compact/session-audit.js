@@ -179,6 +179,36 @@ function isGenericPattern(entry) {
     return false;
 }
 
+function checkAutoMemoryGrowth(sessionId) {
+    if (!sessionId) return null;
+    try {
+        const memDir = path.dirname(MEMORY_FILE);
+        const newFiles = [];
+        for (const f of fs.readdirSync(memDir)) {
+            if (!f.endsWith('.md') || f === 'MEMORY.md' || f.includes('.bak')) continue;
+            const fp = path.join(memDir, f);
+            try {
+                const content = fs.readFileSync(fp, 'utf8');
+                const m = content.match(/^originSessionId:\s*([a-f0-9-]+)/m);
+                if (m && m[1] === sessionId) {
+                    const typeMatch = content.match(/^type:\s*(\w+)/m);
+                    newFiles.push({ name: f, type: typeMatch ? typeMatch[1] : 'unknown' });
+                }
+            } catch {}
+        }
+        const flagPath = path.join(CLAUDE_DIR, 'hooks', '.auto-memory-routing-needed');
+        if (newFiles.length > 0) {
+            fs.writeFileSync(flagPath, JSON.stringify({
+                sessionId, files: newFiles, timestamp: new Date().toISOString()
+            }), 'utf8');
+            return newFiles;
+        } else if (fs.existsSync(flagPath)) {
+            fs.unlinkSync(flagPath);
+        }
+    } catch {}
+    return null;
+}
+
 function checkAccumulatorOverflow() {
     try {
         const tsLines = fs.existsSync(TROUBLESHOOTING) ? fs.readFileSync(TROUBLESHOOTING, 'utf8').split('\n').length : 0;
@@ -250,6 +280,7 @@ async function main() {
     // Accumulator check runs regardless of extraction — protects against silent overflow
     // when session has <5 new lines (early return skips the LLM path but flag still needed).
     checkAccumulatorOverflow();
+    const newAutoMemFiles = checkAutoMemoryGrowth(sessionId);
 
     if (!transcriptSummary) {
         console.log('Session audit: no new content since last run');
@@ -364,6 +395,7 @@ Rules:
 
     // Re-run accumulator check AFTER append — post-extraction may have pushed over threshold.
     checkAccumulatorOverflow();
+    const newAutoMemFilesPost = checkAutoMemoryGrowth(sessionId);
 
     // Formatted report
     const time = new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
@@ -389,7 +421,7 @@ Rules:
         counts.errors && `errors(${counts.errors})`,
         counts.patterns && `patterns(${counts.patterns})`
     ].filter(Boolean).join(' ');
-    const factsSummary = counts.facts ? `MEMORY.md: facts(${counts.facts})` : '';
+    const factsSummary = counts.facts ? `project-facts.md: facts(${counts.facts})` : '';
     parts.push('');
     parts.push(`  → vault: ${vaultSummary || 'none'} | ${factsSummary || 'no facts'}`);
     parts.push(line);

@@ -4,11 +4,16 @@
 
 ## Accumulators (записи копятся, устаревают → cleanup)
 
-| Файл | Лимит | Действие |
+| Файл/директория | Лимит | Действие |
 |------|-------|----------|
 | troubleshooting-current.md | 150 строк | Distillation → routing map destinations |
 | global-patterns.md | 150 строк | Distillation → routing map destinations |
-| MEMORY.md | 250 строк | Ревью: удалить невалидные `[verified:]` факты, схлопнуть дубли |
+| MEMORY.md | 200 строк (cap, после truncate) | Ревью: удалить невалидные `[verified:]` факты, схлопнуть дубли. Соблюдать "index one-liner" правило |
+| auto-memory dir (`projects/<cwd>/memory/`) | 30 файлов | >30 → librarian distillation session. Cross-project знания → vault, behavioral rules остаются |
+| logs/rollback/ | mtime >30 дней | Auto-cleanup в session-audit.js (PreCompact) |
+| logs/post-mortem/ | без лимита | Append-only архив |
+| ~/.claude/tmp/ | mtime >3 дня | Auto-cleanup в init-memory.js (SessionStart, уже работает) |
+| paste-cache/ | mtime >7 дней | Auto-cleanup в init-memory.js (SessionStart, уже работает) |
 | VPS refresh.log | 50 строк | Auto-rotation (cron) |
 | VPS telegram-reports.archive.log | 30 дней | Auto-trim (report-lifecycle.sh) |
 

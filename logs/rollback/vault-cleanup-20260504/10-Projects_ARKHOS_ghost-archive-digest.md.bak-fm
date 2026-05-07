@@ -1,0 +1,24 @@
+# Ghost Archive Digest
+
+First-prompt trail for sessions lacking formal extraction.
+
+
+## Transcript rescue 2026-04-23
+
+<!-- Empty/trivial prompts filtered: "Проверка связи", "Это новая сессия", <local-command-caveat> wrappers. ULTRATHINK prefix stripped. -->
+
+- [2026-04-06] `c--Users-sorte--claude/029dbc6a-bea6-4594-bf30-14b9cf063360`: BRB80F26CES0EO Найди монтажный мануал и сделай в Jpeg
+- [2026-04-10] `c--Users-sorte--claude/11668fb0-529b-43e8-a4ee-e78d0d832410`: `C:\Users\sorte\.claude\mcp-needs-auth-cache.json` для чего и откуда этот файл? и зачем?
+- [2026-04-10] `c--Users-sorte--claude/17daa9f5-028b-427b-97be-973f7f8c7496`: У меня есть две папки с файлами (текстуры для SU). Нужно их интергрировать в плагин, чтоб можно было с ними работать
+- [2026-04-11] `c--Users-sorte--claude/1e57f769-8ea9-4229-be5c-7da291a7e1e6`: Проверь корректность работы обсидиан. Правильно ли определяются/распределяются файлы и правильно ли индексируются
+- [2026-04-05] `c--Users-sorte--claude/3a38173f-9b94-42da-9e6f-081606330652`: Я хочу быть увереным что у нас правильно работает Obsidian, все согласно документации из комюнити
+- [2026-04-09] `c--Users-sorte--claude/5215709e-1f6d-4ebe-b9d8-747d2170d2f7`: ClaudeClaw (бот на VPS, в телеграме) плохо держит контекст. Проверь его лог за сегодня и сделай аудит
+- [2026-04-07] `c--Users-sorte--claude/95f417b8-32f5-4d94-aa04-509033707b4e`: Что за квоты появились в виде цепленка? по команде /buddy?
+- [2026-04-05] `c--Users-sorte--claude/b03f9a46-52a4-4ba4-8b9d-3df3f3376af0`: Я хочу проработать тексты на сайте и реализовать новый редизайн
+- [2026-04-08] `c--Users-sorte--claude/c6177345-e40f-4a27-83d2-bce1acced1d1`: Как перейти в нужную мне папку в терминале?
+- [2026-04-08] `c--Users-sorte--claude/c8040837-2d0b-475f-b424-d30f048017ae`: Запиши в credentials/telegram-api.key: APP_API_ID/APP_API_HASH [Telegram MTProto setup]
+- [2026-04-08] `c--Users-sorte--claude/c8c84606-db92-4012-9cfa-2dcd181497f2`: Проверь лог чат бота ARKHOS. Меня интересует куда идут данные, которые мы парсим из комюнити
+- [2026-04-10] `c--Users-sorte--claude/dc69f5c3-4d93-471e-b423-469da66378eb`: Собери статистику по динамике развития сайта
+- [2026-04-06] `c--Users-sorte-Documents-GitHub-ARKHOS--claude/dc7fa42d-9704-4707-98c2-b1467e61751d`: Хочу узнать почему WP, Seo сидят на отдельных доменах а не внутри Studiokook
+- [2026-04-05] `c--Users-sorte-Documents-GitHub-ARKHOS--claude/e3c66ae1-5567-4cc7-bcfe-eb2717a2a0de`: Пришел запрос на перезагрузку компа, чтоб установился какой то файл. Проверь че за файл
+- [2026-04-06] `c--Users-sorte-Documents-GitHub-ARKHOS--claude/7c3244e5-bbf8-4604-a302-57309a0aa7a2`: Phase 2 learning loop

@@ -1,0 +1,162 @@
+# Maartin Scene Audit - 2026-05-03
+
+Source scene: `C:\Users\sorte\Desktop\Проекты\Maartin\Scene.skp`
+
+Audit artifacts:
+- JSON: `C:/tmp/ek-scene-audit-20260503-maartin.json`
+- Screenshots: `C:/tmp/ek-scene-audit-20260503-maartin-top.png`, `C:/tmp/ek-scene-audit-20260503-maartin-iso.png`
+
+## Extraction Summary
+
+- Live read-only extraction through SketchUp TCP on 2026-05-03.
+- Model bounds mm: `X[-1001.8..4832.6]`, `Y[-2069..2319.3]`, `Z[-98.3..3023.1]`.
+- Top-level entities: `40 ComponentInstance`, `18 Face`, `43 Edge`, `38 DimensionLinear`, `1 Text`.
+- Definitions in model: `6110`.
+- Top-level component kinds: `14 other`, `10 panel_facade`, `1 corner_lower`, `4 lower`, `1 pencil`, `4 appliance`, `2 countertop`, `3 panel`, `1 upper`.
+- Corner modules: `BG1`.
+- Pencil/tall modules: `PD1_6#1`.
+- Appliances observed: sink, `SIEMENS HB23AB520E`, `Miele KM 6322 PowerFlex`, `Bosch_1`, and a standalone refrigerator component.
+
+## Room And Architecture
+
+The scene is a compact L/return kitchen with a long back wall and a short left return. Raw room geometry and dimensions are present.
+
+Important dimensions:
+
+- Back wall/main run: `4273`.
+- Left return / refrigerator side: `1919`.
+- Working run length: `3035`.
+- Left return worktop: `1242`.
+- Tall/pencil height: `2535` nominal, modules observed to `2505` with `30` top gap.
+
+Pattern: this scene uses explicit red/blue dimensions to describe both room envelope and production chain. Keep dimension strings such as `50+831`, `600+50`, and `4273` as design intent.
+
+## Layout Composition
+
+Maartin is a single-corner L with a long back working row and a refrigerator zone on the left side. Unlike Sven, there is no left tall-bank chain of PB modules; the main tall unit is `PD1_6#1` at the right end of the back row.
+
+### Back Working Row
+
+Top-level chain along `Y[-671..0]`:
+
+- `BG1`: corner start, `X[0..670]`, `Y[-1242..0]`, `Z[0..880]`.
+- `BD2_1#1`: cooktop base, `X[642..1473]`, width `831`.
+- `BD2#1`: drawer/base module, `X[1473..2304]`, width `831`.
+- `BD1`: sink base, `X[2304..2904]`, 600mm.
+- `BI#1`: dishwasher, `X[2904..3504]`, 600mm.
+- `BJ`: narrow/filler module, `X[3504..3730.5]`, observed width `226.5` with dimension intent `150` nearby.
+- `PD1_6#1`: oven/micro pencil, `X[3654..4254]`, 600mm.
+- `PANEL-FACADE#9`: full-height right side panel, `X[4253.7..4273]`, 19.3mm thick.
+
+Dimension chain reinforces this: `50+831`, `831`, `600`, `600`, `150`, `600`, `19`.
+
+### Left Return And Refrigerator Zone
+
+- `BG1` forms the inside corner and projects along the left return to `Y[-1242]`.
+- Horizontal left worktop segment: `X[0..650]`, `Y[-1242..0]`, `Z[880..900]`.
+- Standalone refrigerator component: bbox `X[0..1057]`, `Y[-1919..-1302.3]`, `Z[0..1850]`.
+- `TB1#1` upper/end component above left return: `X[0..670]`, `Y[-1897..-1261]`, `Z[2000..2505]`.
+- `PANEL-FACADE` at `Y[-1261..-1241.7]`, full height `Z[0..2505]`, separates the return/corner from the refrigerator zone.
+
+Pattern: standalone refrigerators are modeled with an existing fridge component and left in the scene as visual/check evidence. Do not replace this with measurement-only geometry.
+
+## Corner And Junction Logic
+
+Only one real `BG1` is used. In this scene the corner has nonstandard height/top relationship:
+
+- `BG1` bbox height to `Z=880`, matching 20mm countertop thickness to reach 900mm.
+- Previous scenes often used `862 + 38`; this one uses `880 + 20`.
+
+Learning rule: working height stays 900mm, but carcass/top split can vary by countertop material/thickness. Generator checks must use declared countertop thickness, not hardcode 862/38 everywhere.
+
+## Appliances And Services
+
+- Cooktop: `Miele KM 6322 PowerFlex`, over `BD2_1#1`, bbox `X[707.5..1322.5]`, `Y[-552..-38]`, `Z[900..910]`.
+- Sink: over `BD1`, bbox `X[2336..2876]`, `Y[-582.7..-62.7]`, `Z[648.4..898.4]`.
+- Dishwasher: `BI#1` next to sink base, `X[2904..3504]`.
+- Oven: `SIEMENS HB23AB520E`, in `PD1_6#1`, bbox `X[3658..4254]`, `Y[-672..-72]`, `Z[676.7..1276.5]`.
+- Micro/upper appliance: `Bosch_1`, in `PD1_6#1`, bbox `X[3654..4254]`, `Y[-672..-272]`, `Z[1282..1662]`.
+- Standalone fridge: existing fridge component, left of the corner, bbox `X[0..1057]`, `Y[-1919..-1302.3]`, `Z[0..1850]`.
+
+Pattern: oven/micro stack is hosted in the right pencil; cooktop remains in a separate lower base. Sink/dishwasher form the service cluster.
+
+## Fridge Rule Evidence
+
+This scene directly confirms the clarified standalone-fridge rule:
+
+- Use the existing refrigerator component from available components.
+- Keep it in the scene when it represents the real appliance/visual check.
+- Do not create a separate measuring object for the niche.
+- Verify adjacent panels, clearances, and surrounding module placement against the actual fridge component bbox.
+
+## Upper Row And Filler Pattern
+
+Upper row uses tall `TC1` modules in two Z bands:
+
+- Lower upper band: `TC1-H1`, `TC1HL`, `TC1HL#1` at `Z[1500..2138]`.
+- Top band: `TC1#1/#2/#3/#6/#7` at `Z[2138..2505]`.
+- `TP` and `TP#1` are 50mm vertical transition/filler elements at the corner/row break.
+- Width sequence: `50`, `392`, `392`, `50`, `805`, `805`, `19`, `782`, `19`, `600`, `19`.
+
+Pattern: upper cabinets can be a two-band composition with separate top-lift/antresol modules. The generator must not collapse this into one row of standard uppers.
+
+## Panels, Fillers, And Cladding
+
+Top-level `PANEL-FACADE` roles include:
+
+- Full-height left refrigerator/corner divider: `PANEL-FACADE`, size approx `592 x 2505 x 19.3`.
+- Right side panel next to `PD1_6`: `PANEL-FACADE#9`, 19.3mm thick, full height.
+- Side/end panels at worktop/tall transitions: `PANEL-FACADE#3/#4/#5`.
+- Low plinth/front strips: `PANEL-FACADE#6/#7/#8`, low height around `110`.
+- Detached sample panels: `PANEL-FACADE#1/#2`, outside the main footprint.
+
+Pattern: panel roles must be classified by adjacency, bbox and Z range. The low strip height here is `110`, not the `128` seen in Sven/Margit.
+
+## Countertops And Work Zones
+
+Two horizontal countertops:
+
+- Left return worktop: `X[0..650]`, `Y[-1242..0]`, `Z[880..900]`, thickness `20`.
+- Main back worktop: `X[600..3635]`, `Y[-642.7..7.3]`, `Z[878.4..898.4]`, thickness `20`.
+
+Pattern: countertop thickness can be 20mm stone style, while worktop target remains 900mm. This affects base carcass height and should be part of verification.
+
+## Dimensions Worth Preserving
+
+Dimension texts: `3035`, `1242`, `22`, `19`, `50`, `392`, `392`, `50`, `805`, `805`, `19`, `782`, `19`, `600`, `19`, `110`, `770`, `20`, `600`, `639`, `367`, `30`, `2535`, `4273`, `1919`, `782`, `800`, `636`, `2000`, `658`, `600`, `150`, `600`, `600`, `831`, `50+831`, `600+50`, `400`.
+
+Important deviations from previous scenes:
+
+- Base/countertop split: `880 + 20`, not `862 + 38`.
+- Low plinth/front strip: `110`.
+- Standalone fridge visual component is explicit and opened in the screenshot.
+
+## Reusable Pattern Candidates
+
+| Pattern ID | Evidence | Rule | Confidence | Destination |
+|---|---|---|---|---|
+| `standalone_fridge_existing_component_left_zone` | Existing fridge component at `X[0..1057]`, `Y[-1919..-1302.3]` | Use real fridge component for visual/check evidence, not measurement geometry | verified-live | [[appliances-taxonomy]], `ek_standards.rb` |
+| `stone_20mm_countertop_base_880` | Countertops `Z[880..900]` and base modules to `Z=880` | Work height can be 900 with 20mm stone top and 880mm base height | user-corrected | [[generated-project-verification-template]], `ek_standards.rb` candidate |
+| `right_end_pd1_6_oven_micro_stack` | `PD1_6#1` right end with Siemens + Bosch | Pencil can terminate main back row; oven/micro bind stack remains separate from cooktop | verified-live | [[appliances-taxonomy]] |
+| `two_band_tc1_upper_antresol` | `TC1-H1/TC1HL` lower band and `TC1#*` top band | Uppers may be two-band tall/antresol composition | verified-live | [[finished-project-patterns]] |
+| `low_strip_height_110` | `PANEL-FACADE#6/#7/#8` low strips around `Z[0..110]` | Plinth/front strip height varies by project; classify by bbox, not fixed 128 | verified-live | panel classifier candidate |
+| `single_bg1_with_left_fridge_zone` | `BG1` plus fridge zone beyond left return | L corner can coexist with standalone fridge zone outside main worktop line | verified-live | [[row-composition-formulas]] |
+
+## Generator Implications
+
+Future EK generation should:
+
+1. Treat standalone fridge components as real visual/check components that can remain in the scene.
+2. Verify fridge zone against the actual component bbox and surrounding panels; do not create a separate measurement object.
+3. Support 20mm/30mm stone countertop workflows: base/carcass top must adjust so base height + stone thickness = target work height.
+4. Preserve `50+831` and `600+50` dimension expressions as intent.
+5. Allow `PD1_6` to terminate the main row on the right while cooktop stays in a separate base module.
+6. Support two-band `TC1` upper/antresol rows with 50mm transition fillers.
+7. Classify low `PANEL-FACADE` strips by measured height; do not assume one universal plinth strip height.
+
+## Open Items
+
+- Add `20mm/30mm stone countertop -> adjusted base height` as a standard/check rule after comparing with more stone worktop scenes.
+- Improve extractor name encoding for Russian component/material names.
+- Add automatic detection of existing standalone fridge components by definition/material/name patterns.
+- Add upper-row band classifier for `TC1` lower/top compositions.

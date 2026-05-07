@@ -1,0 +1,458 @@
+{
+  "updatedAt": "2026-05-01T03:48:49.376Z",
+  "createdAt": "2026-04-12T13:20:39.139Z",
+  "id": "owCznJaLTsTxRMfv",
+  "name": "Trading: Seasonality Engine",
+  "description": null,
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "30 7 * * *"
+            }
+          ]
+        }
+      },
+      "id": "sched1",
+      "name": "Daily 07:30",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Historical monthly return patterns (compiled from decades of data)\n// Source: Stock Trader's Almanac, commodity seasonal patterns research\nconst seasonality = {\n  GOLD: [\n    { month: 1, avg_return: 3.2, win_rate: 72, sample_years: 20 },\n    { month: 2, avg_return: -0.5, win_rate: 45, sample_years: 20 },\n    { month: 3, avg_return: -0.8, win_rate: 40, sample_years: 20 },\n    { month: 4, avg_return: 1.5, win_rate: 60, sample_years: 20 },\n    { month: 5, avg_return: 0.3, win_rate: 52, sample_years: 20 },\n    { month: 6, avg_return: -0.2, win_rate: 48, sample_years: 20 },\n    { month: 7, avg_return: 1.8, win_rate: 65, sample_years: 20 },\n    { month: 8, avg_return: 2.5, win_rate: 70, sample_years: 20 },\n    { month: 9, avg_return: 2.0, win_rate: 68, sample_years: 20 },\n    { month: 10, avg_return: -0.3, win_rate: 45, sample_years: 20 },\n    { month: 11, avg_return: 1.2, win_rate: 58, sample_years: 20 },\n    { month: 12, avg_return: 1.0, win_rate: 55, sample_years: 20 }\n  ],\n  SILVER: [\n    { month: 1, avg_return: 2.5, win_rate: 65, sample_years: 20 },\n    { month: 2, avg_return: 1.8, win_rate: 60, sample_years: 20 },\n    { month: 3, avg_return: -1.2, win_rate: 38, sample_years: 20 },\n    { month: 4, avg_return: 2.0, win_rate: 62, sample_years: 20 },\n    { month: 5, avg_return: -0.5, win_rate: 45, sample_years: 20 },\n    { month: 6, avg_return: -1.0, win_rate: 42, sample_years: 20 },\n    { month: 7, avg_return: 2.5, win_rate: 65, sample_years: 20 },\n    { month: 8, avg_return: 3.0, win_rate: 72, sample_years: 20 },\n    { month: 9, avg_return: 2.2, win_rate: 68, sample_years: 20 },\n    { month: 10, avg_return: -0.8, win_rate: 42, sample_years: 20 },\n    { month: 11, avg_return: 1.5, win_rate: 58, sample_years: 20 },\n    { month: 12, avg_return: 0.5, win_rate: 52, sample_years: 20 }\n  ],\n  WTI_OIL: [\n    { month: 1, avg_return: -2.0, win_rate: 35, sample_years: 20 },\n    { month: 2, avg_return: 1.5, win_rate: 58, sample_years: 20 },\n    { month: 3, avg_return: 2.5, win_rate: 65, sample_years: 20 },\n    { month: 4, avg_return: 3.0, win_rate: 70, sample_years: 20 },\n    { month: 5, avg_return: 1.0, win_rate: 55, sample_years: 20 },\n    { month: 6, avg_return: 2.0, win_rate: 62, sample_years: 20 },\n    { month: 7, avg_return: -0.5, win_rate: 48, sample_years: 20 },\n    { month: 8, avg_return: -1.5, win_rate: 40, sample_years: 20 },\n    { month: 9, avg_return: -2.5, win_rate: 32, sample_years: 20 },\n    { month: 10, avg_return: 1.0, win_rate: 55, sample_years: 20 },\n    { month: 11, avg_return: -1.0, win_rate: 42, sample_years: 20 },\n    { month: 12, avg_return: 0.5, win_rate: 52, sample_years: 20 }\n  ],\n  NATGAS: [\n    { month: 1, avg_return: -5.0, win_rate: 30, sample_years: 20 },\n    { month: 2, avg_return: -3.0, win_rate: 35, sample_years: 20 },\n    { month: 3, avg_return: -4.0, win_rate: 32, sample_years: 20 },\n    { month: 4, avg_return: -2.0, win_rate: 38, sample_years: 20 },\n    { month: 5, avg_return: 1.5, win_rate: 55, sample_years: 20 },\n    { month: 6, avg_return: 3.0, win_rate: 65, sample_years: 20 },\n    { month: 7, avg_return: 2.0, win_rate: 60, sample_years: 20 },\n    { month: 8, avg_return: 1.5, win_rate: 58, sample_years: 20 },\n    { month: 9, avg_return: 3.5, win_rate: 68, sample_years: 20 },\n    { month: 10, avg_return: 5.0, win_rate: 75, sample_years: 20 },\n    { month: 11, avg_return: 2.0, win_rate: 60, sample_years: 20 },\n    { month: 12, avg_return: -1.0, win_rate: 42, sample_years: 20 }\n  ],\n  SPY: [\n    { month: 1, avg_return: 1.0, win_rate: 58, sample_years: 30 },\n    { month: 2, avg_return: 0.2, win_rate: 52, sample_years: 30 },\n    { month: 3, avg_return: 1.2, win_rate: 62, sample_years: 30 },\n    { month: 4, avg_return: 1.5, win_rate: 70, sample_years: 30 },\n    { month: 5, avg_return: 0.3, win_rate: 55, sample_years: 30 },\n    { month: 6, avg_return: 0.0, win_rate: 50, sample_years: 30 },\n    { month: 7, avg_return: 1.0, win_rate: 58, sample_years: 30 },\n    { month: 8, avg_return: -0.5, win_rate: 45, sample_years: 30 },\n    { month: 9, avg_return: -1.0, win_rate: 38, sample_years: 30 },\n    { month: 10, avg_return: 0.8, win_rate: 58, sample_years: 30 },\n    { month: 11, avg_return: 1.5, win_rate: 68, sample_years: 30 },\n    { month: 12, avg_return: 1.3, win_rate: 72, sample_years: 30 }\n  ],\n  BTC: [\n    { month: 1, avg_return: 5.0, win_rate: 60, sample_years: 10 },\n    { month: 2, avg_return: 8.0, win_rate: 65, sample_years: 10 },\n    { month: 3, avg_return: -2.0, win_rate: 40, sample_years: 10 },\n    { month: 4, avg_return: 10.0, win_rate: 70, sample_years: 10 },\n    { month: 5, avg_return: -5.0, win_rate: 35, sample_years: 10 },\n    { month: 6, avg_return: -3.0, win_rate: 38, sample_years: 10 },\n    { month: 7, avg_return: 8.0, win_rate: 65, sample_years: 10 },\n    { month: 8, avg_return: 2.0, win_rate: 55, sample_years: 10 },\n    { month: 9, avg_return: -5.0, win_rate: 30, sample_years: 10 },\n    { month: 10, avg_return: 15.0, win_rate: 80, sample_years: 10 },\n    { month: 11, avg_return: 20.0, win_rate: 78, sample_years: 10 },\n    { month: 12, avg_return: 5.0, win_rate: 60, sample_years: 10 }\n  ]\n};\n\nconst currentMonth = new Date().getMonth() + 1;\nconst results = [];\n\nfor (const [asset, months] of Object.entries(seasonality)) {\n  const current = months.find(m => m.month === currentMonth);\n  if (!current) continue;\n  \n  let bias = 'neutral';\n  if (current.avg_return > 1.5 && current.win_rate > 60) bias = 'bullish';\n  else if (current.avg_return < -1.5 && current.win_rate < 40) bias = 'bearish';\n  else if (current.avg_return > 0.5) bias = 'mildly_bull';\n  else if (current.avg_return < -0.5) bias = 'mildly_bear';\n  \n  results.push({\n    json: {\n      asset,\n      month: currentMonth,\n      avg_return: current.avg_return,\n      win_rate: current.win_rate,\n      sample_years: current.sample_years,\n      current_bias: bias\n    }\n  });\n}\n\nreturn results;"
+      },
+      "id": "code1",
+      "name": "Compute Seasonality",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO seasonality_signals (asset, month, avg_return, win_rate, sample_years, current_bias, updated_at) VALUES ($1, $2, $3, $4, $5, $6, NOW()) ON CONFLICT (asset, month) DO UPDATE SET avg_return = $3, win_rate = $4, current_bias = $6, updated_at = NOW();",
+        "options": {
+          "queryReplacement": "={{ [$json.asset, $json.month, $json.avg_return, $json.win_rate, $json.sample_years, $json.current_bias] }}"
+        }
+      },
+      "id": "pg1",
+      "name": "Upsert Seasonality",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        440,
+        0
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "TradingPostgres1",
+          "name": "Trading Postgres"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\nconst currentMonth = new Date().toLocaleString('en', { month: 'long' });\n\nconst strong = items.filter(i => i.json.current_bias === 'bullish' || i.json.current_bias === 'bearish');\nif (!strong.length) return [{ json: { skip: true } }];\n\nconst lines = strong.map(i => {\n  const j = i.json;\n  const arrow = j.avg_return > 0 ? '\\u25b2' : '\\u25bc';\n  const emoji = j.current_bias === 'bullish' ? '\\ud83d\\udfe2' : '\\ud83d\\udd34';\n  return `${emoji} *${j.asset}*: ${arrow} ${j.avg_return > 0 ? '+' : ''}${j.avg_return}% avg (${j.win_rate}% win, ${j.sample_years}yr)`;\n}).join('\\n');\n\nconst msg = `\\ud83d\\udcc5 *Seasonal Signals — ${currentMonth}*\\n\\n${lines}\\n\\n_Strong historical patterns (>60% win rate)_`;\nreturn [{ json: { message: msg, skip: false } }];"
+      },
+      "id": "code2",
+      "name": "Format Alert",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        660,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "has-signal",
+              "leftValue": "={{ $json.skip }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "false"
+              }
+            }
+          ]
+        }
+      },
+      "id": "if1",
+      "name": "Has Strong Signals?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        880,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "chatId": "804465999",
+        "text": "={{ $json.message }}",
+        "additionalFields": {
+          "parse_mode": "Markdown"
+        }
+      },
+      "id": "tg1",
+      "name": "Send Seasonal Alert",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1100,
+        -50
+      ],
+      "credentials": {
+        "telegramApi": {
+          "id": "TradingTelegramBot",
+          "name": "Trading Bot"
+        }
+      },
+      "webhookId": "23fb40f8-e30d-46f5-bfac-07b0433560d4",
+      "disabled": true
+    }
+  ],
+  "connections": {
+    "Daily 07:30": {
+      "main": [
+        [
+          {
+            "node": "Compute Seasonality",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Compute Seasonality": {
+      "main": [
+        [
+          {
+            "node": "Upsert Seasonality",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upsert Seasonality": {
+      "main": [
+        [
+          {
+            "node": "Format Alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Alert": {
+      "main": [
+        [
+          {
+            "node": "Has Strong Signals?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Strong Signals?": {
+      "main": [
+        [
+          {
+            "node": "Send Seasonal Alert",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false,
+    "errorWorkflow": "mzrUOgpYW8OVSWGl"
+  },
+  "staticData": {
+    "node:Daily 07:30": {
+      "recurrenceRules": []
+    }
+  },
+  "meta": null,
+  "pinData": null,
+  "versionId": "29846472-6fd4-4144-bb6c-10faf4d4213e",
+  "activeVersionId": "29846472-6fd4-4144-bb6c-10faf4d4213e",
+  "versionCounter": 42,
+  "triggerCount": 1,
+  "shared": [
+    {
+      "updatedAt": "2026-04-12T13:20:39.139Z",
+      "createdAt": "2026-04-12T13:20:39.139Z",
+      "role": "workflow:owner",
+      "workflowId": "owCznJaLTsTxRMfv",
+      "projectId": "PufDuNtXpreUjA3o",
+      "project": {
+        "updatedAt": "2025-12-05T21:25:37.247Z",
+        "createdAt": "2025-11-04T19:43:55.674Z",
+        "id": "PufDuNtXpreUjA3o",
+        "name": "Maksim Parve <maksim@studiokook.ee>",
+        "type": "personal",
+        "icon": null,
+        "description": null,
+        "creatorId": "3462e3d2-f46b-4d98-acea-93ac07713bf5"
+      }
+    }
+  ],
+  "tags": [],
+  "activeVersion": {
+    "updatedAt": "2026-05-01T03:48:49.377Z",
+    "createdAt": "2026-05-01T03:48:49.377Z",
+    "versionId": "29846472-6fd4-4144-bb6c-10faf4d4213e",
+    "workflowId": "owCznJaLTsTxRMfv",
+    "nodes": [
+      {
+        "parameters": {
+          "rule": {
+            "interval": [
+              {
+                "field": "cronExpression",
+                "expression": "30 7 * * *"
+              }
+            ]
+          }
+        },
+        "id": "sched1",
+        "name": "Daily 07:30",
+        "type": "n8n-nodes-base.scheduleTrigger",
+        "typeVersion": 1.2,
+        "position": [
+          0,
+          0
+        ]
+      },
+      {
+        "parameters": {
+          "jsCode": "// Historical monthly return patterns (compiled from decades of data)\n// Source: Stock Trader's Almanac, commodity seasonal patterns research\nconst seasonality = {\n  GOLD: [\n    { month: 1, avg_return: 3.2, win_rate: 72, sample_years: 20 },\n    { month: 2, avg_return: -0.5, win_rate: 45, sample_years: 20 },\n    { month: 3, avg_return: -0.8, win_rate: 40, sample_years: 20 },\n    { month: 4, avg_return: 1.5, win_rate: 60, sample_years: 20 },\n    { month: 5, avg_return: 0.3, win_rate: 52, sample_years: 20 },\n    { month: 6, avg_return: -0.2, win_rate: 48, sample_years: 20 },\n    { month: 7, avg_return: 1.8, win_rate: 65, sample_years: 20 },\n    { month: 8, avg_return: 2.5, win_rate: 70, sample_years: 20 },\n    { month: 9, avg_return: 2.0, win_rate: 68, sample_years: 20 },\n    { month: 10, avg_return: -0.3, win_rate: 45, sample_years: 20 },\n    { month: 11, avg_return: 1.2, win_rate: 58, sample_years: 20 },\n    { month: 12, avg_return: 1.0, win_rate: 55, sample_years: 20 }\n  ],\n  SILVER: [\n    { month: 1, avg_return: 2.5, win_rate: 65, sample_years: 20 },\n    { month: 2, avg_return: 1.8, win_rate: 60, sample_years: 20 },\n    { month: 3, avg_return: -1.2, win_rate: 38, sample_years: 20 },\n    { month: 4, avg_return: 2.0, win_rate: 62, sample_years: 20 },\n    { month: 5, avg_return: -0.5, win_rate: 45, sample_years: 20 },\n    { month: 6, avg_return: -1.0, win_rate: 42, sample_years: 20 },\n    { month: 7, avg_return: 2.5, win_rate: 65, sample_years: 20 },\n    { month: 8, avg_return: 3.0, win_rate: 72, sample_years: 20 },\n    { month: 9, avg_return: 2.2, win_rate: 68, sample_years: 20 },\n    { month: 10, avg_return: -0.8, win_rate: 42, sample_years: 20 },\n    { month: 11, avg_return: 1.5, win_rate: 58, sample_years: 20 },\n    { month: 12, avg_return: 0.5, win_rate: 52, sample_years: 20 }\n  ],\n  WTI_OIL: [\n    { month: 1, avg_return: -2.0, win_rate: 35, sample_years: 20 },\n    { month: 2, avg_return: 1.5, win_rate: 58, sample_years: 20 },\n    { month: 3, avg_return: 2.5, win_rate: 65, sample_years: 20 },\n    { month: 4, avg_return: 3.0, win_rate: 70, sample_years: 20 },\n    { month: 5, avg_return: 1.0, win_rate: 55, sample_years: 20 },\n    { month: 6, avg_return: 2.0, win_rate: 62, sample_years: 20 },\n    { month: 7, avg_return: -0.5, win_rate: 48, sample_years: 20 },\n    { month: 8, avg_return: -1.5, win_rate: 40, sample_years: 20 },\n    { month: 9, avg_return: -2.5, win_rate: 32, sample_years: 20 },\n    { month: 10, avg_return: 1.0, win_rate: 55, sample_years: 20 },\n    { month: 11, avg_return: -1.0, win_rate: 42, sample_years: 20 },\n    { month: 12, avg_return: 0.5, win_rate: 52, sample_years: 20 }\n  ],\n  NATGAS: [\n    { month: 1, avg_return: -5.0, win_rate: 30, sample_years: 20 },\n    { month: 2, avg_return: -3.0, win_rate: 35, sample_years: 20 },\n    { month: 3, avg_return: -4.0, win_rate: 32, sample_years: 20 },\n    { month: 4, avg_return: -2.0, win_rate: 38, sample_years: 20 },\n    { month: 5, avg_return: 1.5, win_rate: 55, sample_years: 20 },\n    { month: 6, avg_return: 3.0, win_rate: 65, sample_years: 20 },\n    { month: 7, avg_return: 2.0, win_rate: 60, sample_years: 20 },\n    { month: 8, avg_return: 1.5, win_rate: 58, sample_years: 20 },\n    { month: 9, avg_return: 3.5, win_rate: 68, sample_years: 20 },\n    { month: 10, avg_return: 5.0, win_rate: 75, sample_years: 20 },\n    { month: 11, avg_return: 2.0, win_rate: 60, sample_years: 20 },\n    { month: 12, avg_return: -1.0, win_rate: 42, sample_years: 20 }\n  ],\n  SPY: [\n    { month: 1, avg_return: 1.0, win_rate: 58, sample_years: 30 },\n    { month: 2, avg_return: 0.2, win_rate: 52, sample_years: 30 },\n    { month: 3, avg_return: 1.2, win_rate: 62, sample_years: 30 },\n    { month: 4, avg_return: 1.5, win_rate: 70, sample_years: 30 },\n    { month: 5, avg_return: 0.3, win_rate: 55, sample_years: 30 },\n    { month: 6, avg_return: 0.0, win_rate: 50, sample_years: 30 },\n    { month: 7, avg_return: 1.0, win_rate: 58, sample_years: 30 },\n    { month: 8, avg_return: -0.5, win_rate: 45, sample_years: 30 },\n    { month: 9, avg_return: -1.0, win_rate: 38, sample_years: 30 },\n    { month: 10, avg_return: 0.8, win_rate: 58, sample_years: 30 },\n    { month: 11, avg_return: 1.5, win_rate: 68, sample_years: 30 },\n    { month: 12, avg_return: 1.3, win_rate: 72, sample_years: 30 }\n  ],\n  BTC: [\n    { month: 1, avg_return: 5.0, win_rate: 60, sample_years: 10 },\n    { month: 2, avg_return: 8.0, win_rate: 65, sample_years: 10 },\n    { month: 3, avg_return: -2.0, win_rate: 40, sample_years: 10 },\n    { month: 4, avg_return: 10.0, win_rate: 70, sample_years: 10 },\n    { month: 5, avg_return: -5.0, win_rate: 35, sample_years: 10 },\n    { month: 6, avg_return: -3.0, win_rate: 38, sample_years: 10 },\n    { month: 7, avg_return: 8.0, win_rate: 65, sample_years: 10 },\n    { month: 8, avg_return: 2.0, win_rate: 55, sample_years: 10 },\n    { month: 9, avg_return: -5.0, win_rate: 30, sample_years: 10 },\n    { month: 10, avg_return: 15.0, win_rate: 80, sample_years: 10 },\n    { month: 11, avg_return: 20.0, win_rate: 78, sample_years: 10 },\n    { month: 12, avg_return: 5.0, win_rate: 60, sample_years: 10 }\n  ]\n};\n\nconst currentMonth = new Date().getMonth() + 1;\nconst results = [];\n\nfor (const [asset, months] of Object.entries(seasonality)) {\n  const current = months.find(m => m.month === currentMonth);\n  if (!current) continue;\n  \n  let bias = 'neutral';\n  if (current.avg_return > 1.5 && current.win_rate > 60) bias = 'bullish';\n  else if (current.avg_return < -1.5 && current.win_rate < 40) bias = 'bearish';\n  else if (current.avg_return > 0.5) bias = 'mildly_bull';\n  else if (current.avg_return < -0.5) bias = 'mildly_bear';\n  \n  results.push({\n    json: {\n      asset,\n      month: currentMonth,\n      avg_return: current.avg_return,\n      win_rate: current.win_rate,\n      sample_years: current.sample_years,\n      current_bias: bias\n    }\n  });\n}\n\nreturn results;"
+        },
+        "id": "code1",
+        "name": "Compute Seasonality",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          220,
+          0
+        ]
+      },
+      {
+        "parameters": {
+          "operation": "executeQuery",
+          "query": "INSERT INTO seasonality_signals (asset, month, avg_return, win_rate, sample_years, current_bias, updated_at) VALUES ($1, $2, $3, $4, $5, $6, NOW()) ON CONFLICT (asset, month) DO UPDATE SET avg_return = $3, win_rate = $4, current_bias = $6, updated_at = NOW();",
+          "options": {
+            "queryReplacement": "={{ [$json.asset, $json.month, $json.avg_return, $json.win_rate, $json.sample_years, $json.current_bias] }}"
+          }
+        },
+        "id": "pg1",
+        "name": "Upsert Seasonality",
+        "type": "n8n-nodes-base.postgres",
+        "typeVersion": 2.5,
+        "position": [
+          440,
+          0
+        ],
+        "credentials": {
+          "postgres": {
+            "id": "TradingPostgres1",
+            "name": "Trading Postgres"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "jsCode": "const items = $input.all();\nconst currentMonth = new Date().toLocaleString('en', { month: 'long' });\n\nconst strong = items.filter(i => i.json.current_bias === 'bullish' || i.json.current_bias === 'bearish');\nif (!strong.length) return [{ json: { skip: true } }];\n\nconst lines = strong.map(i => {\n  const j = i.json;\n  const arrow = j.avg_return > 0 ? '\\u25b2' : '\\u25bc';\n  const emoji = j.current_bias === 'bullish' ? '\\ud83d\\udfe2' : '\\ud83d\\udd34';\n  return `${emoji} *${j.asset}*: ${arrow} ${j.avg_return > 0 ? '+' : ''}${j.avg_return}% avg (${j.win_rate}% win, ${j.sample_years}yr)`;\n}).join('\\n');\n\nconst msg = `\\ud83d\\udcc5 *Seasonal Signals — ${currentMonth}*\\n\\n${lines}\\n\\n_Strong historical patterns (>60% win rate)_`;\nreturn [{ json: { message: msg, skip: false } }];"
+        },
+        "id": "code2",
+        "name": "Format Alert",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          660,
+          0
+        ]
+      },
+      {
+        "parameters": {
+          "conditions": {
+            "options": {
+              "caseSensitive": true,
+              "leftValue": "",
+              "typeValidation": "strict"
+            },
+            "conditions": [
+              {
+                "id": "has-signal",
+                "leftValue": "={{ $json.skip }}",
+                "rightValue": true,
+                "operator": {
+                  "type": "boolean",
+                  "operation": "false"
+                }
+              }
+            ]
+          }
+        },
+        "id": "if1",
+        "name": "Has Strong Signals?",
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 2.2,
+        "position": [
+          880,
+          0
+        ]
+      },
+      {
+        "parameters": {
+          "chatId": "804465999",
+          "text": "={{ $json.message }}",
+          "additionalFields": {
+            "parse_mode": "Markdown"
+          }
+        },
+        "id": "tg1",
+        "name": "Send Seasonal Alert",
+        "type": "n8n-nodes-base.telegram",
+        "typeVersion": 1.2,
+        "position": [
+          1100,
+          -50
+        ],
+        "credentials": {
+          "telegramApi": {
+            "id": "TradingTelegramBot",
+            "name": "Trading Bot"
+          }
+        },
+        "webhookId": "23fb40f8-e30d-46f5-bfac-07b0433560d4",
+        "disabled": true
+      }
+    ],
+    "connections": {
+      "Daily 07:30": {
+        "main": [
+          [
+            {
+              "node": "Compute Seasonality",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Compute Seasonality": {
+        "main": [
+          [
+            {
+              "node": "Upsert Seasonality",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Upsert Seasonality": {
+        "main": [
+          [
+            {
+              "node": "Format Alert",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Format Alert": {
+        "main": [
+          [
+            {
+              "node": "Has Strong Signals?",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Has Strong Signals?": {
+        "main": [
+          [
+            {
+              "node": "Send Seasonal Alert",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          []
+        ]
+      }
+    },
+    "authors": "Maksim Parve",
+    "name": null,
+    "description": null,
+    "autosaved": false,
+    "workflowPublishHistory": [
+      {
+        "createdAt": "2026-05-01T03:48:49.402Z",
+        "id": 937,
+        "workflowId": "owCznJaLTsTxRMfv",
+        "versionId": "29846472-6fd4-4144-bb6c-10faf4d4213e",
+        "event": "deactivated",
+        "userId": "3462e3d2-f46b-4d98-acea-93ac07713bf5"
+      },
+      {
+        "createdAt": "2026-05-01T03:48:49.414Z",
+        "id": 938,
+        "workflowId": "owCznJaLTsTxRMfv",
+        "versionId": "29846472-6fd4-4144-bb6c-10faf4d4213e",
+        "event": "activated",
+        "userId": "3462e3d2-f46b-4d98-acea-93ac07713bf5"
+      },
+      {
+        "createdAt": "2026-05-01T03:48:49.468Z",
+        "id": 939,
+        "workflowId": "owCznJaLTsTxRMfv",
+        "versionId": "29846472-6fd4-4144-bb6c-10faf4d4213e",
+        "event": "deactivated",
+        "userId": "3462e3d2-f46b-4d98-acea-93ac07713bf5"
+      },
+      {
+        "createdAt": "2026-05-01T03:48:49.609Z",
+        "id": 940,
+        "workflowId": "owCznJaLTsTxRMfv",
+        "versionId": "29846472-6fd4-4144-bb6c-10faf4d4213e",
+        "event": "activated",
+        "userId": "3462e3d2-f46b-4d98-acea-93ac07713bf5"
+      }
+    ]
+  }
+}

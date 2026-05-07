@@ -1,0 +1,874 @@
+{
+  "success": true,
+  "data": {
+    "updatedAt": "2026-05-05T06:45:20.635Z",
+    "createdAt": "2026-03-08T18:18:48.577Z",
+    "id": "EMUTtOI8BWLvDxn0",
+    "name": "SEO Audit",
+    "description": null,
+    "active": true,
+    "isArchived": false,
+    "nodes": [
+      {
+        "id": "schedule1",
+        "name": "Weekly Schedule",
+        "type": "n8n-nodes-base.scheduleTrigger",
+        "typeVersion": 1.3,
+        "position": [
+          200,
+          300
+        ],
+        "parameters": {
+          "rule": {
+            "interval": [
+              {
+                "field": "cronExpression",
+                "expression": "0 8 * * 1"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "id": "webhook_test",
+        "name": "TestTrigger",
+        "type": "n8n-nodes-base.webhook",
+        "typeVersion": 2,
+        "position": [
+          200,
+          500
+        ],
+        "parameters": {
+          "path": "deep-audit-test",
+          "httpMethod": "GET",
+          "responseMode": "lastNode",
+          "options": {}
+        },
+        "webhookId": "deep-audit-test"
+      },
+      {
+        "id": "daterange1",
+        "name": "Date Range",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          420,
+          300
+        ],
+        "parameters": {
+          "jsCode": "const now = DateTime.now();\nconst endDate = now.minus({ days: 2 });\nconst startDate = endDate.minus({ days: 6 });\nreturn [{ json: {\n  startDate: startDate.toFormat('yyyy-MM-dd'),\n  endDate: endDate.toFormat('yyyy-MM-dd')\n}}];"
+        }
+      },
+      {
+        "id": "gsc_queries",
+        "name": "GSC Queries",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.4,
+        "position": [
+          640,
+          300
+        ],
+        "parameters": {
+          "method": "POST",
+          "url": "https://www.googleapis.com/webmasters/v3/sites/sc-domain%3Astudiokook.ee/searchAnalytics/query",
+          "authentication": "predefinedCredentialType",
+          "nodeCredentialType": "googleApi",
+          "sendBody": true,
+          "specifyBody": "json",
+          "jsonBody": "={{ JSON.stringify({startDate: $('Date Range').item.json.startDate, endDate: $('Date Range').item.json.endDate, dimensions: ['query', 'page', 'device'], rowLimit: 500}) }}",
+          "options": {}
+        },
+        "credentials": {
+          "googleApi": {
+            "id": "LXXepEp1vyFTOExy",
+            "name": "Google SA (studiokook readonly)"
+          }
+        }
+      },
+      {
+        "id": "ga4_pages",
+        "name": "GA4 Pages",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.4,
+        "position": [
+          860,
+          300
+        ],
+        "parameters": {
+          "method": "POST",
+          "url": "https://analyticsdata.googleapis.com/v1beta/properties/441276059:runReport",
+          "authentication": "predefinedCredentialType",
+          "nodeCredentialType": "googleApi",
+          "sendBody": true,
+          "specifyBody": "json",
+          "jsonBody": "={{ JSON.stringify({dateRanges: [{startDate: $('Date Range').item.json.startDate, endDate: $('Date Range').item.json.endDate}], dimensions: [{name: 'pagePath'}], metrics: [{name: 'activeUsers'}, {name: 'sessions'}, {name: 'screenPageViews'}, {name: 'bounceRate'}, {name: 'averageSessionDuration'}, {name: 'conversions'}], limit: 100}) }}",
+          "options": {}
+        },
+        "credentials": {
+          "googleApi": {
+            "id": "LXXepEp1vyFTOExy",
+            "name": "Google SA (studiokook readonly)"
+          }
+        }
+      },
+      {
+        "id": "fetch_prev",
+        "name": "Fetch Previous Audit",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          1080,
+          300
+        ],
+        "parameters": {
+          "jsCode": "const url = $env.SUPABASE_URL;\nconst key = $env.SUPABASE_SERVICE_ROLE_KEY;\nif (!url || !key) return [{ json: { previousAudits: [], trendWeeks: 0 } }];\ntry {\n  const resp = await this.helpers.httpRequest({\n    method: 'GET',\n    url: url + '/rest/v1/audit_results?type=eq.seo&order=created_at.desc&limit=4',\n    headers: { 'apikey': key, 'Authorization': 'Bearer ' + key }\n  });\n  return [{ json: { previousAudits: resp || [], trendWeeks: (resp || []).length } }];\n} catch(e) {\n  return [{ json: { previousAudits: [], trendWeeks: 0, fetchError: e.message } }];\n}"
+        }
+      },
+      {
+        "id": "audit_pages",
+        "name": "Audit All Pages",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          1300,
+          300
+        ],
+        "parameters": {
+          "jsCode": "const gscData = $('GSC Queries').first().json;\nconst ga4Data = $('GA4 Pages').first().json;\n\nconst gscRows = (gscData.rows || []).map(r => ({\n  query: r.keys[0], page: r.keys[1], device: r.keys[2], clicks: r.clicks,\n  impressions: r.impressions, ctr: +(r.ctr * 100).toFixed(1),\n  position: +r.position.toFixed(1)\n}));\n\nconst ga4Rows = (ga4Data.rows || []).map(r => ({\n  page: r.dimensionValues[0].value,\n  users: +r.metricValues[0].value,\n  sessions: +r.metricValues[1].value,\n  pageviews: +r.metricValues[2].value,\n  bounce: +(+r.metricValues[3].value * 100).toFixed(1),\n  duration: Math.round(+r.metricValues[4].value),\n  conversions: +r.metricValues[5].value\n}));\n\nconst pages = [\n  { id: 8, url: '/', name: 'Home' },\n  { id: 21, url: '/koogid', name: 'Koogid' },\n  { id: 3133, url: '/koogid-eritellimusel', name: 'Custom Kitchens' },\n  { id: 2465, url: '/kontakt', name: 'Kontakt' },\n  { id: 6409, url: '/faq', name: 'FAQ' },\n  { id: 25, url: '/hinnaparing', name: 'Hinnaparing' },\n  { id: 5800, url: '/fassaadid', name: 'Fassaadid' },\n  { id: 2530, url: '/materjalid', name: 'Materjalid' },\n  { id: 2776, url: '/toopinnad', name: 'Toopinnad' },\n  { id: 3010, url: '/valmistamine', name: 'Valmistamine' },\n  { id: 2706, url: '/meie-furnituur', name: 'Furnituur' },\n  { id: 2619, url: '/sahtlid', name: 'Sahtlid' },\n  { id: 2651, url: '/nurgamehhanismid', name: 'Nurgamehhanismid' },\n  { id: 536, url: '/tostemehhanismid', name: 'Tostemehhanismid' },\n  { id: 2674, url: '/ladustamissusteemid', name: 'Ladustamissusteemid' },\n  { id: 6309, url: '/fassaadid/egger-fassaadid', name: 'Egger Fassaadid' },\n  { id: 5802, url: '/fassaadid/egger', name: 'Egger' },\n  { id: 5804, url: '/fassaadid/fenix', name: 'Fenix' },\n  { id: 6291, url: '/fassaadid/egger-kivi', name: 'Egger Kivi' },\n  { id: 6293, url: '/fassaadid/egger-puit', name: 'Egger Puit' },\n  { id: 6295, url: '/fassaadid/egger-monokroom', name: 'Egger Monokroom' },\n  { id: 2943, url: '/toopinnad/laminaadist-toopinnad', name: 'Laminaat' },\n  { id: 2951, url: '/toopinnad/kividest-toopinnad', name: 'Kivi Toopinnad' },\n  { id: 6335, url: '/toopinnad/hpl-tootasapinnad', name: 'HPL' },\n  { id: 0, url: '/blogi', name: 'Blogi' }\n];\n\nconst results = [];\nconst delay = ms => new Promise(r => setTimeout(r, ms));\n\nfor (const page of pages) {\n  let score = 0;\n  const issues = [];\n  const checks = {};\n\n  try {\n    const html = await this.helpers.httpRequest({ method: 'GET', url: 'https://studiokook.ee' + page.url, encoding: 'utf-8' });\n    const htmlSize = Buffer.byteLength(html, 'utf8');\n    checks.htmlSizeKB = Math.round(htmlSize / 1024);\n\n    const titleMatch = html.match(/<title[^>]*>([^<]+)<\\/title>/i);\n    const title = titleMatch ? titleMatch[1].trim() : '';\n    checks.title = title; checks.titleLength = title.length;\n    if (!title) issues.push('NO_TITLE');\n    else if (title.length < 25) { issues.push('TITLE_TOO_SHORT'); score += 4; }\n    else if (title.length > 60) { issues.push('TITLE_TOO_LONG'); score += 8; }\n    else score += 12;\n\n    const descMatch = html.match(/<meta[^>]*name=[\"']description[\"'][^>]*content=[\"']([^\"']*?)[\"']/i) || html.match(/<meta[^>]*content=[\"']([^\"']*?)[\"'][^>]*name=[\"']description[\"']/i);\n    const desc = descMatch ? descMatch[1].trim() : '';\n    checks.description = desc; checks.descLength = desc.length;\n    if (!desc) issues.push('NO_META_DESCRIPTION');\n    else if (desc.length < 80) { issues.push('DESC_TOO_SHORT'); score += 6; }\n    else if (desc.length > 160) { issues.push('DESC_TOO_LONG'); score += 8; }\n    else score += 12;\n\n    const h1s = html.match(/<h1[^>]*>[\\s\\S]*?<\\/h1>/gi) || [];\n    checks.h1Count = h1s.length;\n    if (h1s.length === 0) issues.push('NO_H1');\n    else if (h1s.length > 1) { issues.push('MULTIPLE_H1'); score += 4; }\n    else score += 8;\n\n    const h2s = html.match(/<h2[^>]*>[\\s\\S]*?<\\/h2>/gi) || [];\n    checks.h2Count = h2s.length;\n    if (h2s.length === 0) issues.push('NO_H2_HEADINGS');\n    else if (h2s.length < 2) score += 4;\n    else score += 8;\n\n    const imgs = html.match(/<img[^>]*>/gi) || [];\n    const realImgs = imgs.filter(i => !i.includes('data:image'));\n    const base64Imgs = imgs.filter(i => i.includes('data:image'));\n    checks.imgTotal = imgs.length; checks.imgReal = realImgs.length; checks.imgBase64 = base64Imgs.length;\n    let ma=0,md=0,mj=0;\n    for (const img of realImgs) {\n      if (!img.match(/alt=[\"'][^\"']+[\"']/)) ma++;\n      if (!img.includes('width=')) md++;\n      if (img.match(/\\.jpe?g[\"'?]/i) && !img.includes('srcset')) mj++;\n    }\n    checks.imgMissingAlt=ma; checks.imgMissingDim=md; checks.imgJpgNoWebp=mj;\n    let imgScore = 12;\n    if (ma>3) { imgScore-=4; issues.push('IMAGES_MISSING_ALT: '+ma); }\n    if (md>3) { imgScore-=3; issues.push('IMAGES_MISSING_DIMENSIONS: '+md); }\n    if (base64Imgs.length>10) { imgScore-=3; issues.push('EXCESSIVE_BASE64: '+base64Imgs.length); }\n    if (mj>5) { imgScore-=2; issues.push('JPG_WITHOUT_WEBP: '+mj); }\n    score += Math.max(0, imgScore);\n\n    const schemas = html.match(/<script[^>]*type=[\"']application\\/ld\\+json[\"'][^>]*>[\\s\\S]*?<\\/script>/gi) || [];\n    checks.schemaCount = schemas.length;\n    const schemaTypes = [];\n    for (const s of schemas) { try { const j = JSON.parse(s.replace(/<[^>]+>/g,'')); schemaTypes.push(j['@type']||(j['@graph']?'Graph':'?')); } catch{} }\n    checks.schemaTypes = schemaTypes;\n    if (!schemas.length) issues.push('NO_STRUCTURED_DATA');\n    else if (schemaTypes.includes('LocalBusiness')||schemaTypes.includes('FAQPage')) score+=8;\n    else score+=5;\n\n    if (htmlSize>500000) issues.push('HTML_TOO_LARGE: '+checks.htmlSizeKB+'KB');\n    else if (htmlSize>300000) { issues.push('HTML_LARGE: '+checks.htmlSizeKB+'KB'); score+=4; }\n    else score+=8;\n\n    const il = (html.match(/href=[\"']https?:\\/\\/studiokook\\.ee[^\"']*/gi)||[]).length + (html.match(/href=[\"']\\/[^\"']*/gi)||[]).length;\n    checks.internalLinks = il;\n    if (il<3) issues.push('FEW_INTERNAL_LINKS'); else score+=5;\n\n    checks.hasCanonical = !!html.match(/<link[^>]*rel=[\"']canonical[\"']/i);\n    if (!checks.hasCanonical) issues.push('NO_CANONICAL'); else score+=5;\n\n    const ogT=!!html.match(/<meta[^>]*property=[\"']og:title[\"']/i);\n    const ogD=!!html.match(/<meta[^>]*property=[\"']og:description[\"']/i);\n    const ogI=!!html.match(/<meta[^>]*property=[\"']og:image[\"']/i);\n    checks.hasOgTitle=ogT; checks.hasOgDesc=ogD; checks.hasOgImage=ogI;\n    if(!ogT||!ogD) issues.push('MISSING_OG_TAGS');\n    if(ogT&&ogD&&ogI) score+=5; else if(ogT||ogD) score+=2;\n\n    // Hreflang\n    const hTags = html.match(/<link[^>]*hreflang=[^>]*>/gi) || [];\n    const hMap = {};\n    for (const t of hTags) { const l=t.match(/hreflang=[\"']([^\"']+)[\"']/i); const h=t.match(/href=[\"']([^\"']+)[\"']/i); if(l&&h) hMap[l[1]]=h[1]; }\n    const missing = ['x-default','et','ru','en','fi'].filter(l=>!hMap[l]);\n    checks.hreflang=hMap; checks.missingHreflang=missing;\n    if(missing.length) issues.push('MISSING_HREFLANG: '+missing.join(',')); else score+=5;\n\n    // Translation: lightweight HEAD-only check\n    const tr = { et: 200 };\n    for (const lang of ['ru','en','fi']) {\n      const u = page.url==='/' ? 'https://studiokook.ee/'+lang+'/' : 'https://studiokook.ee/'+lang+page.url;\n      try { await this.helpers.httpRequest({ method:'HEAD', url:u }); tr[lang]=200; } catch(e) { tr[lang]=e.message.includes('404')?404:0; }\n    }\n    checks.translations=tr;\n    const tc = Object.values(tr).filter(s=>s===200).length;\n    checks.translationCoverage = Math.round((tc/4)*100);\n    if(tc<4) issues.push('MISSING_TRANSLATIONS: '+Object.entries(tr).filter(([,s])=>s!==200).map(([l])=>l).join(','));\n    else score+=5;\n\n    const pageGsc = gscRows.filter(r => { const u=r.page||''; if(page.url==='/') return u.match(/studiokook\\.ee\\/?([?#].*)?$/); return u.includes('studiokook.ee'+page.url); }).sort((a,b)=>b.impressions-a.impressions).slice(0,5);\n    const pageGa4 = ga4Rows.find(r => { if(page.url==='/') return r.page==='/'||r.page===''; return r.page===page.url||r.page===page.url+'/'; }) || {users:0,sessions:0,pageviews:0,bounce:0,duration:0,conversions:0};\n\n    results.push({ page_id:page.id, url:page.url, name:page.name, score:Math.min(100,score), issues, checks, currentSeo:{title,description:desc}, gscQueries:pageGsc, ga4Metrics:pageGa4 });\n    // Free memory\n  } catch(e) {\n    const st = (e.message.includes('301')||e.message.includes('302')) ? 'redirect' : 'error';\n    results.push({ page_id:page.id, url:page.url, name:page.name, score:0, issues:[st==='redirect'?'REDIRECT':'FETCH_ERROR: '+e.message.slice(0,60)], checks:{}, currentSeo:{}, gscQueries:[], ga4Metrics:{}, status:st });\n  }\n  await delay(200);\n}\n\nconst active = results.filter(r=>r.status!=='redirect'&&r.status!=='error');\nconst avgScore = active.length ? Math.round(active.reduce((s,r)=>s+r.score,0)/active.length) : 0;\nconst totalIssues = results.reduce((s,r)=>s+r.issues.length,0);\n\nreturn [{ json: { date: DateTime.now().toFormat('yyyy-MM-dd'), avgScore, totalIssues, pageCount: pages.length, results, worst: [...active].sort((a,b)=>a.score-b.score).slice(0,5).map(w=>w.name+' ('+w.score+')'), best: [...active].sort((a,b)=>b.score-a.score).slice(0,5).map(b=>b.name+' ('+b.score+')') } }];"
+        }
+      },
+      {
+        "id": "cwv_fetch",
+        "name": "CWV Fetch",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          1520,
+          300
+        ],
+        "parameters": {
+          "jsCode": "const audit = $('Audit All Pages').first().json;\nconst pages = (audit.results || []).filter(r => r.status !== 'redirect' && r.status !== 'error').slice(0, 8);\nconst cwvResults = [];\nconst delay = ms => new Promise(r => setTimeout(r, ms));\n\nfor (const page of pages) {\n  const fullUrl = 'https://studiokook.ee' + page.url;\n  const pageResult = { url: page.url, name: page.name, mobile: null, desktop: null };\n\n  try {\n    const apiUrl = 'https://www.googleapis.com/pagespeedonline/v5/runPagespeed?url=' + encodeURIComponent(fullUrl) + '&strategy=mobile&category=performance';\n    const resp = await this.helpers.httpRequest({ method: 'GET', url: apiUrl });\n    const audits = resp.lighthouseResult?.audits || {};\n    pageResult.mobile = {\n      performanceScore: Math.round((resp.lighthouseResult?.categories?.performance?.score || 0) * 100),\n      lcp: audits['largest-contentful-paint']?.numericValue || null,\n      cls: audits['cumulative-layout-shift']?.numericValue || null,\n      tbt: audits['total-blocking-time']?.numericValue || null,\n      fcp: audits['first-contentful-paint']?.numericValue || null\n    };\n  } catch(e) {\n    if (e.message.includes('429')) {\n      await delay(15000);\n      try {\n        const apiUrl = 'https://www.googleapis.com/pagespeedonline/v5/runPagespeed?url=' + encodeURIComponent(fullUrl) + '&strategy=mobile&category=performance';\n        const resp = await this.helpers.httpRequest({ method: 'GET', url: apiUrl });\n        const audits = resp.lighthouseResult?.audits || {};\n        pageResult.mobile = {\n          performanceScore: Math.round((resp.lighthouseResult?.categories?.performance?.score || 0) * 100),\n          lcp: audits['largest-contentful-paint']?.numericValue || null,\n          cls: audits['cumulative-layout-shift']?.numericValue || null,\n          tbt: audits['total-blocking-time']?.numericValue || null,\n          fcp: audits['first-contentful-paint']?.numericValue || null\n        };\n      } catch(e2) { pageResult.mobile = { error: e2.message.slice(0, 80) }; }\n    } else {\n      pageResult.mobile = { error: e.message.slice(0, 80) };\n    }\n  }\n  cwvResults.push(pageResult);\n  await delay(3000);\n}\n\nreturn [{ json: { cwvResults } }];"
+        }
+      },
+      {
+        "id": "merge_data",
+        "name": "Merge Audit Data",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          1740,
+          300
+        ],
+        "parameters": {
+          "jsCode": "const audit = $('Audit All Pages').first().json;\nconst cwv = $('CWV Fetch').first().json;\nconst previous = $('Fetch Previous Audit').first().json;\n\nfor (const result of audit.results) {\n  if (result.status === 'redirect' || result.status === 'error') continue;\n  const cwvPage = (cwv.cwvResults || []).find(c => c.url === result.url);\n  result.cwv = cwvPage || { mobile: null, desktop: null };\n  if (cwvPage?.mobile && !cwvPage.mobile.error) {\n    const lcp = cwvPage.mobile.lcp;\n    const cls = cwvPage.mobile.cls;\n    if (lcp && lcp > 2500) { result.issues.push('LCP_SLOW: ' + Math.round(lcp) + 'ms'); result.score = Math.max(0, result.score - 5); }\n    if (cls && cls > 0.1) { result.issues.push('CLS_HIGH: ' + cls.toFixed(3)); result.score = Math.max(0, result.score - 3); }\n    if (lcp && lcp <= 2500 && cls !== null && cls <= 0.1) result.score = Math.min(100, result.score + 7);\n  }\n}\n\nconst prevAudit = (previous.previousAudits || [])[0];\nlet trends = null;\nif (prevAudit) {\n  const prevResults = prevAudit.results || [];\n  const prevByUrl = {};\n  for (const pr of prevResults) prevByUrl[pr.url] = pr;\n  const active = audit.results.filter(r => r.status !== 'redirect' && r.status !== 'error');\n  const activeAvg = active.length ? Math.round(active.reduce((s, r) => s + r.score, 0) / active.length) : 0;\n  trends = {\n    prevDate: prevAudit.date, prevAvgScore: prevAudit.avg_score,\n    scoreDelta: activeAvg - (prevAudit.avg_score || 0),\n    issuesDelta: audit.totalIssues - (prevAudit.total_issues || 0),\n    pageChanges: []\n  };\n  for (const result of audit.results) {\n    const prev = prevByUrl[result.url];\n    if (prev) {\n      result.prevScore = prev.score;\n      result.scoreDelta = result.score - prev.score;\n      result.newIssues = result.issues.filter(i => !(prev.issues || []).includes(i));\n      result.resolvedIssues = (prev.issues || []).filter(i => !result.issues.includes(i));\n      if (Math.abs(result.scoreDelta) >= 5) trends.pageChanges.push({ name: result.name, url: result.url, from: prev.score, to: result.score, delta: result.scoreDelta });\n    } else {\n      result.prevScore = null; result.scoreDelta = null;\n      result.newIssues = result.issues; result.resolvedIssues = [];\n    }\n  }\n}\n\nconst active = audit.results.filter(r => r.status !== 'redirect' && r.status !== 'error');\nconst avgScore = active.length ? Math.round(active.reduce((s, r) => s + r.score, 0) / active.length) : 0;\nconst totalIssues = audit.results.reduce((s, r) => s + r.issues.length, 0);\nconst cwvValid = (cwv.cwvResults || []).filter(c => c.mobile && !c.mobile.error);\n\nreturn [{ json: {\n  ...audit, avgScore, totalIssues,\n  cwvSummary: {\n    avgMobileLCP: cwvValid.length ? Math.round(cwvValid.reduce((s, c) => s + (c.mobile?.lcp || 0), 0) / cwvValid.length) : null,\n    avgMobileCLS: cwvValid.length ? +(cwvValid.reduce((s, c) => s + (c.mobile?.cls || 0), 0) / cwvValid.length).toFixed(3) : null,\n    pagesWithSlowLCP: cwvValid.filter(c => c.mobile?.lcp > 2500).length,\n    pagesWithHighCLS: cwvValid.filter(c => c.mobile?.cls > 0.1).length,\n    pagesChecked: cwvValid.length,\n    elapsed: cwv.elapsed\n  },\n  trends,\n  previousWeeks: (previous.previousAudits || []).map(a => ({ date: a.date, avgScore: a.avg_score, issues: a.total_issues }))\n}}];"
+        }
+      },
+      {
+        "id": "claude_analysis",
+        "name": "Claude Analysis",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          1960,
+          300
+        ],
+        "parameters": {
+          "jsCode": "const data = $input.first().json;\nconst apiKey = $env.ANTHROPIC_API_KEY;\nif (!apiKey) return [{ json: { ...data, recommendations: 'ERROR: API key not set' } }];\n\nconst resultsForClaude = data.results.filter(r => r.status !== 'redirect').map(r => ({\n  url: r.url, name: r.name, score: r.score, prevScore: r.prevScore, scoreDelta: r.scoreDelta,\n  issues: r.issues, translationCoverage: r.checks?.translationCoverage,\n  gscTop: (r.gscQueries || []).slice(0, 5).map(q => ({ query: q.query, clicks: q.clicks, impressions: q.impressions, ctr: q.ctr, position: q.position, device: q.device })),\n  ga4: r.ga4Metrics ? { users: r.ga4Metrics.users, bounce: r.ga4Metrics.bounce } : null,\n  cwvMobile: r.cwv?.mobile ? { lcp: r.cwv.mobile.lcp, cls: r.cwv.mobile.cls, perf: r.cwv.mobile.performanceScore } : null\n}));\n\nconst prompt = `You are an SEO auditor for studiokook.ee (custom kitchen furniture, Tallinn, Estonia). Languages: ET, RU, EN, FI.\n\nAudit: ${data.pageCount} pages, avg score ${data.avgScore}/100, ${data.totalIssues} issues.\n\n## CWV Summary\nAvg Mobile LCP: ${data.cwvSummary?.avgMobileLCP || 'N/A'}ms | CLS: ${data.cwvSummary?.avgMobileCLS || 'N/A'}\nSlow LCP pages: ${data.cwvSummary?.pagesWithSlowLCP || 0} | High CLS: ${data.cwvSummary?.pagesWithHighCLS || 0}\n\n## Trends\n${data.trends ? 'Previous: ' + data.trends.prevDate + ', score ' + data.trends.prevAvgScore + '. Delta: ' + (data.trends.scoreDelta > 0 ? '+' : '') + data.trends.scoreDelta + '. Changes: ' + JSON.stringify(data.trends.pageChanges) : 'No previous data'}\n\n## Per-Page Data\n${JSON.stringify(resultsForClaude, null, 1)}\n\n## Task\n1. Cross-reference SEO issues with traffic/CWV data\n2. Pages with high impressions but low CTR = meta optimization\n3. Pages with slow LCP = performance priority\n4. Translation gaps affecting international SEO\n5. TOP 5 PRIORITY recommendations (most impactful first)\n6. Compare with previous week — highlight improvements/regressions\n7. Patterns across pages\n\nRules: RUSSIAN, specific (page+fix+impact), reference metrics, max 500 words, plain text`;\n\nconst response = await this.helpers.httpRequest({\n  method: 'POST', url: 'https://api.anthropic.com/v1/messages',\n  headers: { 'x-api-key': apiKey, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },\n  body: { model: 'claude-sonnet-4-20250514', max_tokens: 3000, messages: [{ role: 'user', content: prompt }] }\n});\n\nreturn [{ json: { ...data, recommendations: response.content[0].text } }];"
+        }
+      },
+      {
+        "id": "save_supabase",
+        "name": "Save to Supabase",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          2180,
+          300
+        ],
+        "parameters": {
+          "jsCode": "const audit = $input.first().json;\nconst url = $env.SUPABASE_URL;\nconst key = $env.SUPABASE_SERVICE_ROLE_KEY;\nif (!url || !key) return [{ json: { ...audit, supabaseError: 'SUPABASE_URL or KEY not set' } }];\n\ntry {\n  const resp = await this.helpers.httpRequest({\n    method: 'POST', url: url + '/rest/v1/audit_results',\n    headers: { 'apikey': key, 'Authorization': 'Bearer ' + key, 'Content-Type': 'application/json', 'Prefer': 'return=representation,resolution=merge-duplicates' },\n    body: { type: 'seo', date: audit.date, avg_score: audit.avgScore, total_issues: audit.totalIssues, page_count: audit.pageCount, results: audit.results, recommendations: audit.recommendations || '' }\n  });\n  audit.supabaseId = resp[0]?.id || 'saved';\n} catch(e) { audit.supabaseError = e.message.slice(0, 200); }\n\ntry {\n  const pageScoreRows = audit.results.filter(r => r.status !== 'redirect' && r.status !== 'error').map(r => ({\n    audit_type: 'seo', date: audit.date, page_url: r.url, page_name: r.name, score: r.score,\n    issue_count: r.issues.length,\n    cwv_lcp_mobile: r.cwv?.mobile?.lcp || null, cwv_cls_mobile: r.cwv?.mobile?.cls || null,\n    cwv_perf_mobile: r.cwv?.mobile?.performanceScore || null,\n    translation_coverage: r.checks?.translationCoverage || null,\n    hreflang_ok: (r.checks?.missingHreflang || []).length === 0\n  }));\n  await this.helpers.httpRequest({\n    method: 'POST', url: url + '/rest/v1/audit_page_scores',\n    headers: { 'apikey': key, 'Authorization': 'Bearer ' + key, 'Content-Type': 'application/json', 'Prefer': 'resolution=merge-duplicates' },\n    body: pageScoreRows\n  });\n} catch(e) { /* non-fatal */ }\n\nreturn [{ json: audit }];"
+        }
+      },
+      {
+        "id": "format_report",
+        "name": "Format Report",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          2400,
+          300
+        ],
+        "parameters": {
+          "jsCode": "const data = $input.first().json;\nconst results = (data.results || []).filter(r => r.status !== 'redirect' && r.status !== 'error');\n\nlet md = '---\\ntype: seo-audit\\ndate: ' + data.date + '\\navgScore: ' + data.avgScore + '\\ntotalIssues: ' + data.totalIssues + '\\npageCount: ' + data.pageCount + '\\n---\\n\\n';\nmd += '# SEO Audit: ' + data.date + '\\n\\n';\nmd += '## Summary\\n\\n';\nmd += '| Metric | Value |\\n|--------|-------|\\n';\nmd += '| Score | **' + data.avgScore + '/100** |\\n';\nmd += '| Pages | ' + data.pageCount + ' |\\n';\nmd += '| Issues | ' + data.totalIssues + ' |\\n';\n\nif (data.trends) {\n  md += '| Prev Score | ' + data.trends.prevAvgScore + ' (' + (data.trends.scoreDelta >= 0 ? '+' : '') + data.trends.scoreDelta + ') |\\n';\n}\n\nif (data.cwvSummary && data.cwvSummary.avgMobileLCP) {\n  md += '| Avg LCP | ' + (data.cwvSummary.avgMobileLCP / 1000).toFixed(1) + 's |\\n';\n  md += '| Avg CLS | ' + data.cwvSummary.avgMobileCLS + ' |\\n';\n  md += '| Slow LCP pages | ' + data.cwvSummary.pagesWithSlowLCP + ' |\\n';\n}\n\nconst translated = results.filter(r => r.checks?.translationCoverage === 100).length;\nmd += '| Translations | ' + translated + '/' + results.length + ' (' + Math.round(translated/results.length*100) + '%) |\\n';\nmd += '\\n';\n\n// Trends\nif (data.trends?.pageChanges?.length) {\n  md += '## Changes vs Previous Week\\n\\n';\n  const improved = data.trends.pageChanges.filter(c => c.delta > 0);\n  const degraded = data.trends.pageChanges.filter(c => c.delta < 0);\n  if (improved.length) { md += '**Improved:**\\n'; improved.forEach(c => md += '- ' + c.name + ': ' + c.from + ' -> ' + c.to + ' (+' + c.delta + ')\\n'); md += '\\n'; }\n  if (degraded.length) { md += '**Degraded:**\\n'; degraded.forEach(c => md += '- ' + c.name + ': ' + c.from + ' -> ' + c.to + ' (' + c.delta + ')\\n'); md += '\\n'; }\n}\n\nif (data.previousWeeks?.length) {\n  md += '## Score History\\n\\n';\n  md += '| Date | Score | Issues |\\n|------|-------|--------|\\n';\n  md += '| ' + data.date + ' | **' + data.avgScore + '** | ' + data.totalIssues + ' |\\n';\n  data.previousWeeks.forEach(w => md += '| ' + w.date + ' | ' + w.avgScore + ' | ' + (w.issues || '-') + ' |\\n');\n  md += '\\n';\n}\n\n// Scoreboard\nmd += '## Scoreboard\\n\\n';\nmd += '| Page | Score | Issues | Users | Translations |\\n|------|-------|--------|-------|-------------|\\n';\nresults.sort((a, b) => a.score - b.score);\nfor (const r of results) {\n  const delta = (r.scoreDelta !== null && r.scoreDelta !== undefined) ? ' (' + (r.scoreDelta >= 0 ? '+' : '') + r.scoreDelta + ')' : '';\n  const emoji = r.score >= 80 ? '\\u2705' : r.score >= 60 ? '\\u26A0\\uFE0F' : '\\u274C';\n  md += '| ' + emoji + ' ' + r.name + ' | ' + r.score + delta + ' | ' + r.issues.length + ' | ' + (r.ga4Metrics?.users || 0) + ' | ' + (r.checks?.translationCoverage || 0) + '% |\\n';\n}\nmd += '\\n';\n\n// Issues per page\nmd += '## Issues Detail\\n\\n';\nfor (const r of results) {\n  if (r.issues.length === 0) continue;\n  md += '### ' + r.name + ' (' + r.url + ') — ' + r.score + '/100\\n\\n';\n  r.issues.forEach(i => md += '- ' + i + '\\n');\n  if (r.cwv?.mobile && !r.cwv.mobile.error) {\n    md += '- CWV: LCP=' + Math.round(r.cwv.mobile.lcp) + 'ms, CLS=' + (r.cwv.mobile.cls?.toFixed(3) || 'N/A') + ', Perf=' + r.cwv.mobile.performanceScore + '\\n';\n  }\n  if (r.gscQueries?.length) {\n    md += '\\n**Top GSC queries:**\\n';\n    r.gscQueries.slice(0, 3).forEach(q => md += '- \"' + q.query + '\" — pos ' + q.position + ', ' + q.impressions + ' imp, ' + q.ctr + '% CTR\\n');\n  }\n  md += '\\n';\n}\n\n// Recommendations\nmd += '## Recommendations\\n\\n';\nmd += (data.recommendations || 'No analysis available') + '\\n';\n\n// Short Telegram summary\nlet tg = '\\uD83D\\uDD0D SEO Audit: ' + data.date + '\\n';\ntg += 'Score: ' + data.avgScore + '/100';\nif (data.trends) tg += ' (' + (data.trends.scoreDelta >= 0 ? '+' : '') + data.trends.scoreDelta + ')';\ntg += '\\nPages: ' + data.pageCount + ' | Issues: ' + data.totalIssues;\nif (data.cwvSummary?.avgMobileLCP) tg += '\\nCWV: LCP ' + (data.cwvSummary.avgMobileLCP/1000).toFixed(1) + 's | CLS ' + data.cwvSummary.avgMobileCLS;\ntg += '\\nTranslations: ' + translated + '/' + results.length + ' (' + Math.round(translated/results.length*100) + '%)';\ntg += '\\n\\nWorst: ' + results.slice(0, 3).map(r => r.name + ' ' + r.score).join(', ');\ntg += '\\nBest: ' + results.slice(-3).reverse().map(r => r.name + ' ' + r.score).join(', ');\ntg += '\\n\\nFull report attached as .md file';\n\nreturn [{ json: { markdown: md, telegramCaption: tg, filename: 'seo-audit-' + data.date + '.md' } }];"
+        }
+      },
+      {
+        "id": "write_binary",
+        "name": "Create MD File",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          2620,
+          300
+        ],
+        "parameters": {
+          "jsCode": "const data = $input.first().json;\nconst md = data.markdown;\nconst filename = data.filename;\nconst caption = data.telegramCaption;\n\n// Create binary data from markdown string\nconst binaryData = await this.helpers.prepareBinaryData(\n  Buffer.from(md, 'utf-8'),\n  filename,\n  'text/markdown'\n);\n\nreturn [{ json: { caption }, binary: { data: binaryData } }];"
+        }
+      },
+      {
+        "id": "tg_send_doc",
+        "name": "Telegram Report",
+        "type": "n8n-nodes-base.telegram",
+        "typeVersion": 1.2,
+        "position": [
+          2840,
+          300
+        ],
+        "parameters": {
+          "operation": "sendDocument",
+          "chatId": "804465999",
+          "binaryData": true,
+          "binaryPropertyName": "data",
+          "additionalFields": {
+            "caption": "={{ $json.caption }}",
+            "appendAttribution": false
+          }
+        },
+        "credentials": {
+          "telegramApi": {
+            "id": "mxbg2RUQv7Widfws",
+            "name": "General"
+          }
+        },
+        "webhookId": "29cff534-ffb3-423d-8b5c-ecc5f39ea11f",
+        "disabled": true
+      }
+    ],
+    "connections": {
+      "Weekly Schedule": {
+        "main": [
+          [
+            {
+              "node": "Date Range",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "TestTrigger": {
+        "main": [
+          [
+            {
+              "node": "Date Range",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Date Range": {
+        "main": [
+          [
+            {
+              "node": "GSC Queries",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "GSC Queries": {
+        "main": [
+          [
+            {
+              "node": "GA4 Pages",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "GA4 Pages": {
+        "main": [
+          [
+            {
+              "node": "Fetch Previous Audit",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Fetch Previous Audit": {
+        "main": [
+          [
+            {
+              "node": "Audit All Pages",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Audit All Pages": {
+        "main": [
+          [
+            {
+              "node": "CWV Fetch",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "CWV Fetch": {
+        "main": [
+          [
+            {
+              "node": "Merge Audit Data",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Merge Audit Data": {
+        "main": [
+          [
+            {
+              "node": "Claude Analysis",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Claude Analysis": {
+        "main": [
+          [
+            {
+              "node": "Save to Supabase",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Save to Supabase": {
+        "main": [
+          [
+            {
+              "node": "Format Report",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Format Report": {
+        "main": [
+          [
+            {
+              "node": "Create MD File",
+              "type": "0",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Create MD File": {
+        "main": [
+          [
+            {
+              "node": "Telegram Report",
+              "type": "0",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "settings": {
+      "executionOrder": "v1",
+      "timezone": "Europe/Tallinn",
+      "saveDataErrorExecution": "all",
+      "saveDataSuccessExecution": "all",
+      "callerPolicy": "workflowsFromSameOwner",
+      "availableInMCP": false,
+      "errorWorkflow": "mzrUOgpYW8OVSWGl"
+    },
+    "staticData": {
+      "node:Weekly Schedule": {
+        "recurrenceRules": []
+      }
+    },
+    "meta": null,
+    "pinData": null,
+    "versionId": "9c60f10e-7909-45bc-b5a7-d4f77d3d4cc0",
+    "activeVersionId": "9c60f10e-7909-45bc-b5a7-d4f77d3d4cc0",
+    "versionCounter": 178,
+    "triggerCount": 2,
+    "shared": [
+      {
+        "updatedAt": "2026-03-08T18:18:48.577Z",
+        "createdAt": "2026-03-08T18:18:48.577Z",
+        "role": "workflow:owner",
+        "workflowId": "EMUTtOI8BWLvDxn0",
+        "projectId": "PufDuNtXpreUjA3o",
+        "project": {
+          "updatedAt": "2025-12-05T21:25:37.247Z",
+          "createdAt": "2025-11-04T19:43:55.674Z",
+          "id": "PufDuNtXpreUjA3o",
+          "name": "Maksim Parve <maksim@studiokook.ee>",
+          "type": "personal",
+          "icon": null,
+          "description": null,
+          "creatorId": "3462e3d2-f46b-4d98-acea-93ac07713bf5"
+        }
+      }
+    ],
+    "tags": [],
+    "activeVersion": {
+      "updatedAt": "2026-05-01T03:48:47.583Z",
+      "createdAt": "2026-05-01T03:48:47.583Z",
+      "versionId": "9c60f10e-7909-45bc-b5a7-d4f77d3d4cc0",
+      "workflowId": "EMUTtOI8BWLvDxn0",
+      "nodes": [
+        {
+          "id": "schedule1",
+          "name": "Weekly Schedule",
+          "type": "n8n-nodes-base.scheduleTrigger",
+          "typeVersion": 1.3,
+          "position": [
+            200,
+            300
+          ],
+          "parameters": {
+            "rule": {
+              "interval": [
+                {
+                  "field": "cronExpression",
+                  "expression": "0 8 * * 1"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "id": "webhook_test",
+          "name": "TestTrigger",
+          "type": "n8n-nodes-base.webhook",
+          "typeVersion": 2,
+          "position": [
+            200,
+            500
+          ],
+          "parameters": {
+            "path": "deep-audit-test",
+            "httpMethod": "GET",
+            "responseMode": "lastNode",
+            "options": {}
+          },
+          "webhookId": "deep-audit-test"
+        },
+        {
+          "id": "daterange1",
+          "name": "Date Range",
+          "type": "n8n-nodes-base.code",
+          "typeVersion": 2,
+          "position": [
+            420,
+            300
+          ],
+          "parameters": {
+            "jsCode": "const now = DateTime.now();\nconst endDate = now.minus({ days: 2 });\nconst startDate = endDate.minus({ days: 6 });\nreturn [{ json: {\n  startDate: startDate.toFormat('yyyy-MM-dd'),\n  endDate: endDate.toFormat('yyyy-MM-dd')\n}}];"
+          }
+        },
+        {
+          "id": "gsc_queries",
+          "name": "GSC Queries",
+          "type": "n8n-nodes-base.httpRequest",
+          "typeVersion": 4.4,
+          "position": [
+            640,
+            300
+          ],
+          "parameters": {
+            "method": "POST",
+            "url": "https://www.googleapis.com/webmasters/v3/sites/sc-domain%3Astudiokook.ee/searchAnalytics/query",
+            "authentication": "predefinedCredentialType",
+            "nodeCredentialType": "googleApi",
+            "sendBody": true,
+            "specifyBody": "json",
+            "jsonBody": "={{ JSON.stringify({startDate: $('Date Range').item.json.startDate, endDate: $('Date Range').item.json.endDate, dimensions: ['query', 'page', 'device'], rowLimit: 500}) }}",
+            "options": {}
+          },
+          "credentials": {
+            "googleApi": {
+              "id": "LXXepEp1vyFTOExy",
+              "name": "Google SA (studiokook readonly)"
+            }
+          }
+        },
+        {
+          "id": "ga4_pages",
+          "name": "GA4 Pages",
+          "type": "n8n-nodes-base.httpRequest",
+          "typeVersion": 4.4,
+          "position": [
+            860,
+            300
+          ],
+          "parameters": {
+            "method": "POST",
+            "url": "https://analyticsdata.googleapis.com/v1beta/properties/441276059:runReport",
+            "authentication": "predefinedCredentialType",
+            "nodeCredentialType": "googleApi",
+            "sendBody": true,
+            "specifyBody": "json",
+            "jsonBody": "={{ JSON.stringify({dateRanges: [{startDate: $('Date Range').item.json.startDate, endDate: $('Date Range').item.json.endDate}], dimensions: [{name: 'pagePath'}], metrics: [{name: 'activeUsers'}, {name: 'sessions'}, {name: 'screenPageViews'}, {name: 'bounceRate'}, {name: 'averageSessionDuration'}, {name: 'conversions'}], limit: 100}) }}",
+            "options": {}
+          },
+          "credentials": {
+            "googleApi": {
+              "id": "LXXepEp1vyFTOExy",
+              "name": "Google SA (studiokook readonly)"
+            }
+          }
+        },
+        {
+          "id": "fetch_prev",
+          "name": "Fetch Previous Audit",
+          "type": "n8n-nodes-base.code",
+          "typeVersion": 2,
+          "position": [
+            1080,
+            300
+          ],
+          "parameters": {
+            "jsCode": "const url = $env.SUPABASE_URL;\nconst key = $env.SUPABASE_SERVICE_ROLE_KEY;\nif (!url || !key) return [{ json: { previousAudits: [], trendWeeks: 0 } }];\ntry {\n  const resp = await this.helpers.httpRequest({\n    method: 'GET',\n    url: url + '/rest/v1/audit_results?type=eq.seo&order=created_at.desc&limit=4',\n    headers: { 'apikey': key, 'Authorization': 'Bearer ' + key }\n  });\n  return [{ json: { previousAudits: resp || [], trendWeeks: (resp || []).length } }];\n} catch(e) {\n  return [{ json: { previousAudits: [], trendWeeks: 0, fetchError: e.message } }];\n}"
+          }
+        },
+        {
+          "id": "audit_pages",
+          "name": "Audit All Pages",
+          "type": "n8n-nodes-base.code",
+          "typeVersion": 2,
+          "position": [
+            1300,
+            300
+          ],
+          "parameters": {
+            "jsCode": "const gscData = $('GSC Queries').first().json;\nconst ga4Data = $('GA4 Pages').first().json;\n\nconst gscRows = (gscData.rows || []).map(r => ({\n  query: r.keys[0], page: r.keys[1], device: r.keys[2], clicks: r.clicks,\n  impressions: r.impressions, ctr: +(r.ctr * 100).toFixed(1),\n  position: +r.position.toFixed(1)\n}));\n\nconst ga4Rows = (ga4Data.rows || []).map(r => ({\n  page: r.dimensionValues[0].value,\n  users: +r.metricValues[0].value,\n  sessions: +r.metricValues[1].value,\n  pageviews: +r.metricValues[2].value,\n  bounce: +(+r.metricValues[3].value * 100).toFixed(1),\n  duration: Math.round(+r.metricValues[4].value),\n  conversions: +r.metricValues[5].value\n}));\n\nconst pages = [\n  { id: 8, url: '/', name: 'Home' },\n  { id: 21, url: '/koogid', name: 'Koogid' },\n  { id: 3133, url: '/koogid-eritellimusel', name: 'Custom Kitchens' },\n  { id: 2465, url: '/kontakt', name: 'Kontakt' },\n  { id: 6409, url: '/faq', name: 'FAQ' },\n  { id: 25, url: '/hinnaparing', name: 'Hinnaparing' },\n  { id: 5800, url: '/fassaadid', name: 'Fassaadid' },\n  { id: 2530, url: '/materjalid', name: 'Materjalid' },\n  { id: 2776, url: '/toopinnad', name: 'Toopinnad' },\n  { id: 3010, url: '/valmistamine', name: 'Valmistamine' },\n  { id: 2706, url: '/meie-furnituur', name: 'Furnituur' },\n  { id: 2619, url: '/sahtlid', name: 'Sahtlid' },\n  { id: 2651, url: '/nurgamehhanismid', name: 'Nurgamehhanismid' },\n  { id: 536, url: '/tostemehhanismid', name: 'Tostemehhanismid' },\n  { id: 2674, url: '/ladustamissusteemid', name: 'Ladustamissusteemid' },\n  { id: 6309, url: '/fassaadid/egger-fassaadid', name: 'Egger Fassaadid' },\n  { id: 5802, url: '/fassaadid/egger', name: 'Egger' },\n  { id: 5804, url: '/fassaadid/fenix', name: 'Fenix' },\n  { id: 6291, url: '/fassaadid/egger-kivi', name: 'Egger Kivi' },\n  { id: 6293, url: '/fassaadid/egger-puit', name: 'Egger Puit' },\n  { id: 6295, url: '/fassaadid/egger-monokroom', name: 'Egger Monokroom' },\n  { id: 2943, url: '/toopinnad/laminaadist-toopinnad', name: 'Laminaat' },\n  { id: 2951, url: '/toopinnad/kividest-toopinnad', name: 'Kivi Toopinnad' },\n  { id: 6335, url: '/toopinnad/hpl-tootasapinnad', name: 'HPL' },\n  { id: 0, url: '/blogi', name: 'Blogi' }\n];\n\nconst results = [];\nconst delay = ms => new Promise(r => setTimeout(r, ms));\n\nfor (const page of pages) {\n  let score = 0;\n  const issues = [];\n  const checks = {};\n\n  try {\n    const html = await this.helpers.httpRequest({ method: 'GET', url: 'https://studiokook.ee' + page.url, encoding: 'utf-8' });\n    const htmlSize = Buffer.byteLength(html, 'utf8');\n    checks.htmlSizeKB = Math.round(htmlSize / 1024);\n\n    const titleMatch = html.match(/<title[^>]*>([^<]+)<\\/title>/i);\n    const title = titleMatch ? titleMatch[1].trim() : '';\n    checks.title = title; checks.titleLength = title.length;\n    if (!title) issues.push('NO_TITLE');\n    else if (title.length < 25) { issues.push('TITLE_TOO_SHORT'); score += 4; }\n    else if (title.length > 60) { issues.push('TITLE_TOO_LONG'); score += 8; }\n    else score += 12;\n\n    const descMatch = html.match(/<meta[^>]*name=[\"']description[\"'][^>]*content=[\"']([^\"']*?)[\"']/i) || html.match(/<meta[^>]*content=[\"']([^\"']*?)[\"'][^>]*name=[\"']description[\"']/i);\n    const desc = descMatch ? descMatch[1].trim() : '';\n    checks.description = desc; checks.descLength = desc.length;\n    if (!desc) issues.push('NO_META_DESCRIPTION');\n    else if (desc.length < 80) { issues.push('DESC_TOO_SHORT'); score += 6; }\n    else if (desc.length > 160) { issues.push('DESC_TOO_LONG'); score += 8; }\n    else score += 12;\n\n    const h1s = html.match(/<h1[^>]*>[\\s\\S]*?<\\/h1>/gi) || [];\n    checks.h1Count = h1s.length;\n    if (h1s.length === 0) issues.push('NO_H1');\n    else if (h1s.length > 1) { issues.push('MULTIPLE_H1'); score += 4; }\n    else score += 8;\n\n    const h2s = html.match(/<h2[^>]*>[\\s\\S]*?<\\/h2>/gi) || [];\n    checks.h2Count = h2s.length;\n    if (h2s.length === 0) issues.push('NO_H2_HEADINGS');\n    else if (h2s.length < 2) score += 4;\n    else score += 8;\n\n    const imgs = html.match(/<img[^>]*>/gi) || [];\n    const realImgs = imgs.filter(i => !i.includes('data:image'));\n    const base64Imgs = imgs.filter(i => i.includes('data:image'));\n    checks.imgTotal = imgs.length; checks.imgReal = realImgs.length; checks.imgBase64 = base64Imgs.length;\n    let ma=0,md=0,mj=0;\n    for (const img of realImgs) {\n      if (!img.match(/alt=[\"'][^\"']+[\"']/)) ma++;\n      if (!img.includes('width=')) md++;\n      if (img.match(/\\.jpe?g[\"'?]/i) && !img.includes('srcset')) mj++;\n    }\n    checks.imgMissingAlt=ma; checks.imgMissingDim=md; checks.imgJpgNoWebp=mj;\n    let imgScore = 12;\n    if (ma>3) { imgScore-=4; issues.push('IMAGES_MISSING_ALT: '+ma); }\n    if (md>3) { imgScore-=3; issues.push('IMAGES_MISSING_DIMENSIONS: '+md); }\n    if (base64Imgs.length>10) { imgScore-=3; issues.push('EXCESSIVE_BASE64: '+base64Imgs.length); }\n    if (mj>5) { imgScore-=2; issues.push('JPG_WITHOUT_WEBP: '+mj); }\n    score += Math.max(0, imgScore);\n\n    const schemas = html.match(/<script[^>]*type=[\"']application\\/ld\\+json[\"'][^>]*>[\\s\\S]*?<\\/script>/gi) || [];\n    checks.schemaCount = schemas.length;\n    const schemaTypes = [];\n    for (const s of schemas) { try { const j = JSON.parse(s.replace(/<[^>]+>/g,'')); schemaTypes.push(j['@type']||(j['@graph']?'Graph':'?')); } catch{} }\n    checks.schemaTypes = schemaTypes;\n    if (!schemas.length) issues.push('NO_STRUCTURED_DATA');\n    else if (schemaTypes.includes('LocalBusiness')||schemaTypes.includes('FAQPage')) score+=8;\n    else score+=5;\n\n    if (htmlSize>500000) issues.push('HTML_TOO_LARGE: '+checks.htmlSizeKB+'KB');\n    else if (htmlSize>300000) { issues.push('HTML_LARGE: '+checks.htmlSizeKB+'KB'); score+=4; }\n    else score+=8;\n\n    const il = (html.match(/href=[\"']https?:\\/\\/studiokook\\.ee[^\"']*/gi)||[]).length + (html.match(/href=[\"']\\/[^\"']*/gi)||[]).length;\n    checks.internalLinks = il;\n    if (il<3) issues.push('FEW_INTERNAL_LINKS'); else score+=5;\n\n    checks.hasCanonical = !!html.match(/<link[^>]*rel=[\"']canonical[\"']/i);\n    if (!checks.hasCanonical) issues.push('NO_CANONICAL'); else score+=5;\n\n    const ogT=!!html.match(/<meta[^>]*property=[\"']og:title[\"']/i);\n    const ogD=!!html.match(/<meta[^>]*property=[\"']og:description[\"']/i);\n    const ogI=!!html.match(/<meta[^>]*property=[\"']og:image[\"']/i);\n    checks.hasOgTitle=ogT; checks.hasOgDesc=ogD; checks.hasOgImage=ogI;\n    if(!ogT||!ogD) issues.push('MISSING_OG_TAGS');\n    if(ogT&&ogD&&ogI) score+=5; else if(ogT||ogD) score+=2;\n\n    // Hreflang\n    const hTags = html.match(/<link[^>]*hreflang=[^>]*>/gi) || [];\n    const hMap = {};\n    for (const t of hTags) { const l=t.match(/hreflang=[\"']([^\"']+)[\"']/i); const h=t.match(/href=[\"']([^\"']+)[\"']/i); if(l&&h) hMap[l[1]]=h[1]; }\n    const missing = ['x-default','et','ru','en','fi'].filter(l=>!hMap[l]);\n    checks.hreflang=hMap; checks.missingHreflang=missing;\n    if(missing.length) issues.push('MISSING_HREFLANG: '+missing.join(',')); else score+=5;\n\n    // Translation: lightweight HEAD-only check\n    const tr = { et: 200 };\n    for (const lang of ['ru','en','fi']) {\n      const u = page.url==='/' ? 'https://studiokook.ee/'+lang+'/' : 'https://studiokook.ee/'+lang+page.url;\n      try { await this.helpers.httpRequest({ method:'HEAD', url:u }); tr[lang]=200; } catch(e) { tr[lang]=e.message.includes('404')?404:0; }\n    }\n    checks.translations=tr;\n    const tc = Object.values(tr).filter(s=>s===200).length;\n    checks.translationCoverage = Math.round((tc/4)*100);\n    if(tc<4) issues.push('MISSING_TRANSLATIONS: '+Object.entries(tr).filter(([,s])=>s!==200).map(([l])=>l).join(','));\n    else score+=5;\n\n    const pageGsc = gscRows.filter(r => { const u=r.page||''; if(page.url==='/') return u.match(/studiokook\\.ee\\/?([?#].*)?$/); return u.includes('studiokook.ee'+page.url); }).sort((a,b)=>b.impressions-a.impressions).slice(0,5);\n    const pageGa4 = ga4Rows.find(r => { if(page.url==='/') return r.page==='/'||r.page===''; return r.page===page.url||r.page===page.url+'/'; }) || {users:0,sessions:0,pageviews:0,bounce:0,duration:0,conversions:0};\n\n    results.push({ page_id:page.id, url:page.url, name:page.name, score:Math.min(100,score), issues, checks, currentSeo:{title,description:desc}, gscQueries:pageGsc, ga4Metrics:pageGa4 });\n    // Free memory\n  } catch(e) {\n    const st = (e.message.includes('301')||e.message.includes('302')) ? 'redirect' : 'error';\n    results.push({ page_id:page.id, url:page.url, name:page.name, score:0, issues:[st==='redirect'?'REDIRECT':'FETCH_ERROR: '+e.message.slice(0,60)], checks:{}, currentSeo:{}, gscQueries:[], ga4Metrics:{}, status:st });\n  }\n  await delay(200);\n}\n\nconst active = results.filter(r=>r.status!=='redirect'&&r.status!=='error');\nconst avgScore = active.length ? Math.round(active.reduce((s,r)=>s+r.score,0)/active.length) : 0;\nconst totalIssues = results.reduce((s,r)=>s+r.issues.length,0);\n\nreturn [{ json: { date: DateTime.now().toFormat('yyyy-MM-dd'), avgScore, totalIssues, pageCount: pages.length, results, worst: [...active].sort((a,b)=>a.score-b.score).slice(0,5).map(w=>w.name+' ('+w.score+')'), best: [...active].sort((a,b)=>b.score-a.score).slice(0,5).map(b=>b.name+' ('+b.score+')') } }];"
+          }
+        },
+        {
+          "id": "cwv_fetch",
+          "name": "CWV Fetch",
+          "type": "n8n-nodes-base.code",
+          "typeVersion": 2,
+          "position": [
+            1520,
+            300
+          ],
+          "parameters": {
+            "jsCode": "const audit = $('Audit All Pages').first().json;\nconst pages = (audit.results || []).filter(r => r.status !== 'redirect' && r.status !== 'error').slice(0, 8);\nconst cwvResults = [];\nconst delay = ms => new Promise(r => setTimeout(r, ms));\n\nfor (const page of pages) {\n  const fullUrl = 'https://studiokook.ee' + page.url;\n  const pageResult = { url: page.url, name: page.name, mobile: null, desktop: null };\n\n  try {\n    const apiUrl = 'https://www.googleapis.com/pagespeedonline/v5/runPagespeed?url=' + encodeURIComponent(fullUrl) + '&strategy=mobile&category=performance';\n    const resp = await this.helpers.httpRequest({ method: 'GET', url: apiUrl });\n    const audits = resp.lighthouseResult?.audits || {};\n    pageResult.mobile = {\n      performanceScore: Math.round((resp.lighthouseResult?.categories?.performance?.score || 0) * 100),\n      lcp: audits['largest-contentful-paint']?.numericValue || null,\n      cls: audits['cumulative-layout-shift']?.numericValue || null,\n      tbt: audits['total-blocking-time']?.numericValue || null,\n      fcp: audits['first-contentful-paint']?.numericValue || null\n    };\n  } catch(e) {\n    if (e.message.includes('429')) {\n      await delay(15000);\n      try {\n        const apiUrl = 'https://www.googleapis.com/pagespeedonline/v5/runPagespeed?url=' + encodeURIComponent(fullUrl) + '&strategy=mobile&category=performance';\n        const resp = await this.helpers.httpRequest({ method: 'GET', url: apiUrl });\n        const audits = resp.lighthouseResult?.audits || {};\n        pageResult.mobile = {\n          performanceScore: Math.round((resp.lighthouseResult?.categories?.performance?.score || 0) * 100),\n          lcp: audits['largest-contentful-paint']?.numericValue || null,\n          cls: audits['cumulative-layout-shift']?.numericValue || null,\n          tbt: audits['total-blocking-time']?.numericValue || null,\n          fcp: audits['first-contentful-paint']?.numericValue || null\n        };\n      } catch(e2) { pageResult.mobile = { error: e2.message.slice(0, 80) }; }\n    } else {\n      pageResult.mobile = { error: e.message.slice(0, 80) };\n    }\n  }\n  cwvResults.push(pageResult);\n  await delay(3000);\n}\n\nreturn [{ json: { cwvResults } }];"
+          }
+        },
+        {
+          "id": "merge_data",
+          "name": "Merge Audit Data",
+          "type": "n8n-nodes-base.code",
+          "typeVersion": 2,
+          "position": [
+            1740,
+            300
+          ],
+          "parameters": {
+            "jsCode": "const audit = $('Audit All Pages').first().json;\nconst cwv = $('CWV Fetch').first().json;\nconst previous = $('Fetch Previous Audit').first().json;\n\nfor (const result of audit.results) {\n  if (result.status === 'redirect' || result.status === 'error') continue;\n  const cwvPage = (cwv.cwvResults || []).find(c => c.url === result.url);\n  result.cwv = cwvPage || { mobile: null, desktop: null };\n  if (cwvPage?.mobile && !cwvPage.mobile.error) {\n    const lcp = cwvPage.mobile.lcp;\n    const cls = cwvPage.mobile.cls;\n    if (lcp && lcp > 2500) { result.issues.push('LCP_SLOW: ' + Math.round(lcp) + 'ms'); result.score = Math.max(0, result.score - 5); }\n    if (cls && cls > 0.1) { result.issues.push('CLS_HIGH: ' + cls.toFixed(3)); result.score = Math.max(0, result.score - 3); }\n    if (lcp && lcp <= 2500 && cls !== null && cls <= 0.1) result.score = Math.min(100, result.score + 7);\n  }\n}\n\nconst prevAudit = (previous.previousAudits || [])[0];\nlet trends = null;\nif (prevAudit) {\n  const prevResults = prevAudit.results || [];\n  const prevByUrl = {};\n  for (const pr of prevResults) prevByUrl[pr.url] = pr;\n  const active = audit.results.filter(r => r.status !== 'redirect' && r.status !== 'error');\n  const activeAvg = active.length ? Math.round(active.reduce((s, r) => s + r.score, 0) / active.length) : 0;\n  trends = {\n    prevDate: prevAudit.date, prevAvgScore: prevAudit.avg_score,\n    scoreDelta: activeAvg - (prevAudit.avg_score || 0),\n    issuesDelta: audit.totalIssues - (prevAudit.total_issues || 0),\n    pageChanges: []\n  };\n  for (const result of audit.results) {\n    const prev = prevByUrl[result.url];\n    if (prev) {\n      result.prevScore = prev.score;\n      result.scoreDelta = result.score - prev.score;\n      result.newIssues = result.issues.filter(i => !(prev.issues || []).includes(i));\n      result.resolvedIssues = (prev.issues || []).filter(i => !result.issues.includes(i));\n      if (Math.abs(result.scoreDelta) >= 5) trends.pageChanges.push({ name: result.name, url: result.url, from: prev.score, to: result.score, delta: result.scoreDelta });\n    } else {\n      result.prevScore = null; result.scoreDelta = null;\n      result.newIssues = result.issues; result.resolvedIssues = [];\n    }\n  }\n}\n\nconst active = audit.results.filter(r => r.status !== 'redirect' && r.status !== 'error');\nconst avgScore = active.length ? Math.round(active.reduce((s, r) => s + r.score, 0) / active.length) : 0;\nconst totalIssues = audit.results.reduce((s, r) => s + r.issues.length, 0);\nconst cwvValid = (cwv.cwvResults || []).filter(c => c.mobile && !c.mobile.error);\n\nreturn [{ json: {\n  ...audit, avgScore, totalIssues,\n  cwvSummary: {\n    avgMobileLCP: cwvValid.length ? Math.round(cwvValid.reduce((s, c) => s + (c.mobile?.lcp || 0), 0) / cwvValid.length) : null,\n    avgMobileCLS: cwvValid.length ? +(cwvValid.reduce((s, c) => s + (c.mobile?.cls || 0), 0) / cwvValid.length).toFixed(3) : null,\n    pagesWithSlowLCP: cwvValid.filter(c => c.mobile?.lcp > 2500).length,\n    pagesWithHighCLS: cwvValid.filter(c => c.mobile?.cls > 0.1).length,\n    pagesChecked: cwvValid.length,\n    elapsed: cwv.elapsed\n  },\n  trends,\n  previousWeeks: (previous.previousAudits || []).map(a => ({ date: a.date, avgScore: a.avg_score, issues: a.total_issues }))\n}}];"
+          }
+        },
+        {
+          "id": "claude_analysis",
+          "name": "Claude Analysis",
+          "type": "n8n-nodes-base.code",
+          "typeVersion": 2,
+          "position": [
+            1960,
+            300
+          ],
+          "parameters": {
+            "jsCode": "const data = $input.first().json;\nconst apiKey = $env.ANTHROPIC_API_KEY;\nif (!apiKey) return [{ json: { ...data, recommendations: 'ERROR: API key not set' } }];\n\nconst resultsForClaude = data.results.filter(r => r.status !== 'redirect').map(r => ({\n  url: r.url, name: r.name, score: r.score, prevScore: r.prevScore, scoreDelta: r.scoreDelta,\n  issues: r.issues, translationCoverage: r.checks?.translationCoverage,\n  gscTop: (r.gscQueries || []).slice(0, 5).map(q => ({ query: q.query, clicks: q.clicks, impressions: q.impressions, ctr: q.ctr, position: q.position, device: q.device })),\n  ga4: r.ga4Metrics ? { users: r.ga4Metrics.users, bounce: r.ga4Metrics.bounce } : null,\n  cwvMobile: r.cwv?.mobile ? { lcp: r.cwv.mobile.lcp, cls: r.cwv.mobile.cls, perf: r.cwv.mobile.performanceScore } : null\n}));\n\nconst prompt = `You are an SEO auditor for studiokook.ee (custom kitchen furniture, Tallinn, Estonia). Languages: ET, RU, EN, FI.\n\nAudit: ${data.pageCount} pages, avg score ${data.avgScore}/100, ${data.totalIssues} issues.\n\n## CWV Summary\nAvg Mobile LCP: ${data.cwvSummary?.avgMobileLCP || 'N/A'}ms | CLS: ${data.cwvSummary?.avgMobileCLS || 'N/A'}\nSlow LCP pages: ${data.cwvSummary?.pagesWithSlowLCP || 0} | High CLS: ${data.cwvSummary?.pagesWithHighCLS || 0}\n\n## Trends\n${data.trends ? 'Previous: ' + data.trends.prevDate + ', score ' + data.trends.prevAvgScore + '. Delta: ' + (data.trends.scoreDelta > 0 ? '+' : '') + data.trends.scoreDelta + '. Changes: ' + JSON.stringify(data.trends.pageChanges) : 'No previous data'}\n\n## Per-Page Data\n${JSON.stringify(resultsForClaude, null, 1)}\n\n## Task\n1. Cross-reference SEO issues with traffic/CWV data\n2. Pages with high impressions but low CTR = meta optimization\n3. Pages with slow LCP = performance priority\n4. Translation gaps affecting international SEO\n5. TOP 5 PRIORITY recommendations (most impactful first)\n6. Compare with previous week — highlight improvements/regressions\n7. Patterns across pages\n\nRules: RUSSIAN, specific (page+fix+impact), reference metrics, max 500 words, plain text`;\n\nconst response = await this.helpers.httpRequest({\n  method: 'POST', url: 'https://api.anthropic.com/v1/messages',\n  headers: { 'x-api-key': apiKey, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },\n  body: { model: 'claude-sonnet-4-20250514', max_tokens: 3000, messages: [{ role: 'user', content: prompt }] }\n});\n\nreturn [{ json: { ...data, recommendations: response.content[0].text } }];"
+          }
+        },
+        {
+          "id": "save_supabase",
+          "name": "Save to Supabase",
+          "type": "n8n-nodes-base.code",
+          "typeVersion": 2,
+          "position": [
+            2180,
+            300
+          ],
+          "parameters": {
+            "jsCode": "const audit = $input.first().json;\nconst url = $env.SUPABASE_URL;\nconst key = $env.SUPABASE_SERVICE_ROLE_KEY;\nif (!url || !key) return [{ json: { ...audit, supabaseError: 'SUPABASE_URL or KEY not set' } }];\n\ntry {\n  const resp = await this.helpers.httpRequest({\n    method: 'POST', url: url + '/rest/v1/audit_results',\n    headers: { 'apikey': key, 'Authorization': 'Bearer ' + key, 'Content-Type': 'application/json', 'Prefer': 'return=representation,resolution=merge-duplicates' },\n    body: { type: 'seo', date: audit.date, avg_score: audit.avgScore, total_issues: audit.totalIssues, page_count: audit.pageCount, results: audit.results, recommendations: audit.recommendations || '' }\n  });\n  audit.supabaseId = resp[0]?.id || 'saved';\n} catch(e) { audit.supabaseError = e.message.slice(0, 200); }\n\ntry {\n  const pageScoreRows = audit.results.filter(r => r.status !== 'redirect' && r.status !== 'error').map(r => ({\n    audit_type: 'seo', date: audit.date, page_url: r.url, page_name: r.name, score: r.score,\n    issue_count: r.issues.length,\n    cwv_lcp_mobile: r.cwv?.mobile?.lcp || null, cwv_cls_mobile: r.cwv?.mobile?.cls || null,\n    cwv_perf_mobile: r.cwv?.mobile?.performanceScore || null,\n    translation_coverage: r.checks?.translationCoverage || null,\n    hreflang_ok: (r.checks?.missingHreflang || []).length === 0\n  }));\n  await this.helpers.httpRequest({\n    method: 'POST', url: url + '/rest/v1/audit_page_scores',\n    headers: { 'apikey': key, 'Authorization': 'Bearer ' + key, 'Content-Type': 'application/json', 'Prefer': 'resolution=merge-duplicates' },\n    body: pageScoreRows\n  });\n} catch(e) { /* non-fatal */ }\n\nreturn [{ json: audit }];"
+          }
+        },
+        {
+          "id": "format_report",
+          "name": "Format Report",
+          "type": "n8n-nodes-base.code",
+          "typeVersion": 2,
+          "position": [
+            2400,
+            300
+          ],
+          "parameters": {
+            "jsCode": "const data = $input.first().json;\nconst results = (data.results || []).filter(r => r.status !== 'redirect' && r.status !== 'error');\n\nlet md = '---\\ntype: seo-audit\\ndate: ' + data.date + '\\navgScore: ' + data.avgScore + '\\ntotalIssues: ' + data.totalIssues + '\\npageCount: ' + data.pageCount + '\\n---\\n\\n';\nmd += '# SEO Audit: ' + data.date + '\\n\\n';\nmd += '## Summary\\n\\n';\nmd += '| Metric | Value |\\n|--------|-------|\\n';\nmd += '| Score | **' + data.avgScore + '/100** |\\n';\nmd += '| Pages | ' + data.pageCount + ' |\\n';\nmd += '| Issues | ' + data.totalIssues + ' |\\n';\n\nif (data.trends) {\n  md += '| Prev Score | ' + data.trends.prevAvgScore + ' (' + (data.trends.scoreDelta >= 0 ? '+' : '') + data.trends.scoreDelta + ') |\\n';\n}\n\nif (data.cwvSummary && data.cwvSummary.avgMobileLCP) {\n  md += '| Avg LCP | ' + (data.cwvSummary.avgMobileLCP / 1000).toFixed(1) + 's |\\n';\n  md += '| Avg CLS | ' + data.cwvSummary.avgMobileCLS + ' |\\n';\n  md += '| Slow LCP pages | ' + data.cwvSummary.pagesWithSlowLCP + ' |\\n';\n}\n\nconst translated = results.filter(r => r.checks?.translationCoverage === 100).length;\nmd += '| Translations | ' + translated + '/' + results.length + ' (' + Math.round(translated/results.length*100) + '%) |\\n';\nmd += '\\n';\n\n// Trends\nif (data.trends?.pageChanges?.length) {\n  md += '## Changes vs Previous Week\\n\\n';\n  const improved = data.trends.pageChanges.filter(c => c.delta > 0);\n  const degraded = data.trends.pageChanges.filter(c => c.delta < 0);\n  if (improved.length) { md += '**Improved:**\\n'; improved.forEach(c => md += '- ' + c.name + ': ' + c.from + ' -> ' + c.to + ' (+' + c.delta + ')\\n'); md += '\\n'; }\n  if (degraded.length) { md += '**Degraded:**\\n'; degraded.forEach(c => md += '- ' + c.name + ': ' + c.from + ' -> ' + c.to + ' (' + c.delta + ')\\n'); md += '\\n'; }\n}\n\nif (data.previousWeeks?.length) {\n  md += '## Score History\\n\\n';\n  md += '| Date | Score | Issues |\\n|------|-------|--------|\\n';\n  md += '| ' + data.date + ' | **' + data.avgScore + '** | ' + data.totalIssues + ' |\\n';\n  data.previousWeeks.forEach(w => md += '| ' + w.date + ' | ' + w.avgScore + ' | ' + (w.issues || '-') + ' |\\n');\n  md += '\\n';\n}\n\n// Scoreboard\nmd += '## Scoreboard\\n\\n';\nmd += '| Page | Score | Issues | Users | Translations |\\n|------|-------|--------|-------|-------------|\\n';\nresults.sort((a, b) => a.score - b.score);\nfor (const r of results) {\n  const delta = (r.scoreDelta !== null && r.scoreDelta !== undefined) ? ' (' + (r.scoreDelta >= 0 ? '+' : '') + r.scoreDelta + ')' : '';\n  const emoji = r.score >= 80 ? '\\u2705' : r.score >= 60 ? '\\u26A0\\uFE0F' : '\\u274C';\n  md += '| ' + emoji + ' ' + r.name + ' | ' + r.score + delta + ' | ' + r.issues.length + ' | ' + (r.ga4Metrics?.users || 0) + ' | ' + (r.checks?.translationCoverage || 0) + '% |\\n';\n}\nmd += '\\n';\n\n// Issues per page\nmd += '## Issues Detail\\n\\n';\nfor (const r of results) {\n  if (r.issues.length === 0) continue;\n  md += '### ' + r.name + ' (' + r.url + ') — ' + r.score + '/100\\n\\n';\n  r.issues.forEach(i => md += '- ' + i + '\\n');\n  if (r.cwv?.mobile && !r.cwv.mobile.error) {\n    md += '- CWV: LCP=' + Math.round(r.cwv.mobile.lcp) + 'ms, CLS=' + (r.cwv.mobile.cls?.toFixed(3) || 'N/A') + ', Perf=' + r.cwv.mobile.performanceScore + '\\n';\n  }\n  if (r.gscQueries?.length) {\n    md += '\\n**Top GSC queries:**\\n';\n    r.gscQueries.slice(0, 3).forEach(q => md += '- \"' + q.query + '\" — pos ' + q.position + ', ' + q.impressions + ' imp, ' + q.ctr + '% CTR\\n');\n  }\n  md += '\\n';\n}\n\n// Recommendations\nmd += '## Recommendations\\n\\n';\nmd += (data.recommendations || 'No analysis available') + '\\n';\n\n// Short Telegram summary\nlet tg = '\\uD83D\\uDD0D SEO Audit: ' + data.date + '\\n';\ntg += 'Score: ' + data.avgScore + '/100';\nif (data.trends) tg += ' (' + (data.trends.scoreDelta >= 0 ? '+' : '') + data.trends.scoreDelta + ')';\ntg += '\\nPages: ' + data.pageCount + ' | Issues: ' + data.totalIssues;\nif (data.cwvSummary?.avgMobileLCP) tg += '\\nCWV: LCP ' + (data.cwvSummary.avgMobileLCP/1000).toFixed(1) + 's | CLS ' + data.cwvSummary.avgMobileCLS;\ntg += '\\nTranslations: ' + translated + '/' + results.length + ' (' + Math.round(translated/results.length*100) + '%)';\ntg += '\\n\\nWorst: ' + results.slice(0, 3).map(r => r.name + ' ' + r.score).join(', ');\ntg += '\\nBest: ' + results.slice(-3).reverse().map(r => r.name + ' ' + r.score).join(', ');\ntg += '\\n\\nFull report attached as .md file';\n\nreturn [{ json: { markdown: md, telegramCaption: tg, filename: 'seo-audit-' + data.date + '.md' } }];"
+          }
+        },
+        {
+          "id": "write_binary",
+          "name": "Create MD File",
+          "type": "n8n-nodes-base.code",
+          "typeVersion": 2,
+          "position": [
+            2620,
+            300
+          ],
+          "parameters": {
+            "jsCode": "const data = $input.first().json;\nconst md = data.markdown;\nconst filename = data.filename;\nconst caption = data.telegramCaption;\n\n// Create binary data from markdown string\nconst binaryData = await this.helpers.prepareBinaryData(\n  Buffer.from(md, 'utf-8'),\n  filename,\n  'text/markdown'\n);\n\nreturn [{ json: { caption }, binary: { data: binaryData } }];"
+          }
+        },
+        {
+          "id": "tg_send_doc",
+          "name": "Telegram Report",
+          "type": "n8n-nodes-base.telegram",
+          "typeVersion": 1.2,
+          "position": [
+            2840,
+            300
+          ],
+          "parameters": {
+            "operation": "sendDocument",
+            "chatId": "804465999",
+            "binaryData": true,
+            "binaryPropertyName": "data",
+            "additionalFields": {
+              "caption": "={{ $json.caption }}",
+              "appendAttribution": false
+            }
+          },
+          "credentials": {
+            "telegramApi": {
+              "id": "mxbg2RUQv7Widfws",
+              "name": "General"
+            }
+          },
+          "webhookId": "29cff534-ffb3-423d-8b5c-ecc5f39ea11f",
+          "disabled": true
+        }
+      ],
+      "connections": {
+        "Weekly Schedule": {
+          "main": [
+            [
+              {
+                "node": "Date Range",
+                "type": "main",
+                "index": 0
+              }
+            ]
+          ]
+        },
+        "TestTrigger": {
+          "main": [
+            [
+              {
+                "node": "Date Range",
+                "type": "main",
+                "index": 0
+              }
+            ]
+          ]
+        },
+        "Date Range": {
+          "main": [
+            [
+              {
+                "node": "GSC Queries",
+                "type": "main",
+                "index": 0
+              }
+            ]
+          ]
+        },
+        "GSC Queries": {
+          "main": [
+            [
+              {
+                "node": "GA4 Pages",
+                "type": "main",
+                "index": 0
+              }
+            ]
+          ]
+        },
+        "GA4 Pages": {
+          "main": [
+            [
+              {
+                "node": "Fetch Previous Audit",
+                "type": "main",
+                "index": 0
+              }
+            ]
+          ]
+        },
+        "Fetch Previous Audit": {
+          "main": [
+            [
+              {
+                "node": "Audit All Pages",
+                "type": "main",
+                "index": 0
+              }
+            ]
+          ]
+        },
+        "Audit All Pages": {
+          "main": [
+            [
+              {
+                "node": "CWV Fetch",
+                "type": "main",
+                "index": 0
+              }
+            ]
+          ]
+        },
+        "CWV Fetch": {
+          "main": [
+            [
+              {
+                "node": "Merge Audit Data",
+                "type": "main",
+                "index": 0
+              }
+            ]
+          ]
+        },
+        "Merge Audit Data": {
+          "main": [
+            [
+              {
+                "node": "Claude Analysis",
+                "type": "main",
+                "index": 0
+              }
+            ]
+          ]
+        },
+        "Claude Analysis": {
+          "main": [
+            [
+              {
+                "node": "Save to Supabase",
+                "type": "main",
+                "index": 0
+              }
+            ]
+          ]
+        },
+        "Save to Supabase": {
+          "main": [
+            [
+              {
+                "node": "Format Report",
+                "type": "main",
+                "index": 0
+              }
+            ]
+          ]
+        },
+        "Format Report": {
+          "main": [
+            [
+              {
+                "node": "Create MD File",
+                "type": "0",
+                "index": 0
+              }
+            ]
+          ]
+        },
+        "Create MD File": {
+          "main": [
+            [
+              {
+                "node": "Telegram Report",
+                "type": "0",
+                "index": 0
+              }
+            ]
+          ]
+        }
+      },
+      "authors": "Maksim Parve",
+      "name": null,
+      "description": null,
+      "autosaved": false,
+      "workflowPublishHistory": [
+        {
+          "createdAt": "2026-05-01T03:48:47.617Z",
+          "id": 917,
+          "workflowId": "EMUTtOI8BWLvDxn0",
+          "versionId": "9c60f10e-7909-45bc-b5a7-d4f77d3d4cc0",
+          "event": "deactivated",
+          "userId": "3462e3d2-f46b-4d98-acea-93ac07713bf5"
+        },
+        {
+          "createdAt": "2026-05-01T03:48:47.630Z",
+          "id": 918,
+          "workflowId": "EMUTtOI8BWLvDxn0",
+          "versionId": "9c60f10e-7909-45bc-b5a7-d4f77d3d4cc0",
+          "event": "activated",
+          "userId": "3462e3d2-f46b-4d98-acea-93ac07713bf5"
+        },
+        {
+          "createdAt": "2026-05-01T03:48:47.709Z",
+          "id": 919,
+          "workflowId": "EMUTtOI8BWLvDxn0",
+          "versionId": "9c60f10e-7909-45bc-b5a7-d4f77d3d4cc0",
+          "event": "deactivated",
+          "userId": "3462e3d2-f46b-4d98-acea-93ac07713bf5"
+        },
+        {
+          "createdAt": "2026-05-01T03:48:47.819Z",
+          "id": 920,
+          "workflowId": "EMUTtOI8BWLvDxn0",
+          "versionId": "9c60f10e-7909-45bc-b5a7-d4f77d3d4cc0",
+          "event": "activated",
+          "userId": "3462e3d2-f46b-4d98-acea-93ac07713bf5"
+        },
+        {
+          "createdAt": "2026-05-05T06:45:20.678Z",
+          "id": 1095,
+          "workflowId": "EMUTtOI8BWLvDxn0",
+          "versionId": "9c60f10e-7909-45bc-b5a7-d4f77d3d4cc0",
+          "event": "deactivated",
+          "userId": "3462e3d2-f46b-4d98-acea-93ac07713bf5"
+        },
+        {
+          "createdAt": "2026-05-05T06:45:20.714Z",
+          "id": 1096,
+          "workflowId": "EMUTtOI8BWLvDxn0",
+          "versionId": "9c60f10e-7909-45bc-b5a7-d4f77d3d4cc0",
+          "event": "activated",
+          "userId": "3462e3d2-f46b-4d98-acea-93ac07713bf5"
+        }
+      ]
+    }
+  }
+}

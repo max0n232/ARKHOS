@@ -1,4 +1,25 @@
 {
   "version": 2,
-  "plugins": {}
+  "plugins": {
+    "skill-creator@claude-plugins-official": [
+      {
+        "scope": "user",
+        "installPath": "C:\\Users\\sorte\\.claude\\plugins\\cache\\claude-plugins-official\\skill-creator\\61c0597779bd",
+        "version": "61c0597779bd",
+        "installedAt": "2026-05-03T14:48:28.170Z",
+        "lastUpdated": "2026-05-03T14:48:28.170Z",
+        "gitCommitSha": "61c0597779bd2d670dcd4fbbf37c66aa19eb2ce6"
+      }
+    ],
+    "frontend-design@claude-plugins-official": [
+      {
+        "scope": "user",
+        "installPath": "C:\\Users\\sorte\\.claude\\plugins\\cache\\claude-plugins-official\\frontend-design\\61c0597779bd",
+        "version": "61c0597779bd",
+        "installedAt": "2026-05-03T14:48:28.170Z",
+        "lastUpdated": "2026-05-03T14:48:28.170Z",
+        "gitCommitSha": "61c0597779bd2d670dcd4fbbf37c66aa19eb2ce6"
+      }
+    ]
+  }
 }

@@ -1,0 +1,722 @@
+{
+  "updatedAt": "2026-04-25T10:19:17.432Z",
+  "createdAt": "2026-04-12T18:52:25.222Z",
+  "id": "JN9HhsDNcng8R9po",
+  "name": "Trading: Financial News Monitor",
+  "description": null,
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "*/5 * * * *"
+            }
+          ]
+        }
+      },
+      "id": "sched1",
+      "name": "Every 5min",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const feeds = [\n  { url: 'https://www.investing.com/rss/news_95.rss', src: 'investing', type: 'rss' },\n  { url: 'https://www.investing.com/rss/news_11.rss', src: 'investing', type: 'rss' },\n  { url: 'https://www.investing.com/rss/central_banks.rss', src: 'investing', type: 'rss' },\n  { url: 'https://www.investing.com/rss/news_1.rss', src: 'investing', type: 'rss' },\n  { url: 'https://www.investing.com/rss/news_25.rss', src: 'investing', type: 'rss' },\n  { url: 'https://www.federalreserve.gov/feeds/press_monetary.xml', src: 'fed', type: 'rss' },\n  { url: 'https://www.ecb.europa.eu/rss/press.html', src: 'ecb', type: 'rss' },\n  { url: 'https://seekingalpha.com/feed.xml', src: 'seeking_alpha', type: 'rss' },\n  { url: 'https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=20910258', src: 'cnbc', type: 'rss' },\n  { url: 'https://www.reddit.com/r/wallstreetbets/new.json?limit=5', src: 'reddit', type: 'json' },\n  { url: 'https://www.reddit.com/r/commodities/new.json?limit=5', src: 'reddit', type: 'json' }\n];\nreturn feeds.map(f => ({ json: f }));"
+      },
+      "id": "fetch1",
+      "name": "Feeds List",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        250,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.url }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "User-Agent",
+              "value": "Mozilla/5.0 MiniAladdin/1.0"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 8000,
+          "response": {
+            "response": {
+              "responseFormat": "text",
+              "neverError": true
+            }
+          }
+        }
+      },
+      "id": "httpfetch1",
+      "name": "Fetch Feed",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        500,
+        0
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\nconst allItems = [];\nlet ok = 0;\nfor (const item of items) {\n  const data = item.json.data;\n  const body = typeof data === 'string' ? data : (item.json.body || '');\n  const src = item.json.src || 'unknown';\n  const type = item.json.type || 'rss';\n  if (!body) continue;\n  ok++;\n  if (type === 'json') {\n    let parsed;\n    try { parsed = JSON.parse(body); } catch (e) { continue; }\n    const children = parsed && parsed.data && parsed.data.children;\n    if (!Array.isArray(children)) continue;\n    for (const c of children.slice(0, 5)) {\n      if (c && c.data && c.data.title) {\n        allItems.push({ title: c.data.title, source: src });\n      }\n    }\n  } else {\n    const re = /<item[\\s\\S]*?<title[^>]*>(?:<!\\[CDATA\\[)?(.*?)(?:\\]\\]>)?<\\/title>[\\s\\S]*?<\\/item>/gi;\n    let m, c = 0;\n    while ((m = re.exec(body)) !== null && c < 8) {\n      const t = (m[1] || '').trim();\n      if (t) allItems.push({ title: t, source: src });\n      c++;\n    }\n  }\n}\nif (!allItems.length) return [{ json: { skip: true, total: 0, feeds_ok: ok, feeds_total: items.length } }];\nreturn allItems.map(i => ({ json: i }));"
+      },
+      "id": "parse1",
+      "name": "Parse Feeds",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        750,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const critical = ['rate cut','rate hike','rate decision','recession','military strike','nuclear','invasion','declares war','debt default'];\nconst high = ['interest rate decision','federal reserve statement','fomc statement','ecb rate','bank of japan rate','inflation data','cpi report','sanctions package','new tariff','trade war escalat','opec cut','opec production cut','embargo'];\nconst medium = ['gold price','oil price','crude oil price','natural gas price','copper price','gdp growth','gdp data','unemployment rate','nonfarm payroll','earnings beat','earnings miss','bitcoin price','crypto market'];\n\nfunction classify(title) {\n  const t = title.toLowerCase();\n  for (const p of critical) if (t.includes(p)) return { impact: 'critical', type: getType(p), assets: getAssets(p) };\n  for (const p of high) if (t.includes(p)) return { impact: 'high', type: getType(p), assets: getAssets(p) };\n  for (const p of medium) if (t.includes(p)) return { impact: 'medium', type: getType(p), assets: getAssets(p) };\n  return null;\n}\nfunction getType(p) {\n  if (/rate|fed|fomc|ecb|boj|inflation|cpi/.test(p)) return 'policy_change';\n  if (/sanction|embargo/.test(p)) return 'sanctions';\n  if (/tariff|trade war/.test(p)) return 'trade_war';\n  if (/military|nuclear|invasion|war/.test(p)) return 'conflict';\n  if (/recession|default|gdp|unemployment|nonfarm/.test(p)) return 'macro';\n  if (/opec|gold|oil|crude|gas|copper/.test(p)) return 'commodity';\n  if (/bitcoin|crypto/.test(p)) return 'crypto';\n  if (/earnings/.test(p)) return 'corporate';\n  return 'general';\n}\nfunction getAssets(p) {\n  const m = {'rate cut':['GOLD','TLT','SPY'],'rate hike':['GOLD','TLT','SPY'],'rate decision':['GOLD','TLT','SPY'],'recession':['SPY','GOLD','TLT'],'military strike':['GOLD','OIL'],'nuclear':['GOLD','OIL','USD'],'invasion':['GOLD','OIL'],'declares war':['GOLD','OIL'],'debt default':['GOLD','TLT','SPY'],'interest rate decision':['GOLD','TLT','USD'],'federal reserve statement':['GOLD','SPY'],'fomc statement':['GOLD','SPY','TLT'],'ecb rate':['EUR','GOLD'],'bank of japan rate':['JPY','GOLD'],'inflation data':['GOLD','TLT'],'cpi report':['GOLD','SPY'],'sanctions package':['GOLD','OIL'],'new tariff':['SPY','COPPER'],'trade war escalat':['SPY','COPPER','GOLD'],'opec cut':['OIL'],'opec production cut':['OIL'],'embargo':['OIL','GOLD'],'gold price':['GOLD','SILVER'],'oil price':['OIL'],'crude oil price':['OIL'],'natural gas price':['NATGAS'],'copper price':['COPPER'],'gdp growth':['SPY'],'gdp data':['SPY'],'unemployment rate':['SPY','GOLD'],'nonfarm payroll':['SPY','GOLD'],'earnings beat':['SPY'],'earnings miss':['SPY'],'bitcoin price':['BTC'],'crypto market':['BTC','ETH']};\n  return m[p] || [];\n}\n\nconst items = $input.all();\nconst results = [];\nfor (const item of items) {\n  if (item.json.skip) return [item];\n  const cls = classify(item.json.title || '');\n  if (!cls) continue;\n  results.push({ json: { event_type: cls.type, description: item.json.title, sentiment_score: 0, affected_assets: cls.assets, source: item.json.source || 'rss_news', impact_level: cls.impact } });\n}\nif (!results.length) return [{ json: { skip: true, total: items.length } }];\nreturn results;"
+      },
+      "id": "classify1",
+      "name": "Classify",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1000,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT LEFT(description, 100) as d FROM geopolitical_events WHERE timestamp > NOW() - INTERVAL '24 hours';",
+        "options": {}
+      },
+      "id": "dedup_check",
+      "name": "Get Recent 24h",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        1250,
+        0
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "TradingPostgres1",
+          "name": "Trading Postgres"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const recentRows = $('Get Recent 24h').all();\nconst existing = new Set(recentRows.map(r => (r.json.d || '').toLowerCase().trim()));\nconst classified = $('Classify').all();\nconst newItems = [];\nfor (const item of classified) {\n  if (item.json.skip) continue;\n  const prefix = (item.json.description || '').substring(0, 100).toLowerCase().trim();\n  if (!existing.has(prefix)) {\n    newItems.push(item);\n    existing.add(prefix);\n  }\n}\nif (!newItems.length) return [{ json: { skip: true, new_count: 0 } }];\nreturn newItems;"
+      },
+      "id": "dedup1",
+      "name": "Filter Seen",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1500,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "c1",
+              "leftValue": "={{ $json.skip }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "false"
+              }
+            }
+          ]
+        }
+      },
+      "id": "if1",
+      "name": "Has New?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1750,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO geopolitical_events (event_type, description, sentiment_score, affected_assets, source, impact_level, timestamp) VALUES ($1, $2, $3, $4::text[], $5, $6, NOW());",
+        "options": {
+          "queryReplacement": "={{ [$json.event_type, $json.description, $json.sentiment_score, '{' + ($json.affected_assets || []).join(',') + '}', $json.source, $json.impact_level] }}"
+        }
+      },
+      "id": "pg1",
+      "name": "Save",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        2000,
+        -50
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "TradingPostgres1",
+          "name": "Trading Postgres"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\nconst critical = items.filter(i => i.json.impact_level === 'critical').slice(0, 3);\nif (!critical.length) return [];\nconst lines = critical.map(i => {\n  const e = i.json;\n  const assets = (e.affected_assets || []).join(', ');\n  return '\\ud83d\\udea8 *' + (e.event_type || 'NEWS').toUpperCase() + '* [' + e.source + ']\\n' + e.description + '\\nAssets: ' + assets;\n}).join('\\n\\n');\nreturn [{ json: { message: '\\ud83d\\udcf0 *Critical News*\\n\\n' + lines } }];"
+      },
+      "id": "fmt1",
+      "name": "Format",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2000,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "chatId": "804465999",
+        "text": "={{ $json.message }}",
+        "additionalFields": {
+          "parse_mode": "Markdown"
+        }
+      },
+      "id": "tg1",
+      "name": "Telegram",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        2500,
+        50
+      ],
+      "credentials": {
+        "telegramApi": {
+          "id": "TradingTelegramBot",
+          "name": "Trading Bot"
+        }
+      },
+      "webhookId": "b72b404a-98cf-4f59-9d55-b274cf04dd7e"
+    }
+  ],
+  "connections": {
+    "Every 5min": {
+      "main": [
+        [
+          {
+            "node": "Feeds List",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Classify": {
+      "main": [
+        [
+          {
+            "node": "Get Recent 24h",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Recent 24h": {
+      "main": [
+        [
+          {
+            "node": "Filter Seen",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter Seen": {
+      "main": [
+        [
+          {
+            "node": "Has New?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has New?": {
+      "main": [
+        [
+          {
+            "node": "Save",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Format",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Format": {
+      "main": [
+        [
+          {
+            "node": "Telegram",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Feeds List": {
+      "main": [
+        [
+          {
+            "node": "Fetch Feed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Feed": {
+      "main": [
+        [
+          {
+            "node": "Parse Feeds",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Feeds": {
+      "main": [
+        [
+          {
+            "node": "Classify",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "errorWorkflow": "mzrUOgpYW8OVSWGl",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  },
+  "staticData": {
+    "node:Every 5min": {
+      "recurrenceRules": []
+    }
+  },
+  "meta": null,
+  "pinData": null,
+  "versionId": "ef2b9a89-beef-48da-bd8b-07996236ab0a",
+  "activeVersionId": "ef2b9a89-beef-48da-bd8b-07996236ab0a",
+  "versionCounter": 41,
+  "triggerCount": 1,
+  "shared": [
+    {
+      "updatedAt": "2026-04-12T18:52:25.222Z",
+      "createdAt": "2026-04-12T18:52:25.222Z",
+      "role": "workflow:owner",
+      "workflowId": "JN9HhsDNcng8R9po",
+      "projectId": "PufDuNtXpreUjA3o",
+      "project": {
+        "updatedAt": "2025-12-05T21:25:37.247Z",
+        "createdAt": "2025-11-04T19:43:55.674Z",
+        "id": "PufDuNtXpreUjA3o",
+        "name": "Maksim Parve <maksim@studiokook.ee>",
+        "type": "personal",
+        "icon": null,
+        "description": null,
+        "creatorId": "3462e3d2-f46b-4d98-acea-93ac07713bf5"
+      }
+    }
+  ],
+  "tags": [],
+  "activeVersion": {
+    "updatedAt": "2026-04-19T12:32:24.978Z",
+    "createdAt": "2026-04-19T12:32:24.978Z",
+    "versionId": "ef2b9a89-beef-48da-bd8b-07996236ab0a",
+    "workflowId": "JN9HhsDNcng8R9po",
+    "nodes": [
+      {
+        "parameters": {
+          "rule": {
+            "interval": [
+              {
+                "field": "cronExpression",
+                "expression": "*/5 * * * *"
+              }
+            ]
+          }
+        },
+        "id": "sched1",
+        "name": "Every 5min",
+        "type": "n8n-nodes-base.scheduleTrigger",
+        "typeVersion": 1.2,
+        "position": [
+          0,
+          0
+        ]
+      },
+      {
+        "parameters": {
+          "jsCode": "const feeds = [\n  { url: 'https://www.investing.com/rss/news_95.rss', src: 'investing', type: 'rss' },\n  { url: 'https://www.investing.com/rss/news_11.rss', src: 'investing', type: 'rss' },\n  { url: 'https://www.investing.com/rss/central_banks.rss', src: 'investing', type: 'rss' },\n  { url: 'https://www.investing.com/rss/news_1.rss', src: 'investing', type: 'rss' },\n  { url: 'https://www.investing.com/rss/news_25.rss', src: 'investing', type: 'rss' },\n  { url: 'https://www.federalreserve.gov/feeds/press_monetary.xml', src: 'fed', type: 'rss' },\n  { url: 'https://www.ecb.europa.eu/rss/press.html', src: 'ecb', type: 'rss' },\n  { url: 'https://seekingalpha.com/feed.xml', src: 'seeking_alpha', type: 'rss' },\n  { url: 'https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=20910258', src: 'cnbc', type: 'rss' },\n  { url: 'https://www.reddit.com/r/wallstreetbets/new.json?limit=5', src: 'reddit', type: 'json' },\n  { url: 'https://www.reddit.com/r/commodities/new.json?limit=5', src: 'reddit', type: 'json' }\n];\nreturn feeds.map(f => ({ json: f }));"
+        },
+        "id": "fetch1",
+        "name": "Feeds List",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          250,
+          0
+        ]
+      },
+      {
+        "parameters": {
+          "url": "={{ $json.url }}",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "User-Agent",
+                "value": "Mozilla/5.0 MiniAladdin/1.0"
+              }
+            ]
+          },
+          "options": {
+            "timeout": 8000,
+            "response": {
+              "response": {
+                "responseFormat": "text",
+                "neverError": true
+              }
+            }
+          }
+        },
+        "id": "httpfetch1",
+        "name": "Fetch Feed",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          500,
+          0
+        ],
+        "onError": "continueRegularOutput"
+      },
+      {
+        "parameters": {
+          "jsCode": "const items = $input.all();\nconst allItems = [];\nlet ok = 0;\nfor (const item of items) {\n  const data = item.json.data;\n  const body = typeof data === 'string' ? data : (item.json.body || '');\n  const src = item.json.src || 'unknown';\n  const type = item.json.type || 'rss';\n  if (!body) continue;\n  ok++;\n  if (type === 'json') {\n    let parsed;\n    try { parsed = JSON.parse(body); } catch (e) { continue; }\n    const children = parsed && parsed.data && parsed.data.children;\n    if (!Array.isArray(children)) continue;\n    for (const c of children.slice(0, 5)) {\n      if (c && c.data && c.data.title) {\n        allItems.push({ title: c.data.title, source: src });\n      }\n    }\n  } else {\n    const re = /<item[\\s\\S]*?<title[^>]*>(?:<!\\[CDATA\\[)?(.*?)(?:\\]\\]>)?<\\/title>[\\s\\S]*?<\\/item>/gi;\n    let m, c = 0;\n    while ((m = re.exec(body)) !== null && c < 8) {\n      const t = (m[1] || '').trim();\n      if (t) allItems.push({ title: t, source: src });\n      c++;\n    }\n  }\n}\nif (!allItems.length) return [{ json: { skip: true, total: 0, feeds_ok: ok, feeds_total: items.length } }];\nreturn allItems.map(i => ({ json: i }));"
+        },
+        "id": "parse1",
+        "name": "Parse Feeds",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          750,
+          0
+        ]
+      },
+      {
+        "parameters": {
+          "jsCode": "const critical = ['rate cut','rate hike','rate decision','recession','military strike','nuclear','invasion','declares war','debt default'];\nconst high = ['interest rate decision','federal reserve statement','fomc statement','ecb rate','bank of japan rate','inflation data','cpi report','sanctions package','new tariff','trade war escalat','opec cut','opec production cut','embargo'];\nconst medium = ['gold price','oil price','crude oil price','natural gas price','copper price','gdp growth','gdp data','unemployment rate','nonfarm payroll','earnings beat','earnings miss','bitcoin price','crypto market'];\n\nfunction classify(title) {\n  const t = title.toLowerCase();\n  for (const p of critical) if (t.includes(p)) return { impact: 'critical', type: getType(p), assets: getAssets(p) };\n  for (const p of high) if (t.includes(p)) return { impact: 'high', type: getType(p), assets: getAssets(p) };\n  for (const p of medium) if (t.includes(p)) return { impact: 'medium', type: getType(p), assets: getAssets(p) };\n  return null;\n}\nfunction getType(p) {\n  if (/rate|fed|fomc|ecb|boj|inflation|cpi/.test(p)) return 'policy_change';\n  if (/sanction|embargo/.test(p)) return 'sanctions';\n  if (/tariff|trade war/.test(p)) return 'trade_war';\n  if (/military|nuclear|invasion|war/.test(p)) return 'conflict';\n  if (/recession|default|gdp|unemployment|nonfarm/.test(p)) return 'macro';\n  if (/opec|gold|oil|crude|gas|copper/.test(p)) return 'commodity';\n  if (/bitcoin|crypto/.test(p)) return 'crypto';\n  if (/earnings/.test(p)) return 'corporate';\n  return 'general';\n}\nfunction getAssets(p) {\n  const m = {'rate cut':['GOLD','TLT','SPY'],'rate hike':['GOLD','TLT','SPY'],'rate decision':['GOLD','TLT','SPY'],'recession':['SPY','GOLD','TLT'],'military strike':['GOLD','OIL'],'nuclear':['GOLD','OIL','USD'],'invasion':['GOLD','OIL'],'declares war':['GOLD','OIL'],'debt default':['GOLD','TLT','SPY'],'interest rate decision':['GOLD','TLT','USD'],'federal reserve statement':['GOLD','SPY'],'fomc statement':['GOLD','SPY','TLT'],'ecb rate':['EUR','GOLD'],'bank of japan rate':['JPY','GOLD'],'inflation data':['GOLD','TLT'],'cpi report':['GOLD','SPY'],'sanctions package':['GOLD','OIL'],'new tariff':['SPY','COPPER'],'trade war escalat':['SPY','COPPER','GOLD'],'opec cut':['OIL'],'opec production cut':['OIL'],'embargo':['OIL','GOLD'],'gold price':['GOLD','SILVER'],'oil price':['OIL'],'crude oil price':['OIL'],'natural gas price':['NATGAS'],'copper price':['COPPER'],'gdp growth':['SPY'],'gdp data':['SPY'],'unemployment rate':['SPY','GOLD'],'nonfarm payroll':['SPY','GOLD'],'earnings beat':['SPY'],'earnings miss':['SPY'],'bitcoin price':['BTC'],'crypto market':['BTC','ETH']};\n  return m[p] || [];\n}\n\nconst items = $input.all();\nconst results = [];\nfor (const item of items) {\n  if (item.json.skip) return [item];\n  const cls = classify(item.json.title || '');\n  if (!cls) continue;\n  results.push({ json: { event_type: cls.type, description: item.json.title, sentiment_score: 0, affected_assets: cls.assets, source: item.json.source || 'rss_news', impact_level: cls.impact } });\n}\nif (!results.length) return [{ json: { skip: true, total: items.length } }];\nreturn results;"
+        },
+        "id": "classify1",
+        "name": "Classify",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          1000,
+          0
+        ]
+      },
+      {
+        "parameters": {
+          "operation": "executeQuery",
+          "query": "SELECT LEFT(description, 100) as d FROM geopolitical_events WHERE timestamp > NOW() - INTERVAL '24 hours';",
+          "options": {}
+        },
+        "id": "dedup_check",
+        "name": "Get Recent 24h",
+        "type": "n8n-nodes-base.postgres",
+        "typeVersion": 2.5,
+        "position": [
+          1250,
+          0
+        ],
+        "credentials": {
+          "postgres": {
+            "id": "TradingPostgres1",
+            "name": "Trading Postgres"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "jsCode": "const recentRows = $('Get Recent 24h').all();\nconst existing = new Set(recentRows.map(r => (r.json.d || '').toLowerCase().trim()));\nconst classified = $('Classify').all();\nconst newItems = [];\nfor (const item of classified) {\n  if (item.json.skip) continue;\n  const prefix = (item.json.description || '').substring(0, 100).toLowerCase().trim();\n  if (!existing.has(prefix)) {\n    newItems.push(item);\n    existing.add(prefix);\n  }\n}\nif (!newItems.length) return [{ json: { skip: true, new_count: 0 } }];\nreturn newItems;"
+        },
+        "id": "dedup1",
+        "name": "Filter Seen",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          1500,
+          0
+        ]
+      },
+      {
+        "parameters": {
+          "conditions": {
+            "options": {
+              "caseSensitive": true,
+              "leftValue": "",
+              "typeValidation": "strict"
+            },
+            "conditions": [
+              {
+                "id": "c1",
+                "leftValue": "={{ $json.skip }}",
+                "rightValue": true,
+                "operator": {
+                  "type": "boolean",
+                  "operation": "false"
+                }
+              }
+            ]
+          }
+        },
+        "id": "if1",
+        "name": "Has New?",
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 2.2,
+        "position": [
+          1750,
+          0
+        ]
+      },
+      {
+        "parameters": {
+          "operation": "executeQuery",
+          "query": "INSERT INTO geopolitical_events (event_type, description, sentiment_score, affected_assets, source, impact_level, timestamp) VALUES ($1, $2, $3, $4::text[], $5, $6, NOW());",
+          "options": {
+            "queryReplacement": "={{ [$json.event_type, $json.description, $json.sentiment_score, '{' + ($json.affected_assets || []).join(',') + '}', $json.source, $json.impact_level] }}"
+          }
+        },
+        "id": "pg1",
+        "name": "Save",
+        "type": "n8n-nodes-base.postgres",
+        "typeVersion": 2.5,
+        "position": [
+          2000,
+          -50
+        ],
+        "credentials": {
+          "postgres": {
+            "id": "TradingPostgres1",
+            "name": "Trading Postgres"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "jsCode": "const items = $input.all();\nconst critical = items.filter(i => i.json.impact_level === 'critical').slice(0, 3);\nif (!critical.length) return [];\nconst lines = critical.map(i => {\n  const e = i.json;\n  const assets = (e.affected_assets || []).join(', ');\n  return '\\ud83d\\udea8 *' + (e.event_type || 'NEWS').toUpperCase() + '* [' + e.source + ']\\n' + e.description + '\\nAssets: ' + assets;\n}).join('\\n\\n');\nreturn [{ json: { message: '\\ud83d\\udcf0 *Critical News*\\n\\n' + lines } }];"
+        },
+        "id": "fmt1",
+        "name": "Format",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          2000,
+          100
+        ]
+      },
+      {
+        "parameters": {
+          "chatId": "804465999",
+          "text": "={{ $json.message }}",
+          "additionalFields": {
+            "parse_mode": "Markdown"
+          }
+        },
+        "id": "tg1",
+        "name": "Telegram",
+        "type": "n8n-nodes-base.telegram",
+        "typeVersion": 1.2,
+        "position": [
+          2500,
+          50
+        ],
+        "credentials": {
+          "telegramApi": {
+            "id": "TradingTelegramBot",
+            "name": "Trading Bot"
+          }
+        },
+        "webhookId": "b72b404a-98cf-4f59-9d55-b274cf04dd7e"
+      }
+    ],
+    "connections": {
+      "Every 5min": {
+        "main": [
+          [
+            {
+              "node": "Feeds List",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Classify": {
+        "main": [
+          [
+            {
+              "node": "Get Recent 24h",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Get Recent 24h": {
+        "main": [
+          [
+            {
+              "node": "Filter Seen",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Filter Seen": {
+        "main": [
+          [
+            {
+              "node": "Has New?",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Has New?": {
+        "main": [
+          [
+            {
+              "node": "Save",
+              "type": "main",
+              "index": 0
+            },
+            {
+              "node": "Format",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          []
+        ]
+      },
+      "Format": {
+        "main": [
+          [
+            {
+              "node": "Telegram",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Feeds List": {
+        "main": [
+          [
+            {
+              "node": "Fetch Feed",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Fetch Feed": {
+        "main": [
+          [
+            {
+              "node": "Parse Feeds",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Parse Feeds": {
+        "main": [
+          [
+            {
+              "node": "Classify",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "authors": "Maksim Parve",
+    "name": null,
+    "description": null,
+    "autosaved": false,
+    "workflowPublishHistory": [
+      {
+        "createdAt": "2026-04-25T10:19:17.456Z",
+        "id": 828,
+        "workflowId": "JN9HhsDNcng8R9po",
+        "versionId": "ef2b9a89-beef-48da-bd8b-07996236ab0a",
+        "event": "deactivated",
+        "userId": "3462e3d2-f46b-4d98-acea-93ac07713bf5"
+      },
+      {
+        "createdAt": "2026-04-25T10:19:17.469Z",
+        "id": 829,
+        "workflowId": "JN9HhsDNcng8R9po",
+        "versionId": "ef2b9a89-beef-48da-bd8b-07996236ab0a",
+        "event": "activated",
+        "userId": "3462e3d2-f46b-4d98-acea-93ac07713bf5"
+      }
+    ]
+  }
+}

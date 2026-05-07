@@ -1,0 +1,187 @@
+---
+type: procedure
+tags: [system, librarian, distillation, vault]
+created: 2026-04-27
+---
+
+# Librarian Procedures
+
+Detailed playbooks for the [[~/.claude/agents/librarian|librarian]] agent. Agent file holds only router + invariants — full procedures live here.
+
+## Mode 1 — distill (Knowledge Distillation)
+
+1. Read sources via Obsidian MCP:
+   - `10-Projects/Studiokook/20-Areas/Infrastructure/troubleshooting-current`
+   - `10-Projects/Studiokook/20-Areas/Infrastructure/global-patterns`
+2. Read [[routing-map]]
+3. For each entry, classify: `fact | gotcha | example | pattern | outdated`
+4. Match keywords to routing-map destinations:
+   - **Prefer the most specific row.** Topic-file row (e.g., `dc-mechanics.md`) beats folder-MOC row (e.g., `_index.md`) — even if both match.
+   - **Folder-MOC files (`*/_index.md`) are MOC, not landfill.** Route there only when (a) entry is cross-cutting/taxonomy AND (b) no topic-file row matches.
+   - Before defaulting to folder-MOC → Glob folder for topic files, re-check keywords.
+5. Read each destination — check duplicates BEFORE appending:
+   - Grep for entry's key terms (function names, error keywords, distinctive phrases).
+   - 2+ overlap with existing line = dupe → deletion log with `reason=dedup`.
+6. Append via `mcp__obsidian__obsidian_patch_content`.
+7. Rewrite source files as cleaned skeletons.
+8. Report: N processed, destinations (per-file counts), N remaining, N skipped (dupes/outdated).
+
+**Deletion logging:** Every removal from troubleshooting-current / global-patterns appends one line to `C:/Users/sorte/.claude/logs/librarian-deletions.log`:
+```
+[ISO-timestamp] <source-file>:<lineno> "<first-60-chars>" reason=<dedup|outdated|routed>
+```
+Only place DELETEs are recorded — permanent destinations never lose data.
+
+## Mode 2 — review-routing (Quality Check)
+
+1. Read `C:/Users/sorte/.claude/scripts/.router-state.json`
+2. For each recently routed file → read destination vault file
+3. Assess: correct classification? misrouted? missing context?
+4. Report findings + specific recommendations.
+
+## Mode 3 — vault-maintenance (Health Check)
+
+**Dedup detection:**
+- Read each destination file from routing-map
+- Find entries with identical titles or near-identical content
+- Report duplicates + line numbers
+
+**Stale entry check:**
+- Last-modified date per destination
+- Flag destinations with zero updates >30 days
+- Cross-reference with `.router-state.json insightsPerDomain`
+
+**Orphan / empty-file detection:**
+- Scan vault root `.md` files (depth 1 only)
+- Flag empty (0 bytes)
+- For non-empty root files → check if duplicate exists deeper in PARA (10-Projects/, 20-Areas/, 30-Resources/, 40-Archive/)
+- Original exists with content → report root copy as orphan
+- Check MOC for stale links to deleted/moved files
+- Sources of orphans: ClaudeClaw vault sync, Obsidian wikilink auto-create, daily notes
+- **Delete only after user confirmation** (Safety Rules apply)
+
+**Broken-link scan:**
+- Extract `[[wikilink]]` patterns from destinations
+- Verify each linked note exists
+- Report broken links
+
+## Mode 4 — triage (Inbox Processing)
+
+Process unreviewed inbox files via classify → extract → archive pipeline.
+
+**Inbox locations:**
+- `10-Projects/AiGeneration/claudeclaw-features/` (feature-watcher)
+- `youtube-notes/` (n8n pipeline)
+
+**Lifecycle frontmatter:** `status: triaged | extracted | archived`. Files without `status` = unprocessed.
+
+### Step 1 — Scan
+1. Glob both inbox dirs for `.md` (skip `_index.md`)
+2. Read frontmatter — filter missing `status`
+3. Report: N unprocessed cards, N youtube-notes
+
+### Step 2 — Classify
+**claudeclaw-features** (have `verdict` + `priority_score`):
+- `verdict: reject` + `priority_score ≤ 3` → `status: archived`
+- `verdict: apply` + `priority_score ≥ 7` → `status: triaged`, flag for extraction
+- Middle (4–6 / mixed) → `status: triaged`, note reasoning
+
+**youtube-notes:**
+- Read content, search vault for key terms
+- Already routed → `status: extracted`
+- Not routed → `status: triaged`, list actionable insights
+
+### Step 3 — Extract (triaged files)
+1. Read file fully
+2. Identify actionable insights (n8n patterns, AI tools, architecture, SMM tactics)
+3. Route each to correct vault destination via routing-map
+4. Successful routing → update frontmatter `status: extracted`
+
+### Step 4 — Cleanup
+- `status: extracted` files fully processed → delete
+- Remove from `_index.md` listings if present
+
+### Step 4b — Clear pending flag
+After extraction → delete `~/.claude/hooks/.inbox-extraction-needed` to stop re-alerting.
+
+### Step 5 — Report
+```
+TRIAGE REPORT
+─────────────
+Scanned: N files (M claudeclaw, K youtube)
+Archived (reject/low-pri): X
+Triaged (pending extract): Y
+Extracted (insights routed): Z
+Already processed: W
+
+Destinations updated:
+  - workflow-patterns.md: +3 insights
+  - ai-tools-reference.md: +1 insight
+```
+
+**Auto-trigger:** vault-audit.js detects >10 unprocessed inbox files → suggests triage.
+
+## Mode 5 — register (File Registration)
+
+Enrich vault file: frontmatter + verify placement + rich `## Related`. Complements cheap PostToolUse hook (top-3 Related) — does LLM-expensive semantic work.
+
+**When:**
+- Manual: "зарегистрируй файл <path>", "register file", "пропиши метаданные"
+- Batch: "зарегистрируй все файлы без tags в 10-Projects/" — glob + iterate
+- Newly-created files needing richer metadata than hook provides
+
+### Step 1 — Read context
+1. Read target file (frontmatter + body)
+2. Read [[routing-map]] + [[vault-rules]]
+3. If in project, read project's `_index.md` for taxonomy cues
+
+### Step 2 — Verify placement
+- Match content keywords against routing-map rows
+- Compare matched destination path with actual file path
+- Match → ✓ продолжаем
+- Mismatch → ⚠ flag в отчёте: "content suggests <matched>, file at <actual>" — не двигать автоматически
+
+### Step 3 — Derive frontmatter (only add missing, never overwrite)
+
+**Required:**
+- `title` — из первой H1 или имени файла (de-kebab)
+- `tags` — 3–5 из content keywords + routing-map domain terms
+- `created` — git log first commit date, fallback fs ctime (YYYY-MM-DD)
+- `updated` — today
+- `parent` — wikilink на ближайший `_index.md` вверх по дереву (если есть)
+- `project` — lowercase имя ближайшего проекта (`studiokook`, `arkhos`, `3d-configurators`)
+
+**Conditional:**
+- `type` — только если явно: `index | reference | gotcha | pattern | draft | component | changelog`
+- `aliases` — синонимы для поиска
+- `status` — только для inbox cards (triaged | extracted | archived)
+
+### Step 4 — Derive Related
+1. Existing `## Related` с marker `auto-generated by vault-graph-builder` → сохранить, дополнить своими picks если higher QMD score
+2. Иначе: QMD search `vault` → top-5, `minScore ≥ 0.4`, exclude self/ancestor/descendant
+3. Format: `## Related` с marker `auto-generated by librarian register <date>`
+
+### Step 5 — Apply
+1. Write merged frontmatter (existing values wins на конфликте)
+2. Append/merge `## Related`
+3. **Never relocate** — только suggest в отчёте
+
+### Step 6 — Report (per file)
+```
+REGISTER <path>
+  frontmatter:
+    + tags: [...] (добавлено)
+    + project: xxx
+    + parent: [[...]]
+    + created: YYYY-MM-DD (из git log)
+    = title: ... (existing, оставлено)
+  Related: 3 picks added (QMD top-5 filtered)
+  placement: ✓ routing-map row N
+  OR ⚠ path mismatch: matched row N → <path>, file at <actual>
+```
+
+### Safety (register mode)
+- Never move files
+- Never overwrite existing frontmatter — merge only missing
+- Never replace `## Related` hook-block unless new picks strictly better (avg score higher)
+- File body <100 chars → skip, flag в отчёте

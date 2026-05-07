@@ -1,0 +1,305 @@
+---
+tags: [wordpress, plugins, safety, gotcha]
+project: studiokook
+source: .claude/patterns/wordpress-plugins.md
+updated: 2026-03-17
+---
+
+# WordPress Plugin Safety Patterns
+
+> **Critical patterns learned from production incidents**
+> Last updated: 2026-02-21
+
+---
+
+## ❌ ЗАПРЕЩЁННЫЕ ПАТТЕРНЫ
+
+### 1. CSS/JS Optimization Plugins — NO Auto-Installation
+
+**Affected plugins:**
+- Asset Cleanup / Asset CleanUp Pro
+- Autoptimize
+- WP Rocket
+- W3 Total Cache
+- Fast Velocity Minify
+- Any plugin with "optimize", "minify", "combine" in description
+
+**Problem:**
+Even with DEFAULT settings, these plugins can block critical CSS/JS files, causing complete visual breakdown.
+
+**Symptoms:**
+- Site returns HTTP 200
+- HTML content present
+- **CSS not loaded** — page displays as plain HTML
+- JavaScript errors in console
+- Elementor layouts broken
+
+**Why it happens:**
+- Aggressive default rules block "unnecessary" assets
+- Conflict with existing cache layers (Seraphinite Accelerator)
+- Regex patterns catch legitimate files
+- Load order dependencies broken by combination
+
+**Example incident (2026-02-21):**
+```
+Before: 383KB page with CSS
+After Asset Cleanup activation: 162KB plain HTML (CSS blocked)
+Stylesheets: 1 → 25 after deactivation
+```
+
+**✅ CORRECT approach:**
+1. Measure baseline (PageSpeed score BEFORE changes)
+2. Install plugin
+3. **IMMEDIATELY check site visually** (open in browser)
+4. Configure ONLY via WordPress Admin UI (never WP-CLI)
+5. Enable Test Mode first
+6. Test after EACH setting change
+7. Monitor for 24 hours before declaring success
+
+---
+
+### 2. Plugin Configuration via WP-CLI — NEVER
+
+**Problem:**
+Using `wp eval` + `update_option()` to configure plugins causes type mismatches.
+
+**Example:**
+```bash
+# ❌ WRONG
+wp eval 'update_option("plugin_settings", ["key" => "value"]);'
+
+# Plugin expects JSON string, receives PHP array
+# Result: Fatal error: json_decode(): Argument #1 ($json) must be of type string
+```
+
+**✅ CORRECT methods:**
+1. WordPress Admin UI (always safe)
+2. Plugin's documented WP-CLI commands (if exists)
+3. Default settings (safest)
+
+**Incident reference:** Asset Cleanup crash (2026-02-21)
+- Settings saved as PHP array instead of JSON string
+- Site Fatal Error on every page load
+- Downtime: 5 minutes
+
+---
+
+### 3. Global CSS Overrides via mu-plugin — BE CAREFUL
+
+**Problem:**
+Broad CSS selectors affect unintended elements.
+
+**Example:**
+```php
+// ❌ BAD: Affects ALL elements with this class
+add_action('wp_head', function() {
+    echo '<style>
+        span.elementor-heading-title {
+            color: #ffffff !important;
+        }
+    </style>';
+});
+```
+
+**What breaks:**
+- White text on white backgrounds (light sections)
+- New accessibility issues (contrast violations)
+- Overrides intentional design choices
+
+**✅ CORRECT approach:**
+1. Use Elementor → Edit Widget → Style tab directly
+2. Add class to specific widget: `.my-dark-hero h2 { color: #fff; }`
+3. Use `!important` ONLY when absolutely necessary
+4. Test on ALL page sections (dark + light backgrounds)
+
+---
+
+## ✅ ПРАВИЛЬНЫЕ ПАТТЕРНЫ
+
+### Safe Plugin Installation Workflow
+
+```bash
+# 1. Baseline measurement
+# Run PageSpeed Insights, note scores
+
+# 2. Install plugin
+wp plugin install PLUGIN_SLUG --allow-root
+
+# 3. STOP — DO NOT activate yet
+# Read plugin documentation first
+
+# 4. Activate
+wp plugin activate PLUGIN_SLUG --allow-root
+
+# 5. IMMEDIATE visual check
+curl -s "https://site.com/" | grep -c "stylesheet"
+# Should return >5 for typical WordPress site
+
+# 6. Open in browser
+# Check homepage, key pages, Elementor sections
+
+# 7. Configure via Admin UI ONLY
+# Enable Test Mode if available
+# Make ONE change at a time
+# Check site after each change
+
+# 8. Monitor
+# Check error logs: wp-content/debug.log
+# Monitor for 24 hours
+# Run PageSpeed again
+
+# 9. If anything breaks
+wp plugin deactivate PLUGIN_SLUG --allow-root
+find ~/path/cache/ -type f -delete
+curl "https://site.com/wp-json/sk/v1/full-clear"
+```
+
+---
+
+### Recovery Procedure (Site Broken After Plugin)
+
+```bash
+# 1. Identify suspect plugins
+wp plugin list --allow-root | grep -E "optim|minif|cache|speed"
+
+# 2. Deactivate suspect plugin
+wp plugin deactivate PLUGIN_SLUG --allow-root
+
+# 3. Clear ALL caches
+curl "https://site.com/wp-json/sk/v1/full-clear" -u admin:pass
+find ~/cache/ -type f -delete
+
+# 4. Verify restoration
+curl -s "https://site.com/" | grep -c "stylesheet"
+# Should be >5
+
+# 5. Check site visually
+# Open in browser, verify CSS loads
+
+# 6. Clean up
+wp option delete plugin_settings_option_name --allow-root
+wp plugin uninstall PLUGIN_SLUG --allow-root
+
+# 7. Document incident
+# Create post-mortem in logs/self-learning/
+```
+
+---
+
+### CSS Fixes Best Practices
+
+**For accessibility contrast issues:**
+
+1. **Identify exact element:**
+   ```bash
+   # Use browser DevTools → Inspect Element
+   # Note full selector chain
+   ```
+
+2. **Fix in Elementor directly:**
+   - Edit widget → Style tab → Typography/Color
+   - Widget-specific, no side effects
+
+3. **If must use CSS:**
+   ```php
+   // ✅ GOOD: Specific selector
+   add_action('wp_head', function() {
+       echo '<style id="my-specific-fix">
+           .hero-section .elementor-heading-title {
+               color: #ffffff !important;
+               text-shadow: 2px 2px 4px rgba(0,0,0,0.8);
+           }
+       </style>';
+   }, 999);
+   ```
+
+4. **Test on multiple sections:**
+   - Hero (dark background)
+   - Content (light background)
+   - Footer (dark background)
+   - Mobile view
+
+---
+
+## Detection Rules
+
+### When to be EXTRA careful:
+
+**Plugin name contains:**
+- "optim", "minif", "cache", "speed", "boost", "performance"
+- "asset", "cleanup", "compress", "combine"
+
+**Plugin description mentions:**
+- "minify CSS/JS"
+- "combine files"
+- "defer scripts"
+- "remove unused CSS"
+- "critical CSS"
+
+**High-risk scenarios:**
+1. Site already has cache plugin (Seraphinite, WP Rocket)
+2. Using page builder (Elementor, Divi)
+3. Heavy use of custom CSS
+4. Many third-party scripts (analytics, chat, etc.)
+
+### Green flags (safer plugins):
+
+- Read-only (Site Kit, MonsterInsights)
+- Content-only (Yoast, RankMath)
+- Well-documented WP-CLI commands
+- "Test Mode" feature available
+- 100K+ active installs + 4.5+ rating
+- Official repository, regular updates
+
+---
+
+## Metrics to Track
+
+**Before ANY optimization plugin:**
+
+| Metric | Tool | Baseline |
+|--------|------|----------|
+| PageSpeed Performance | pagespeed.web.dev | Note score |
+| PageSpeed Accessibility | pagespeed.web.dev | Note score |
+| Load time | curl -w "%{time_total}" | Note seconds |
+| Page size | curl -w "%{size_download}" | Note bytes |
+| CSS files loaded | grep -c stylesheet | Note count |
+| JavaScript files | grep -c "<script" | Note count |
+
+**After plugin activation:**
+- Re-run ALL metrics
+- Compare to baseline
+- If ANY metric degrades significantly → investigate
+- If visual breakage → immediate rollback
+
+---
+
+## Related Documentation
+
+- `memory/MEMORY.md` — WordPress plugin configuration safety
+- `logs/self-learning/asset-cleanup-fatal-error-postmortem.md` — Incident analysis
+- `logs/recovery-summary-2026-02-21.md` — Recovery procedure used
+- `logs/executive-summary-2026-02-21.md` — Full incident report
+
+---
+
+## Summary Rules
+
+1. ❌ **NO auto-install** optimization plugins without manual testing
+2. ❌ **NO wp eval** for plugin configuration (use Admin UI)
+3. ❌ **NO broad CSS overrides** (use specific selectors)
+4. ✅ **YES baseline metrics** before changes
+5. ✅ **YES immediate visual check** after activation
+6. ✅ **YES Test Mode** when available
+7. ✅ **YES one change at a time** with verification
+
+**Default action for optimization plugins:** Leave with default settings, configure manually via UI, or don't install at all if Seraphinite/similar already active.
+
+---
+
+## Связанные файлы
+
+- [[10-Projects/Studiokook/20-Areas/WordPress/_index|← WordPress (Studiokook)]]
+- [[10-Projects/Studiokook/infrastructure|Infrastructure]] — версии плагинов и зависимости
+- [[10-Projects/Studiokook/20-Areas/WordPress/five-whys|5 Whys]] — анализ проблем с плагинами
+- [[10-Projects/Studiokook/20-Areas/WordPress/problem-solving|Problem Solving]] — классификация решений
