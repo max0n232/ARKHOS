@@ -3,6 +3,7 @@ name: assistant
 description: >
   Trigger: "что делать", "приоритеты", "статус проектов", "weekly/monthly review", "progress",
   "health check". Check project contexts first. NOT "review" alone (may be output-critic).
+model: sonnet
 ---
 
 # Project Coordinator

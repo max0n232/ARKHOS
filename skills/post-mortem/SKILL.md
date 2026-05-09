@@ -3,6 +3,7 @@ name: post-mortem
 description: >
   Trigger: post-mortem, ретроспектива, "что пошло не так", "разбор ошибок", "debug session".
   Systematic session review + knowledge routing.
+model: sonnet
 ---
 
 # Post-Mortem

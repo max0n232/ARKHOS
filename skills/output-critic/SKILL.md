@@ -3,6 +3,7 @@ name: output-critic
 description: >
   Mandatory after generating final outputs (prompts, code, content, config). Manual: "critique",
   "improve this", "проверь качество". Skip for conversational replies.
+model: sonnet
 ---
 
 # Output Critic — Universal Quality Protocol

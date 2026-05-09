@@ -3,6 +3,7 @@ name: obsidian-router
 description: >
   Trigger: vault, obsidian, заметки, БЗ, qmd, "найди в заметках", "сохрани в базу знаний",
   vault paths. Routes to QMD/Nexus/REST API.
+model: haiku
 ---
 
 # obsidian-router
