@@ -90,12 +90,18 @@ if (hoursSinceLastRun < MIN_INTERVAL_HOURS) {
 const { handler, flagData, ageHours } = pick;
 log(`triggering librarian [${handler.name}] (flag age=${ageHours.toFixed(1)}h, meta=${JSON.stringify(flagData).slice(0, 120)})`);
 
-const r = spawnSync('claude', ['--print', '--dangerously-skip-permissions', handler.buildPrompt(handler.flag)], {
-    stdio: ['ignore', 'pipe', 'pipe'],
+const CLAUDE_BIN = process.platform === 'win32'
+    ? path.join(process.env.APPDATA || '', 'npm', 'claude.cmd')
+    : 'claude';
+const r = spawnSync(CLAUDE_BIN, ['--print', '--dangerously-skip-permissions'], {
+    input: handler.buildPrompt(handler.flag),
+    stdio: ['pipe', 'pipe', 'pipe'],
     timeout: CLAUDE_TIMEOUT_MS,
     windowsHide: true,
-    encoding: 'utf8'
+    encoding: 'utf8',
+    shell: process.platform === 'win32'
 });
+if (r.error) log(`[${handler.name}] spawn error: ${r.error.code || ''} ${r.error.message}`);
 
 try {
     fs.writeFileSync(LAST_RUN, JSON.stringify({
