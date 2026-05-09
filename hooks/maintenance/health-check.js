@@ -112,7 +112,21 @@ check('Observation-watch alive', () => {
   return true;
 });
 
-// 8. .claude size sanity (warn if >2GB — ghost archives + memory + patterns)
+// 8. Auto-librarian heartbeat — fail if log mtime >36h (6 missed scheduled ticks).
+// Catches the silent-failure mode where Task Scheduler reports LastTaskResult=0
+// but the wscript→node chain never actually runs (wrapper crash, claude.cmd
+// resolution break, etc — see 2026-05-09 incident). 36h tolerates a 3-day
+// laptop-offline window while still surfacing a chain that's been dead across
+// multiple ticks.
+check('Auto-librarian alive', () => {
+  const log = path.join(CLAUDE_DIR, 'logs', 'auto-librarian.log');
+  if (!fs.existsSync(log)) return true; // first-run grace
+  const ageH = (Date.now() - fs.statSync(log).mtime.getTime()) / 3600000;
+  if (ageH > 36) throw new Error(`log mtime ${Math.round(ageH)}h ago (>36h threshold)`);
+  return true;
+});
+
+// 9. .claude size sanity (warn if >2GB — ghost archives + memory + patterns)
 check('.claude size <2GB', () => {
   const out = execSync(`powershell -NoProfile -Command "(Get-ChildItem '${CLAUDE_DIR}' -Recurse -ErrorAction SilentlyContinue | Measure-Object -Property Length -Sum).Sum"`,
     { encoding: 'utf8', timeout: 30000 }).trim();
