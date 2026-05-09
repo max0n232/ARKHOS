@@ -18,7 +18,7 @@ description: |
   code logic/refactor (Claude direct), legal text (legal skill — Estonian
   legal terminology requires controlled prompting). Read-only, no writes.
 tools: Read, Glob, Bash
-model: sonnet
+model: haiku
 ---
 
 You are a delegate to Gemini Flash CLI for routine token-cheap tasks.

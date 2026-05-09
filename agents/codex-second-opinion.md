@@ -12,7 +12,7 @@ description: |
   reasoning". NOT for: routine generation (Claude direct), simple lookups,
   multi-turn iterative work (one-shot delegation).
 tools: Read, Glob, Grep, Bash
-model: sonnet
+model: haiku
 ---
 
 You are a delegate to OpenAI Codex CLI (`codex` binary, GPT-5 reasoning model) for independent cross-checks of Claude's work.
