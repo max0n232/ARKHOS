@@ -33,7 +33,8 @@ function saveState(s) { fs.writeFileSync(STATE_FILE, JSON.stringify(s, null, 2))
 
 const state = loadState();
 const now = Date.now();
-if (now - state.lastRun < INTERVAL_HOURS * 3600 * 1000) process.exit(0);
+const force = process.argv.includes('--force');
+if (!force && now - state.lastRun < INTERVAL_HOURS * 3600 * 1000) process.exit(0);
 
 const results = [];
 function check(name, fn) {
@@ -98,7 +99,20 @@ check('Disk space', () => {
   return freeBytes > 5 * 1024 * 1024 * 1024; // >5 GB
 });
 
-// 7. .claude size sanity (warn if >2GB — ghost archives + memory + patterns)
+// 7. Observation-watch heartbeat — fail if watcher hasn't successfully run in 72h.
+// 72h tolerates 3-day weekends + laptop offline. Reads `lastSuccess` not `lastAttempt`
+// so a watcher that crashed mid-run shows up as stale (not silently masked).
+check('Observation-watch alive', () => {
+  const obsState = path.join(CLAUDE_DIR, 'hooks', 'maintenance', '.observation-watch-state.json');
+  if (!fs.existsSync(obsState)) return true; // first-run grace period
+  const s = JSON.parse(fs.readFileSync(obsState, 'utf8'));
+  const lastSuccess = s.lastSuccess || 0;
+  const ageH = (Date.now() - lastSuccess) / 3600000;
+  if (ageH > 72) throw new Error(`last successful run ${Math.round(ageH)}h ago (>72h threshold)`);
+  return true;
+});
+
+// 8. .claude size sanity (warn if >2GB — ghost archives + memory + patterns)
 check('.claude size <2GB', () => {
   const out = execSync(`powershell -NoProfile -Command "(Get-ChildItem '${CLAUDE_DIR}' -Recurse -ErrorAction SilentlyContinue | Measure-Object -Property Length -Sum).Sum"`,
     { encoding: 'utf8', timeout: 30000 }).trim();

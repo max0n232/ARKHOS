@@ -325,6 +325,50 @@ async function callWithFallback(systemPrompt, userMessage, maxTokens, opts = {})
 }
 
 /**
+ * Get Gemini embedding for a text snippet (free tier, 1500 RPD).
+ * Returns a 768-dim vector. Used for semantic dedup of memory patterns.
+ */
+function callGeminiEmbedding(text, model = 'gemini-embedding-001') {
+    return new Promise((resolve, reject) => {
+        const CLAUDE_DIR = path.join(os.homedir(), '.claude');
+        let apiKey = process.env.GEMINI_API_KEY;
+        if (!apiKey) {
+            try { apiKey = fs.readFileSync(path.join(CLAUDE_DIR, 'credentials/gemini-api.key'), 'utf8').trim(); } catch {}
+        }
+        if (!apiKey) return reject(new Error('GEMINI_API_KEY not set'));
+
+        const body = JSON.stringify({
+            content: { parts: [{ text: text.slice(0, 8000) }] }
+        });
+
+        const req = https.request({
+            hostname: 'generativelanguage.googleapis.com',
+            path: `/v1beta/models/${model}:embedContent?key=${apiKey}`,
+            method: 'POST',
+            headers: { 'content-type': 'application/json', 'content-length': Buffer.byteLength(body) }
+        }, res => {
+            res.setEncoding('utf8');
+            let data = '';
+            res.on('data', chunk => data += chunk);
+            res.on('end', () => {
+                try {
+                    const parsed = JSON.parse(data);
+                    if (parsed.error) return reject(new Error(`Embedding error: ${parsed.error.message || data.slice(0,200)}`));
+                    const vec = parsed.embedding?.values;
+                    if (!Array.isArray(vec)) return reject(new Error('Empty embedding response: ' + data.slice(0, 200)));
+                    resolve(vec);
+                } catch (e) { reject(new Error('Embedding parse error: ' + e.message)); }
+            });
+        });
+
+        req.on('error', reject);
+        req.setTimeout(15000, () => { req.destroy(); reject(new Error('Embedding timeout')); });
+        req.write(body);
+        req.end();
+    });
+}
+
+/**
  * Get Telegram bot token from env or credentials file.
  */
 function getTelegramToken() {
@@ -372,6 +416,7 @@ module.exports = {
     callAnthropic,
     callSonnet,
     callGemini,
+    callGeminiEmbedding,
     callWithFallback,
     getTelegramToken,
     sendTelegram

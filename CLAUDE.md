@@ -85,7 +85,11 @@ Path: `C:/Users/sorte/ObsidianVault` (PARA). Доступ → skill `obsidian-ro
 
 ## Observation Protocol
 
-После любого внедрения, требующего проверки в проде через N дней (новый hook, n8n WF, WP mu-plugin, схема, throttle) → создай файл `ObsidianVault/10-Projects/ARKHOS/observations/<subject>-YYYYMMDD.md` с frontmatter (`type: observation`, `observe_until`, `success_criteria`, `status: watching`, `host`). Hook `observation-watch.js` (SessionStart, 12ч throttle) пришлёт TG-алерт по истечении `observe_until`. Lifecycle и контракт → `observations/_index.md`.
+**MANDATORY** после внедрения: новый/изменённый hook, wrapper, n8n WF, WP mu-plugin, схема, throttle, settings.json edit, model swap, dependency upgrade, поведенческий фикс harness/CLI bug, любая фича с runtime-эффектом проверяемым только в живом использовании. **При сомнении → создавай.** Пропуск = фича копится мёртвым грузом без проверки.
+
+Файл `ObsidianVault/10-Projects/ARKHOS/observations/<subject>-YYYYMMDD.md`, frontmatter (`type: observation`, `observe_until`, `success_criteria`, `status: watching`, `host`, `health_command`). Hook `observation-watch.js` (SessionStart, 12ч throttle) пришлёт TG-алерт по истечении `observe_until`. Lifecycle и контракт → `observations/_index.md`.
+
+Skip только если: pure read-only (search, audit, listing) ИЛИ rollback/revert (откатили, нечего наблюдать) ИЛИ юзер явно сказал "не надо в observation".
 
 ## Knowledge Distillation
 
