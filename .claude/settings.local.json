@@ -8,7 +8,30 @@
       "Bash(node -e \":*)",
       "Bash(ssh -i ~/.ssh/id_studiokook virt103578@studiokook.ee \":*)",
       "Edit(c:/Users/sorte/.claude/hooks/**)",
-      "Write(c:/Users/sorte/.claude/hooks/**)"
+      "Write(c:/Users/sorte/.claude/hooks/**)",
+      "Edit(c:/Users/sorte/.claude/logs/**)",
+      "Write(c:/Users/sorte/.claude/logs/**)",
+      "Bash(cp 'file-history/5b733671-f1d6-46de-8c4e-f5ea9f4114c7/1b3259845bd76527@v2' 'hooks/maintenance/health-check.js')",
+      "Bash(cp 'file-history/064ee746-2f61-4f75-ae75-ae2b9f1f4866/90ebfb07fce30ca7@v2' 'hooks/maintenance/observation-watch.js')",
+      "Bash(cp 'file-history/0cd58f3d-96a5-4f10-9db5-f5c6f1b51ca1/24301534c13de32e@v2' 'hooks/maintenance/vault-graph-builder.js')",
+      "Bash(cp 'file-history/36816aa3-36d0-42af-a5f9-cc1ec648d7c3/354b4aac873aab77@v2' 'hooks/maintenance/n8n-monitor.js')",
+      "Bash(cp 'file-history/36816aa3-36d0-42af-a5f9-cc1ec648d7c3/d7354049c2cc73ac@v2' 'hooks/maintenance/memory-consolidation.js')",
+      "Bash(cmd //c \"schtasks /Change /TN \\\\\"ARKHOS-AutoLibrarian\\\\\" /DISABLE\")",
+      "Bash(cmd //c \"schtasks /Change /TN \\\\\"Drift Check\\\\\" /DISABLE\")",
+      "Bash(cmd //c \"schtasks /Change /TN \\\\\"n8n Report Digest\\\\\" /DISABLE\")",
+      "Bash(cmd //c \"schtasks /Change /TN \\\\\"QMD Refresh\\\\\" /DISABLE\")",
+      "Bash(ruby -c \"C:/Users/sorte/Desktop/easykitchen/scripts/ek_standards.rb\")",
+      "Bash(codex exec *)",
+      "mcp__sketchup__eval_ruby",
+      "Bash(mkdir -p \"C:/Users/sorte/.claude/logs/rollback\")",
+      "Bash(cp \"C:/Users/sorte/Desktop/easykitchen/scripts/ek_standards.rb\" \"C:/Users/sorte/.claude/logs/rollback/ek_standards.rb.20260503-pre-validator.bak\")",
+      "mcp__sketchup__get_scene_info",
+      "Bash(sed 's/<[^>]*>//g')",
+      "Bash(python -c ' *)",
+      "Bash(claude update *)",
+      "Bash(\"/c/Users/sorte/.bun/install/global/node_modules/ghost/ghost\" log *)",
+      "Bash(mkdir -p /c/Users/sorte/.claude/logs/rollback/oauth-rotation-20260509)",
+      "Bash(cp /c/Users/sorte/.claude.json /c/Users/sorte/.claude/logs/rollback/oauth-rotation-20260509/claude.json.before-client-swap)"
     ]
   }
 }
