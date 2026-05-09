@@ -3,6 +3,7 @@ name: n8n-expert
 description: >
   Trigger: n8n, воркфлоу, автоматизация, webhook, workflow errors/expressions.
   Use for correct patterns, validation, and sandbox limitations.
+model: sonnet
 ---
 
 # n8n Expert

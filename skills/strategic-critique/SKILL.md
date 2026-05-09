@@ -3,6 +3,7 @@ name: strategic-critique
 description: >
   Trigger: стратегия, strategy, content plan, контент-план, architecture decision,
   "со стратегической критикой". Multi-round critique with scoring. NOT "audit"/"roadmap" alone.
+model: opus
 ---
 
 # Strategic Critique Loop
