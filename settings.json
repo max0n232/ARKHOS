@@ -4,7 +4,6 @@
     "CLAUDE_AUTOCOMPACT_PCT_OVERRIDE": "80",
     "SLASH_COMMAND_TOOL_CHAR_BUDGET": "50000"
   },
-  "model": "sonnet",
   "permissions": {
     "allow": [
       "Read",
@@ -68,13 +67,14 @@
       "Bash(dd if=:*)"
     ]
   },
+  "model": "opus",
   "hooks": {
     "UserPromptSubmit": [
       {
         "hooks": [
           {
             "type": "command",
-            "command": "bash \"C:/Users/sorte/.bun/install/global/node_modules/ghost/ghost\" prompt",
+            "command": "node C:/Users/sorte/.claude/hooks/user-prompt-submit/ghost-prompt-dedup.js",
             "timeout": 5
           },
           {
@@ -147,6 +147,18 @@
           },
           {
             "type": "command",
+            "command": "node C:/Users/sorte/.claude/hooks/maintenance/memory-consolidation.js --anti",
+            "timeout": 120,
+            "statusMessage": "Anti-pattern extraction..."
+          },
+          {
+            "type": "command",
+            "command": "node C:/Users/sorte/.claude/hooks/maintenance/memory-consolidation.js --reorg",
+            "timeout": 180,
+            "statusMessage": "Pattern library reorg..."
+          },
+          {
+            "type": "command",
             "command": "node C:/Users/sorte/.claude/hooks/maintenance/n8n-monitor.js",
             "timeout": 20,
             "statusMessage": "n8n failure check..."
@@ -182,7 +194,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash \"C:/Users/sorte/.bun/install/global/node_modules/ghost/ghost\" stop",
+            "command": "node C:/Users/sorte/.claude/hooks/stop/ghost-stop-dedup.js",
             "timeout": 5
           },
           {
@@ -203,7 +215,7 @@
           },
           {
             "type": "prompt",
-            "prompt": "Analyze the assistant's last response. If stop_hook_active is true, return {\"ok\": true}.\n\nCHECK 1 — GENERATION TASK:\nWas this a GENERATION task? Generation = code/script written, text content produced, AI prompt generated, JSON/config created, plan via ExitPlanMode, recommendation lists with proposed actions, tool/plugin selection plans, multi-step proposals presented to user. NOT generation = answering factual questions, running diagnostic commands, pure explanations of existing state, file reads, search results, status reports without action proposals, conversational replies.\nIf GENERATION task AND response does NOT contain 'CRITIC PHASE' or 'Critic pass:' → return {\"ok\": false, \"reason\": \"Generation without critic. Use Skill tool: Skill('output-critic') in the SAME response before final output — do NOT wait for Stop hook. Apply: score Completeness/Clarity/Goal alignment/Edge cases (1-5), gaps ≤3, improved v2. Mark with CRITIC PHASE header.\"}.\n\nCHECK 2 — SEARCH VAULT FIRST:\nLook at ALL tool_use calls made in this assistant turn. If ANY tools were used (other than only Read on MEMORY.md/settings.json, or only Bash for a single quick command like git status) AND the task involves project work (content, SEO, SMM, translations, WordPress, n8n, Instagram, architecture, analysis, any Studiokook or AiGeneration work) AND the first tool_use was NOT ghost-sessions deep_search, mcp__obsidian, Bash(ghost search *), or Bash(qmd *) AND the MEMORY.md context does NOT contain an AUTOSEARCH section → return {\"ok\": false, \"reason\": \"Prompt hook condition was not met: Project task without vault search. FIRST tool must be ghost-sessions deep_search or mcp__obsidian before doing any project work. Vault contains past decisions, strategies, and patterns — always check before acting.\"}.\n\nCHECK 3 — ARCHITECTURE CHANGELOG:\nLook at ALL Write/Edit tool_use calls made in this session. If ANY tool_use has file_path matching a structural ARKHOS infra change:\n- New file in ObsidianVault/10-Projects/ARKHOS/components/ or libraries/\n- New or edited file in ~/.claude/hooks/ (new hook or removed hook)\n- New file in ~/.claude/skills/*/SKILL.md\n- Edit to ~/.claude/settings.json touching hooks section\n- New top-level dir under Desktop/arkhos-* (new service)\nAND no Write/Edit in this session touched ObsidianVault/10-Projects/ARKHOS/architecture-changelog.md\nAND the assistant's last message does NOT contain the literal string '#no-changelog'\n→ return {\"ok\": false, \"reason\": \"ARKHOS infra change without changelog update. Structural change detected but architecture-changelog.md was not updated this session. Append entry now: ### <emoji> <YYYY-MM-DD> — <title> with Контекст/Решение/Результат/Статус sections at top of ## Записи. If intentional skip, include #no-changelog in your final message.\"}.\nIgnore: edits to existing component content (typos, small updates), edits to tmp/ or .backup/ or .test/ paths, edits to CLAUDE.md unless adding a new rule.\n\n\nCHECK 4 — SKILL CREATION:\nIf any Write or Edit tool_use in this session created or modified a file matching ~/.claude/skills/*/SKILL.md AND no prior tool_use in the same session invoked the Skill tool with skill='anthropic-skills:skill-creator' or similar skill-creator tool → return {\"ok\": false, \"reason\": \"Skill file created/modified without using skill-creator. Use Skill('anthropic-skills:skill-creator') before manually writing SKILL.md files — it ensures proper structure and registration.\"}.\n\nIf none of the four checks fail, return {\"ok\": true}.",
+            "prompt": "Analyze the assistant's last response. If stop_hook_active is true, return {\"ok\": true}.\n\nCHECK 1 — GENERATION TASK:\nWas this a GENERATION task? Generation = code/script written, text content produced, AI prompt generated, JSON/config created, plan via ExitPlanMode, recommendation lists with proposed actions, tool/plugin selection plans, multi-step proposals presented to user. NOT generation = answering factual questions, running diagnostic commands, pure explanations of existing state, file reads, search results, status reports without action proposals, conversational replies.\nIf GENERATION task AND response does NOT contain 'CRITIC PHASE' or 'Critic pass:' → return {\"ok\": false, \"reason\": \"Generation without critic. Use Skill tool: Skill('output-critic') in the SAME response before final output — do NOT wait for Stop hook. Apply: score Completeness/Clarity/Goal alignment/Edge cases (1-5), gaps ≤3, improved v2. Mark with CRITIC PHASE header.\"}.\n\nCHECK 2 — SEARCH VAULT FIRST:\nLook at ALL tool_use calls made in this assistant turn. If ANY tools were used (other than only Read on MEMORY.md/settings.json, or only Bash for a single quick command like git status) AND the task involves project work (content, SEO, SMM, translations, WordPress, n8n, Instagram, architecture, analysis, any Studiokook or AiGeneration work) AND the first tool_use was NOT ghost-sessions deep_search, mcp__obsidian, Bash(ghost search *), or Bash(qmd *) AND the MEMORY.md context does NOT contain an AUTOSEARCH section → return {\"ok\": false, \"reason\": \"Prompt hook condition was not met: Project task without vault search. FIRST tool must be ghost-sessions deep_search or mcp__obsidian before doing any project work. Vault contains past decisions, strategies, and patterns — always check before acting.\"}.\n\nCHECK 3 — ARCHITECTURE CHANGELOG:\nLook at ALL Write/Edit tool_use calls made in this session. If ANY tool_use has file_path matching a structural ARKHOS infra change:\n- New file in ObsidianVault/10-Projects/ARKHOS/components/ or libraries/\n- New or edited file in ~/.claude/hooks/ (new hook or removed hook)\n- New file in ~/.claude/skills/*/SKILL.md\n- Edit to ~/.claude/settings.json touching hooks section\n- New top-level dir under Desktop/arkhos-* (new service)\nAND no Write/Edit in this session touched ObsidianVault/10-Projects/ARKHOS/architecture-changelog.md\nAND the assistant's last message does NOT contain the literal string '#no-changelog'\n→ return {\"ok\": false, \"reason\": \"ARKHOS infra change without changelog update. Structural change detected but architecture-changelog.md was not updated this session. Append entry now: ### <emoji> <YYYY-MM-DD> — <title> with Контекст/Решение/Результат/Статус sections at top of ## Записи. If intentional skip, include #no-changelog in your final message.\"}.\nIgnore: edits to existing component content (typos, small updates), edits to tmp/ or .backup/ or .test/ paths, edits to CLAUDE.md unless adding a new rule.\n\n\nCHECK 4 — SKILL CREATION:\nIf any Write or Edit tool_use in this session created or modified a file matching ~/.claude/skills/*/SKILL.md AND no prior tool_use in the same session invoked the Skill tool with skill='anthropic-skills:skill-creator' or similar skill-creator tool → return {\"ok\": false, \"reason\": \"Skill file created/modified without using skill-creator. Use Skill('anthropic-skills:skill-creator') before manually writing SKILL.md files — it ensures proper structure and registration.\"}.\n\nCHECK 5 — OBSERVATION CARD:\nLook at ALL Write/Edit tool_use calls in this session. If ANY tool_use has file_path matching a runtime-effect change:\n- New or edited file in ~/.claude/hooks/ (any subdir — session-start, user-prompt-submit, stop, pre-tool-use, post-tool-use, pre-compact, maintenance, shared)\n- New wrapper script (e.g. ghost-prompt-dedup.js, *-wrapper.js)\n- Edit to ~/.claude/settings.json touching hooks/permissions/env\n- n8n workflow JSON change (filename matches wf-*.json or n8n-*.json) or n8n MCP write_workflow / update_workflow tool_use\n- WP mu-plugin file edit (Studiokook mu-plugins/, wp-content/mu-plugins/)\n- DB schema migration (*.sql, migrations/)\n- Behavioral fix to harness/CLI bug (e.g. dedup wrapper, hook idempotency)\nAND no Write/Edit in this session touched a file matching ObsidianVault/10-Projects/ARKHOS/observations/*-YYYYMMDD.md (where YYYYMMDD is recent)\nAND the assistant's last message does NOT contain the literal pattern '#no-observation:' (followed by a reason)\n→ return {\"ok\": false, \"reason\": \"Runtime-effect change without observation card. Per CLAUDE.md Observation Protocol (MANDATORY): create ObsidianVault/10-Projects/ARKHOS/observations/<subject>-YYYYMMDD.md with frontmatter type:observation, observe_until (typically +14d), success_criteria, status:watching, host, health_command. If intentional skip, include #no-observation: <reason> in final message.\"}.\nIgnore: edits to *-state.json files (hook state, not config), edits under logs/ or tmp/ or telemetry/ paths, edits to existing SKILL.md docs (already covered by CHECK 4), pure read-only investigations, rollbacks/reverts.\n\nIf none of the five checks fail, return {\"ok\": true}.",
             "if": "has_tool_use"
           }
         ]
