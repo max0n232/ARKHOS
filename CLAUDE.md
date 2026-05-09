@@ -61,7 +61,7 @@ Use the `ghost-sessions` MCP tool with `deep_search` (not `search`). Fallback CL
 
 ## Obsidian Vault
 
-Path: `C:/Users/sorte/ObsidianVault` (PARA). Доступ → skill `obsidian-router` (QMD semantic search / Nexus CRUD when app running / REST API fallback). Коллекции QMD: `vault`, `ghost-.claude`.
+Path: `C:/Users/sorte/ObsidianVault` (PARA). Доступ → skill `obsidian-router` (QMD semantic search / Nexus CRUD when app running / REST API fallback). Коллекции QMD: `vault`, `ghost-.claude`. Для scoped search внутри vault → `qmd query "..." --collection vault --path "10-Projects"` (или `30-Resources`, `90-System`). НЕ создавать subset-коллекции — нарушает `references/growth-limits.md` § QMD Collection Hygiene (default search дублирует результаты across overlapping collections).
 
 ## Session Audit
 

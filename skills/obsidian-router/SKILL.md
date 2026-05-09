@@ -53,9 +53,15 @@ CREATE new note?
 ### QMD Commands (via Bash)
 
 ```bash
-# Semantic search
+# Semantic search (default — across all of vault)
 qmd search vault "query"
 qmd search ghost-.claude "query"
+
+# Scoped search via --path (PREFERRED for domain-specific lookups)
+# Use this instead of creating subset collections — see growth-limits.md § QMD Collection Hygiene.
+qmd query "trading psychology" --collection vault --path "30-Resources"   # theory: Elder/Wyckoff/Brooks/Dalton/Douglas/Van Tharp/Taleb books
+qmd query "Studiokook hosting" --collection vault --path "10-Projects"    # live work: Studi/Trading/ARKHOS/EK/Legal sprints
+qmd query "routing"            --collection vault --path "90-System"      # routing-map, MOC, system docs
 
 # Reindex after vault changes
 qmd update
@@ -63,6 +69,12 @@ qmd update
 # Check status
 qmd collection list
 ```
+
+### Scoping rules
+
+- **NEVER add subset collections** (`qmd collection add <subdir-of-vault>`) — default search will return cross-collection duplicates (each chunk surfaces under both `qmd://vault/...` and `qmd://<subset>/...` at identical scores). See `references/growth-limits.md` § QMD Collection Hygiene.
+- **DO use `--path`** with `qmd query` for any scoped semantic search. The flag is a soft path-bias signal to the reranker, not a strict filter — but it consistently steers results to the requested PARA branch.
+- **DO use `-c vault` explicit** when calling from skills/hooks/scripts — leaves room to add unrelated collections (like `ghost-.claude`) without changing default-search behavior for vault consumers.
 
 ## Pending Writes Flush
 
