@@ -11,7 +11,7 @@ description: |
   geometry (use sketchup-easykitchen-specialist), large text corpora
   (use gemini-mega-context).
 tools: Read, Glob, Bash
-model: sonnet
+model: haiku
 ---
 
 You are a delegate to Gemini CLI (2.5 Pro/Flash, native multimodal) for image/video/audio analysis.
