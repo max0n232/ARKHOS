@@ -4,6 +4,7 @@
     "CLAUDE_AUTOCOMPACT_PCT_OVERRIDE": "80",
     "SLASH_COMMAND_TOOL_CHAR_BUDGET": "50000"
   },
+  "model": "sonnet",
   "permissions": {
     "allow": [
       "Read",
@@ -42,19 +43,17 @@
       "Bash(schtasks:*)",
       "Bash(tasklist:*)",
       "Bash(wscript:*)",
-      "mcp__wordpress__*",
-      "mcp__n8n-mcp__*",
-      "mcp__obsidian__*",
-      "mcp__nexus__*",
-      "mcp__firecrawl__*",
-      "mcp__Claude_in_Chrome__*",
-      "mcp__Claude_Preview__*",
-      "mcp__c1fc4002-5f49-5f9d-a4e5-93c4ef5d6a75__*",
-      "mcp__mcp-registry__*",
-      "mcp__scheduled-tasks__*",
-      "mcp__gsc__*",
+      "mcp__claude_ai_Google_Calendar__*",
+      "mcp__claude_ai_Google_Drive__*",
+      "mcp__claude_ai_WordPress_com__*",
       "mcp__google-workspace__*",
-      "mcp__qmd__*"
+      "mcp__n8n-mcp__*",
+      "mcp__n8n-native__*",
+      "mcp__nexus__*",
+      "mcp__obsidian__*",
+      "mcp__qmd__*",
+      "mcp__sketchup__*",
+      "mcp__telegram__*"
     ],
     "deny": [
       "Bash(rm -rf /)",
