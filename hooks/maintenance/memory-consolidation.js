@@ -22,7 +22,7 @@ const path = require('path');
 const crypto = require('crypto');
 const { execSync } = require('child_process');
 const { CLAUDE_DIR, VAULT_DIR } = require('../shared/paths');
-const { callWithFallback, callGeminiEmbedding, sendTelegram } = require('../shared/obsidian-api');
+const { callWithFallback, callGeminiEmbedding, callOllamaEmbedding, sendTelegram } = require('../shared/obsidian-api');
 
 const INTERVAL_HOURS = 24;
 const REORG_INTERVAL_DAYS = 7;
@@ -43,9 +43,21 @@ const TG_CHAT = '804465999';
 
 // ─── State ────────────────────────────────────────────────────────────────
 
+// Bumped to 2 when embeddings switched from gemini-3072 to nomic-768 (2026-05-10).
+// Mismatched cache keys would silently fail cosine (length guard → 0), still correct
+// but stale 3072-dim vectors stick forever. Flush once on version bump.
+const CACHE_VERSION = 2;
+
 function loadState() {
-  try { return JSON.parse(fs.readFileSync(STATE_FILE, 'utf8')); }
-  catch { return { lastRun: 0, lastReorg: 0, lastAnti: 0, processedSessions: [], embeddings: {} }; }
+  let s;
+  try { s = JSON.parse(fs.readFileSync(STATE_FILE, 'utf8')); }
+  catch { s = { lastRun: 0, lastReorg: 0, lastAnti: 0, processedSessions: [], embeddings: {}, cacheVersion: CACHE_VERSION }; }
+  if (s.cacheVersion !== CACHE_VERSION) {
+    process.stderr.write(`[memory-consolidation] embedding cache flushed (v${s.cacheVersion || 1} → v${CACHE_VERSION}, model space changed)\n`);
+    s.embeddings = {};
+    s.cacheVersion = CACHE_VERSION;
+  }
+  return s;
 }
 
 function saveState(state) {
@@ -102,16 +114,29 @@ function patternKey(p) {
   return crypto.createHash('md5').update(`${p.title}|${p.rule}`).digest('hex').slice(0, 12);
 }
 
+// Cache keys are namespaced by model: nomic vectors are 768-dim, gemini 3072-dim.
+// Cosine guard rejects mismatched lengths (sim=0), so mixing without namespace would
+// silently disable dedup for the cross-model entries.
 async function getEmbedding(text, cache) {
-  const key = crypto.createHash('md5').update(text).digest('hex').slice(0, 12);
-  if (cache[key]) return cache[key];
+  const hash = crypto.createHash('md5').update(text).digest('hex').slice(0, 12);
+  const ollamaKey = `nomic:${hash}`;
+  if (cache[ollamaKey]) return cache[ollamaKey];
   try {
-    const vec = await callGeminiEmbedding(text);
-    cache[key] = vec;
+    const vec = await callOllamaEmbedding(text);
+    cache[ollamaKey] = vec;
     return vec;
   } catch (e) {
-    process.stderr.write(`[memory-consolidation] embed failed: ${e.message}\n`);
-    return null;
+    process.stderr.write(`[memory-consolidation] WARN ollama embed failed: ${e.message} → gemini fallback\n`);
+    const geminiKey = `gemini:${hash}`;
+    if (cache[geminiKey]) return cache[geminiKey];
+    try {
+      const vec = await callGeminiEmbedding(text);
+      cache[geminiKey] = vec;
+      return vec;
+    } catch (e2) {
+      process.stderr.write(`[memory-consolidation] embed failed (both): ${e2.message}\n`);
+      return null;
+    }
   }
 }
 
