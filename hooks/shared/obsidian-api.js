@@ -3,6 +3,7 @@
  * Single source of truth for vault writes — all hooks use this module.
  */
 const fs = require('fs');
+const http = require('http');
 const https = require('https');
 const os = require('os');
 const path = require('path');
@@ -325,8 +326,44 @@ async function callWithFallback(systemPrompt, userMessage, maxTokens, opts = {})
 }
 
 /**
+ * Get local Ollama embedding via nomic-embed-text (768-dim).
+ * Primary path for semantic dedup — free, ~50-100ms latency.
+ * Throws on connection refused / timeout / non-200; caller should fall back to Gemini.
+ */
+function callOllamaEmbedding(text, model = 'nomic-embed-text') {
+    return new Promise((resolve, reject) => {
+        const body = JSON.stringify({ model, input: text.slice(0, 8000) });
+        const req = http.request({
+            hostname: '127.0.0.1',
+            port: 11434,
+            path: '/api/embed',
+            method: 'POST',
+            headers: { 'content-type': 'application/json', 'content-length': Buffer.byteLength(body) }
+        }, res => {
+            res.setEncoding('utf8');
+            let data = '';
+            res.on('data', chunk => data += chunk);
+            res.on('end', () => {
+                try {
+                    if (res.statusCode !== 200) return reject(new Error(`Ollama HTTP ${res.statusCode}: ${data.slice(0, 200)}`));
+                    const parsed = JSON.parse(data);
+                    const vec = parsed.embeddings?.[0];
+                    if (!Array.isArray(vec) || vec.length === 0) return reject(new Error('Empty Ollama embedding'));
+                    resolve(vec);
+                } catch (e) { reject(new Error('Ollama embed parse: ' + e.message)); }
+            });
+        });
+        req.on('error', reject);
+        // First call after model unload can take 3-8s for nomic to warm; 8s covers cold-start.
+        req.setTimeout(8000, () => { req.destroy(); reject(new Error('Ollama embed timeout')); });
+        req.write(body);
+        req.end();
+    });
+}
+
+/**
  * Get Gemini embedding for a text snippet (free tier, 1500 RPD).
- * Returns a 768-dim vector. Used for semantic dedup of memory patterns.
+ * gemini-embedding-001 returns 3072-dim. Used as fallback after callOllamaEmbedding.
  */
 function callGeminiEmbedding(text, model = 'gemini-embedding-001') {
     return new Promise((resolve, reject) => {
@@ -417,6 +454,7 @@ module.exports = {
     callSonnet,
     callGemini,
     callGeminiEmbedding,
+    callOllamaEmbedding,
     callWithFallback,
     getTelegramToken,
     sendTelegram
