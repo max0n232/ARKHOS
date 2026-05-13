@@ -123,6 +123,12 @@ File discipline (approval, ≤200 строк, data homes) → `constitution.md �
 - **Hooks/agents/settings правка** — Plan agent перед write
 - **Closed-book / "тест по памяти" / "без vault"** — explicit warning в первом ответе: "ВНИМАНИЕ: closed-book режим — точные dims/IDs могут быть из устаревшей памяти, не из vault. Recommended open-book для production-задач". Memory-based answers явно labeled "(из памяти, не verified)". Reference: `easykitchen/session-failure-2026-05-06.md` lesson 6.
 
+## Codex Review Gate (enforced by hook)
+
+Critical-path edits (hooks/**, settings.json, CLAUDE.md, rules/**, agents/**, skills/**/SKILL.md, vault 90-System/**, vault ARKHOS/architecture/**) перед commit → spawn `codex-second-opinion` subagent. Хук `hooks/pre-tool-use/codex-gate.js` блокирует `git commit` если staged diff содержит critical files без маркера `[codex-reviewed: <reason>]` в commit message. Override: `[codex-skip: <reason>]` (codex недоступен / trivial change), или env `CLAUDE_SKIP_CODEX_GATE=1` (одноразовый bypass).
+
+**Dual-review mechanism**: Security + Logic reviewers параллельно — это VPS-only ClaudeClaw pattern (codex недоступен в той среде). Локально codex-second-opinion = adversarial reviewer (другой training distribution). Не зеркалировать VPS-rule в local CLAUDE.md.
+
 ## Rollback Protocol
 
 Перед мульти-шаговыми операциями над критичными файлами (settings.json, hooks/*, CLAUDE.md, rules/*, n8n WF, WP):
