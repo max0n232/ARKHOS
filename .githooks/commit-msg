@@ -1,0 +1,73 @@
+#!/usr/bin/env bash
+# Git-level codex-review gate (commit-msg hook)
+#
+# Fires for ALL git commit paths: Claude CLI Bash, manual shell, IDE,
+# auto-commit tooling — anything that uses git binary (NOT isomorphic-git).
+#
+# Mirrors logic of ~/.claude/hooks/pre-tool-use/codex-gate.js but at git layer.
+# Layered defense: Claude PreToolUse hook is layer 1, this is layer 2.
+#
+# Override: include [codex-reviewed: <reason>] or [codex-skip: <reason>] in
+# commit message. Emergency bypass: CLAUDE_SKIP_CODEX_GATE=1 git commit ...
+#
+# Known limitations:
+#  - git commit --no-verify bypasses this hook entirely. Layer 1
+#    (codex-gate.js) still catches Claude CLI commits.
+#  - isomorphic-git clients (Obsidian-git default mode) bypass all native
+#    git hooks. Vault layer 2 covers only CLI-mode Obsidian-git, shell, IDE.
+#  - Deletions of critical files are intentionally not blocked (--diff-filter=ACMR).
+
+set -eu
+
+# Emergency bypass
+if [ "${CLAUDE_SKIP_CODEX_GATE:-0}" = "1" ]; then
+  exit 0
+fi
+
+MSG_FILE="${1:-}"
+if [ -z "$MSG_FILE" ] || [ ! -f "$MSG_FILE" ]; then
+  echo "codex-gate (git): cannot read commit message file" >&2
+  exit 1
+fi
+
+# Read message; skip comment lines (lines starting with #)
+msg=$(grep -v '^#' "$MSG_FILE" 2>/dev/null || true)
+
+# Already has marker — allow (case-insensitive, match JS layer)
+if printf '%s' "$msg" | grep -qiE '\[codex-(reviewed|skip):'; then
+  exit 0
+fi
+
+# Staged files (A/C/M/R only; skip deletions)
+# Fail-CLOSED on git error — inside a commit-msg hook the repo IS valid;
+# any failure here (permissions, corrupt index, safe.directory) is a real
+# environment problem, not a soft skip.
+if ! staged=$(git diff --cached --name-only --diff-filter=ACMR 2>&1); then
+  echo "codex-gate (git): 'git diff --cached' failed; refusing to proceed" >&2
+  echo "$staged" >&2
+  exit 1
+fi
+[ -z "$staged" ] && exit 0
+
+# Critical paths (mirror codex-gate.js CRITICAL_PATHS for ~/.claude scope)
+critical=$(printf '%s\n' "$staged" | grep -E '(^|/)(hooks/|\.githooks/|settings\.json$|CLAUDE\.md$|rules/.*\.md$|agents/[^/]+\.md$|skills/[^/]+/SKILL\.md$)' || true)
+
+[ -z "$critical" ] && exit 0
+
+cat >&2 <<EOF
+codex-gate (git layer): blocked
+
+Staged critical files require codex review marker:
+$critical
+
+Add to commit message ONE of:
+  [codex-reviewed: <reason>]   after running codex-second-opinion subagent
+  [codex-skip: <reason>]       if trivial / codex unavailable
+
+Emergency one-shot bypass:
+  CLAUDE_SKIP_CODEX_GATE=1 git commit ...
+
+Why git-level: catches commits outside Claude CLI (manual shell, IDE,
+auto-commit tools). See observation card codex-gate-hook-20260513.
+EOF
+exit 1

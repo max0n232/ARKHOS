@@ -23,6 +23,7 @@ const { execSync } = require("child_process");
 
 const CRITICAL_PATHS = [
   /(^|\/)hooks\//,
+  /(^|\/)\.githooks\//,
   /(^|\/)settings\.json$/,
   /(^|\/)CLAUDE\.md$/,
   /(^|\/)rules\/.*\.md$/,
