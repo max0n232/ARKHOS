@@ -36,6 +36,28 @@ function readStdinSync() {
 function loadState() { try { return JSON.parse(fs.readFileSync(STATE_FILE, 'utf8')); } catch { return {}; } }
 function saveState(s) { try { fs.writeFileSync(STATE_FILE, JSON.stringify(s)); } catch {} }
 
+// Supersede legacy singleton state {lastSessionId, lastEmit} with multi-key
+// {sessions: {[id]: {lastEmit}}}. No migration — old keys are ignored and
+// expire on next write. Parallel Claude instances (e.g., worktree + main repo)
+// each fire Stop and shared singleton state caused interleaved overwrites —
+// same session re-logged after a different session's Stop bumped lastSessionId.
+// Multi-key state fixes that.
+function getSessionState(state, sid) {
+  if (!state.sessions) state.sessions = {};
+  return state.sessions[sid];
+}
+function setSessionState(state, sid, val) {
+  if (!state.sessions) state.sessions = {};
+  state.sessions[sid] = val;
+  // Garbage-collect entries older than 24h to keep file small.
+  // Also drop malformed entries (missing/non-numeric lastEmit) so they don't accumulate.
+  const cutoff = Date.now() - 24 * 60 * 60 * 1000;
+  for (const id of Object.keys(state.sessions)) {
+    const t = state.sessions[id] && state.sessions[id].lastEmit;
+    if (typeof t !== 'number' || !isFinite(t) || t < cutoff) delete state.sessions[id];
+  }
+}
+
 const stdin = readStdinSync();
 let stdinData = {};
 try { stdinData = JSON.parse(stdin); } catch {}
@@ -43,9 +65,9 @@ const transcriptPath = stdinData.transcript_path;
 const sessionId = stdinData.session_id;
 if (!transcriptPath || !fs.existsSync(transcriptPath)) process.exit(0);
 
-// One reflection entry per session — skip if already logged
+// One reflection entry per session — skip if already logged (per-session, not singleton)
 const state = loadState();
-if (sessionId && state.lastSessionId === sessionId) process.exit(0);
+if (sessionId && getSessionState(state, sessionId)) process.exit(0);
 
 function analyzeTranscript(file) {
   let userMsgs = 0, assistantMsgs = 0, toolCalls = 0, errors = 0, corrections = 0;
@@ -122,8 +144,11 @@ if (stats.userMsgs + stats.assistantMsgs < MIN_TURNS) process.exit(0);
 const commits = getCommits();
 const goalsTouched = getGoalsTouchedToday();
 const now = new Date().toISOString().slice(0, 16);
+// 6-char session tag in header — distinguishes parallel Claude instances in audits.
+// Dedup uses the full sessionId; this tag is purely human readability.
+const sidTag = sessionId ? ` (${String(sessionId).replace(/-/g, '').slice(0, 6)})` : '';
 
-const out = [`\n## ${now}`, ''];
+const out = [`\n## ${now}${sidTag}`, ''];
 out.push(`**Session:** ${stats.userMsgs} user, ${stats.assistantMsgs} assistant, ${stats.toolCalls} tool calls`);
 if (stats.errors > 0) out.push(`**Errors:** ${stats.errors}`);
 if (stats.corrections > 0) out.push(`**Corrections:** ${stats.corrections}`);
@@ -161,7 +186,10 @@ try {
     fs.writeFileSync(REFLECTION_LOG, `---\ntype: reflection-log\ntags: [arkhos, reflection, quality]\ncreated: ${now.slice(0, 10)}\n---\n\n# Reflection Log\n\nАвтоматический журнал рефлексии после каждой сессии.\n`);
   }
   fs.appendFileSync(REFLECTION_LOG, out.join('\n'));
-  if (sessionId) saveState({ lastSessionId: sessionId, lastEmit: Date.now() });
+  if (sessionId) {
+    setSessionState(state, sessionId, { lastEmit: Date.now() });
+    saveState(state);
+  }
   console.log(`[REFLECTION] ${stats.userMsgs}/${stats.assistantMsgs} msgs, ${stats.errors} errors, ${commits.length} commits, preload ${stats.preloadFires}/${stats.preloadKeywordHits}`);
 } catch (e) {
   console.error(`[REFLECTION] failed: ${e.message}`);
