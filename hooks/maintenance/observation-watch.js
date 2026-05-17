@@ -94,7 +94,7 @@ for (const f of files) {
   const text = fs.readFileSync(fp, 'utf8');
   const { fm, body } = parseFrontmatter(text);
   if (!fm || fm.type !== 'observation') continue;
-  if (fm.status === 'closed' || fm.status === 'stale') continue;
+  if (['closed','failed','done','completed','stale','archived','superseded'].includes(fm.status)) continue;
 
   // Enum hygiene — warn but still process via fallback to "watching"
   if (fm.status && !VALID_STATUSES.has(fm.status)) {
