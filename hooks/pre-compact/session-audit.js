@@ -169,6 +169,30 @@ const GENERIC_PATTERN_REJECT = [
     /\bdedicated (log|reference|file|directory)\b/i,  // meta-advice about structure
 ];
 
+// Meta-recursion: entries about the audit/distill/librarian process itself.
+// These accumulate when session-audit re-extracts from transcripts that quote prior reports.
+// Codex review 2026-05-11: added Cyrillic variants, anchored "accumulator", added pre-compact/session-reflection.
+const META_RECURSION_REJECT = [
+    // Latin keywords
+    /\b(librarian|distill(ation|ed|ing|er)?|troubleshooting-current|global-patterns|session-audit|appendToVault|routing-map|audit:20\d\d|audit block|pre-compact|session-reflection|knowledge-routing|isMetaRecursion|META_RECURSION)\b/i,
+    /\b(audit\s+)?accumulator\b(?!\s+pattern)/i,  // "accumulator" but skip "accumulator pattern" (JS reduce idiom)
+    /\b(missed \d+ blocks?|destination files?|audit-?block)\b/i,
+    /\bextract(ed|ion)?\s+(from|into|of)\s+(transcript|accumulator|audit)/i,
+    /\b(re-?extract(ed)?|re-?distilled?|re-?routed)\b/i,
+    // Cyrillic variants — system prompt requests RU for errors+patterns.
+    // Note: JS \b is ASCII-only — use lookaround substring match instead.
+    /(библиотекар[ья]|дистилляц[ияеию]|пропустил[аои]?\s+\d+\s+блок|маршрутизаци[ияею]|транскрипт[аеу]?\b|накопител[ьея])/i,
+    /(повторн(ое|ого)?\s+извлеч|повторн(ое|ого)?\s+распределен|перенос\s+в\s+(destination|накопител))/i,
+];
+
+function isMetaRecursion(entry) {
+    if (!entry || typeof entry !== 'string') return false;
+    for (const re of META_RECURSION_REJECT) {
+        if (re.test(entry)) return true;
+    }
+    return false;
+}
+
 function isGenericPattern(entry) {
     if (!entry || typeof entry !== 'string') return true;
     const t = entry.trim();
@@ -176,16 +200,31 @@ function isGenericPattern(entry) {
     for (const re of GENERIC_PATTERN_REJECT) {
         if (re.test(t)) return true;
     }
+    if (isMetaRecursion(t)) return true;
     return false;
 }
 
 function checkAutoMemoryGrowth(sessionId) {
     if (!sessionId) return null;
+    const flagPath = path.join(CLAUDE_DIR, 'hooks', '.auto-memory-routing-needed');
     try {
+        // Stale-flag clear: if existing flag belongs to different session → remove it.
+        // Prevents showing previous session's routing list to a new session.
+        if (fs.existsSync(flagPath)) {
+            try {
+                const old = JSON.parse(fs.readFileSync(flagPath, 'utf8'));
+                if (old.sessionId && old.sessionId !== sessionId) fs.unlinkSync(flagPath);
+            } catch { fs.unlinkSync(flagPath); }
+        }
         const memDir = path.dirname(MEMORY_FILE);
+        // Files already referenced in MEMORY.md index = routed (KEEP decision recorded).
+        // Skip them to avoid alerting on triaged files just because session id matches.
+        let memIndex = '';
+        try { memIndex = fs.readFileSync(MEMORY_FILE, 'utf8'); } catch {}
         const newFiles = [];
         for (const f of fs.readdirSync(memDir)) {
-            if (!f.endsWith('.md') || f === 'MEMORY.md' || f.includes('.bak')) continue;
+            if (!f.endsWith('.md') || f === 'MEMORY.md' || /\.bak/.test(f)) continue;
+            if (memIndex.includes(f)) continue;
             const fp = path.join(memDir, f);
             try {
                 const content = fs.readFileSync(fp, 'utf8');
@@ -196,7 +235,6 @@ function checkAutoMemoryGrowth(sessionId) {
                 }
             } catch {}
         }
-        const flagPath = path.join(CLAUDE_DIR, 'hooks', '.auto-memory-routing-needed');
         if (newFiles.length > 0) {
             fs.writeFileSync(flagPath, JSON.stringify({
                 sessionId, files: newFiles, timestamp: new Date().toISOString()
@@ -213,19 +251,95 @@ function checkAccumulatorOverflow() {
     try {
         const tsLines = fs.existsSync(TROUBLESHOOTING) ? fs.readFileSync(TROUBLESHOOTING, 'utf8').split('\n').length : 0;
         const ptLines = fs.existsSync(PATTERNS) ? fs.readFileSync(PATTERNS, 'utf8').split('\n').length : 0;
+        const drift = checkVaultDrift();
         const THRESHOLD = 100;
+        const ORPHAN_THRESHOLD = 15; // %, per Codex playbook
+        const UNINDEXED_THRESHOLD = 3; // folders >=3 files without _index.md
+        const STALE_TG_THRESHOLD = 50;
         const flagPath = path.join(CLAUDE_DIR, 'hooks', '.distill-needed');
-        if (tsLines > THRESHOLD || ptLines > THRESHOLD) {
-            console.log(`[AUTO-DISTILL] Over threshold: troubleshooting=${tsLines} patterns=${ptLines} (limit=${THRESHOLD})`);
+        const accOver = tsLines > THRESHOLD || ptLines > THRESHOLD;
+        const driftOver = drift && (drift.orphanRate > ORPHAN_THRESHOLD || drift.unindexedFolders > UNINDEXED_THRESHOLD || drift.staleTGDumps > STALE_TG_THRESHOLD);
+        if (accOver || driftOver) {
+            const reasons = [];
+            if (tsLines > THRESHOLD || ptLines > THRESHOLD) reasons.push(`accumulators(troubleshooting=${tsLines} patterns=${ptLines})`);
+            if (drift?.orphanRate > ORPHAN_THRESHOLD) reasons.push(`orphans(${drift.orphanRate}%)`);
+            if (drift?.unindexedFolders > UNINDEXED_THRESHOLD) reasons.push(`unindexed-folders(${drift.unindexedFolders})`);
+            if (drift?.staleTGDumps > STALE_TG_THRESHOLD) reasons.push(`stale-TG-dumps(${drift.staleTGDumps})`);
+            console.log(`[AUTO-DISTILL] Over threshold: ${reasons.join(' ')}`);
             fs.writeFileSync(flagPath, JSON.stringify({
                 timestamp: new Date().toISOString(),
                 troubleshooting: tsLines,
-                patterns: ptLines
+                patterns: ptLines,
+                vault: drift || {}
             }), 'utf8');
         } else if (fs.existsSync(flagPath)) {
             fs.unlinkSync(flagPath);
         }
     } catch {}
+}
+
+// Vault drift snapshot — read-only, throttled, surfaces signal for librarian.
+// Computes orphan rate, folders without _index.md, stale TG dumps.
+function checkVaultDrift() {
+    try {
+        const allMd = [];
+        const inbound = new Set();
+        const folderMap = new Map(); // folder -> { files: int, hasIndex: bool }
+        const SKIP = new Set(['.obsidian', '.smart-env', '.trash', 'node_modules', '.git', '40-Archive']);
+        function walk(dir, rel) {
+            let entries;
+            try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { return; }
+            for (const e of entries) {
+                if (SKIP.has(e.name) || e.name.startsWith('.')) continue;
+                const fp = path.join(dir, e.name);
+                const r = rel ? rel + '/' + e.name : e.name;
+                if (e.isDirectory()) walk(fp, r);
+                else if (e.name.endsWith('.md')) {
+                    const folderRel = rel || '';
+                    if (!folderMap.has(folderRel)) folderMap.set(folderRel, { files: 0, hasIndex: false });
+                    const fm = folderMap.get(folderRel);
+                    fm.files++;
+                    if (e.name === '_index.md') fm.hasIndex = true;
+                    try {
+                        const txt = fs.readFileSync(fp, 'utf8');
+                        for (const m of txt.matchAll(/\[\[([^\]\|#]+)/g)) {
+                            inbound.add(m[1].trim().split('/').pop().toLowerCase().replace(/\.md$/, ''));
+                        }
+                    } catch {}
+                    if (e.name !== '_index.md') allMd.push({ path: fp, name: path.basename(e.name, '.md') });
+                }
+            }
+        }
+        walk(VAULT_DIR, '');
+        const orphans = allMd.filter(f => !inbound.has(f.name.toLowerCase()));
+        const orphanRate = allMd.length ? Math.round(100 * orphans.length / allMd.length) : 0;
+        // Skip: vault root, transient inbox, Wiki, internal Templater folder.
+        const SKIP_FROM_DRIFT = ['', '00-Inbox', 'Wiki', '90-System/Templates/_templater'];
+        let unindexedFolders = 0;
+        for (const [folder, info] of folderMap) {
+            if (info.hasIndex) continue;
+            if (info.files < 3) continue;
+            if (SKIP_FROM_DRIFT.some(s => folder === s || folder.startsWith(s + '/'))) continue;
+            unindexedFolders++;
+        }
+        // TG dumps stale count
+        const tgFolder = path.join(VAULT_DIR, '10-Projects', 'AiGeneration', 'claudeclaw-features');
+        let staleTGDumps = 0;
+        const cutoff = Date.now() - 30 * 86400000;
+        function countStale(dir) {
+            let entries;
+            try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { return; }
+            for (const e of entries) {
+                const fp = path.join(dir, e.name);
+                if (e.isDirectory()) countStale(fp);
+                else if (e.name.endsWith('.md') && e.name !== '_index.md') {
+                    try { if (fs.statSync(fp).ctimeMs < cutoff) staleTGDumps++; } catch {}
+                }
+            }
+        }
+        if (fs.existsSync(tgFolder)) countStale(tgFolder);
+        return { orphanRate, unindexedFolders, staleTGDumps, totalFiles: allMd.length };
+    } catch { return null; }
 }
 
 // Append facts to references/project-facts.md under a dated section.
@@ -296,7 +410,8 @@ async function main() {
 4. Respond with valid JSON only, no prose.
 5. NEVER invent file paths, test counts, module names, or vault paths not in the transcript.
 6. The transcript may quote PRIOR audit reports (strings like "воспроизведение 11 задач", "Plan A/B", "18 триажных карточек", "COMPACT REPORT"). These describe OLD sessions — DO NOT treat them as this session's work. Summarize only the CURRENT USER/ASSISTANT turns.
-7. If transcript has no substantive actions, return summary: "Session idle — no substantive work" and empty arrays.`;
+7. If transcript has no substantive actions, return summary: "Session idle — no substantive work" and empty arrays.
+8. NEVER extract entries about the audit/distill process itself, the librarian agent, accumulators, routing-map, troubleshooting-current.md, global-patterns.md, or any meta-discussion of how knowledge is extracted/routed. These are infrastructure of the extraction system, not session work. Skip silently.`;
 
     const userMessage = `Extract knowledge from this Claude Code session transcript:
 
@@ -355,8 +470,15 @@ Rules:
     const today = new Date().toISOString().slice(0, 10);
 
     if (extracted.errors?.length) {
-        const content = extracted.errors.map(e => `- [${today}] ${e}`).join('\n');
-        await appendToVault(TROUBLESHOOTING, content);
+        const beforeCount = extracted.errors.length;
+        extracted.errors = extracted.errors.filter(e => !isMetaRecursion(e));
+        const droppedMeta = beforeCount - extracted.errors.length;
+        if (droppedMeta > 0) console.error(`Session audit: filtered ${droppedMeta} meta-recursion error(s)`);
+        counts.errors = extracted.errors.length;
+        if (extracted.errors.length) {
+            const content = extracted.errors.map(e => `- [${today}] ${e}`).join('\n');
+            await appendToVault(TROUBLESHOOTING, content);
+        }
     }
 
     // Filter generic/prescriptive "patterns" that slip past the system prompt.
@@ -379,7 +501,7 @@ Rules:
     let cleanFacts = [];
     if (extracted.facts?.length) {
         const verifiedFacts = extracted.facts.filter(f => !f.confidence || f.confidence !== 'low');
-        cleanFacts = verifiedFacts.filter(f => !isJunkFact(f));
+        cleanFacts = verifiedFacts.filter(f => !isJunkFact(f) && !isMetaRecursion(`${f.key} ${f.value}`));
         const dropped = verifiedFacts.length - cleanFacts.length;
         if (dropped > 0) console.error(`Session audit: filtered ${dropped} junk fact(s)`);
         if (cleanFacts.length) {
@@ -424,6 +546,10 @@ Rules:
     const factsSummary = counts.facts ? `project-facts.md: facts(${counts.facts})` : '';
     parts.push('');
     parts.push(`  → vault: ${vaultSummary || 'none'} | ${factsSummary || 'no facts'}`);
+    if (newAutoMemFilesPost?.length) {
+        parts.push(`  ⚠ auto-memory: ${newAutoMemFilesPost.length} new file(s) this session — routing review needed`);
+        newAutoMemFilesPost.forEach(f => parts.push(`    - ${f.name} (type: ${f.type})`));
+    }
     parts.push(line);
 
     const report = parts.join('\n');

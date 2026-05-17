@@ -12,6 +12,7 @@ Updated: 2026-05-03
 | output-critic | P2 | ACTIVE | Universal output quality gate — auto-critic after generation tasks |
 | obsidian-router | P2 | ACTIVE | Routes vault ops between QMD (search) and Nexus/REST API (CRUD) |
 | strategic-critique | P2 | ACTIVE | Self-critique loop for strategic tasks (plans, SEO, architecture, content) |
+| diagram | P3 | ACTIVE | Regenerate Excalidraw diagrams in vault from source files (hook-lifecycle, n8n-topology, agent-graph, ek-pipeline, knowledge-routing) |
 
 ## Agents (~/.claude/agents/)
 

@@ -15,9 +15,11 @@ const { spawnSync } = require('child_process');
 
 const RETENTION_DAYS = 30;
 const RUN_INTERVAL_DAYS = 7;
+const ACTIVE_TTL_DAYS = 7; // stale active/ → completed/ with audit marker (Codex: conservative threshold)
 
 const CLAUDE_DIR = path.join(process.env.USERPROFILE || process.env.HOME, '.claude');
 const COMPLETED_DIR = path.join(CLAUDE_DIR, '.ai-sessions', 'completed');
+const ACTIVE_DIR = path.join(CLAUDE_DIR, '.ai-sessions', 'active');
 const ARCHIVE_DIR = path.join(CLAUDE_DIR, '.ai-sessions', 'archive');
 const STAMP_FILE = path.join(CLAUDE_DIR, '.ai-sessions', '.last-cleanup');
 const LOG_FILE = path.join(CLAUDE_DIR, 'logs', 'ghost-cleanup.log');
@@ -54,11 +56,48 @@ function updateStamp() {
     fs.writeFileSync(STAMP_FILE, new Date().toISOString());
 }
 
+// Sweep stale active/ files → completed/ with audit marker.
+// Per Codex review: don't blindly mtime>TTL — append finalized footer so we can
+// distinguish auto-finalized from cleanly-completed sessions later.
+function sweepStaleActive() {
+    if (!fs.existsSync(ACTIVE_DIR)) return 0;
+    const cutoff = Date.now() - ACTIVE_TTL_DAYS * 86400000;
+    const files = fs.readdirSync(ACTIVE_DIR).filter(f => f.endsWith('.md'));
+    let promoted = 0;
+    fs.mkdirSync(COMPLETED_DIR, { recursive: true });
+    for (const file of files) {
+        const fp = path.join(ACTIVE_DIR, file);
+        try {
+            const stat = fs.statSync(fp);
+            if (stat.mtimeMs >= cutoff) continue;
+            const dest = path.join(COMPLETED_DIR, file);
+            const content = fs.readFileSync(fp, 'utf8');
+            const ageDays = Math.round((Date.now() - stat.mtimeMs) / 86400000);
+            const marker = `\n\n---\n\n<!--\nauto_finalized: true\nfinalized_reason: stale-active-ttl\nfinalized_at: ${new Date().toISOString()}\nage_days_at_finalize: ${ageDays}\n-->\n`;
+            if (DRY_RUN) {
+                log(`  Would promote: ${file} (age ${ageDays}d)`);
+            } else {
+                fs.writeFileSync(dest, content + marker, 'utf8');
+                fs.unlinkSync(fp);
+                log(`  Promoted: ${file} (age ${ageDays}d) → completed/`);
+            }
+            promoted++;
+        } catch (e) {
+            log(`  active sweep ERROR: ${file} — ${e.message}`);
+        }
+    }
+    return promoted;
+}
+
 function main() {
     if (!isDue()) {
         // Silent skip — not due yet
         return;
     }
+
+    // Phase A: sweep stale active/ first → completed/ (so retention scan picks them up next pass)
+    const promoted = sweepStaleActive();
+    if (promoted > 0) log(`Active sweep: ${promoted} session(s) ${DRY_RUN ? 'would be' : ''} promoted to completed/`);
 
     const cutoffDate = new Date(Date.now() - retentionDays * 24 * 60 * 60 * 1000);
     log(`Ghost cleanup — archiving sessions older than ${retentionDays}d (cutoff: ${cutoffDate.toISOString().slice(0, 10)})`);

@@ -14,6 +14,9 @@
 | logs/post-mortem/ | без лимита | Append-only архив |
 | ~/.claude/tmp/ | mtime >3 дня | Auto-cleanup в init-memory.js (SessionStart, уже работает) |
 | paste-cache/ | mtime >7 дней | Auto-cleanup в init-memory.js (SessionStart, уже работает) |
+| Ghost active/ | mtime >7 дней | Auto-promote в completed/ с audit marker (auto_finalized:true) — ghost-cleanup.js sweepStaleActive() |
+| Ghost completed/ | mtime >30 дней | Auto-archive в archive/ — ghost-cleanup.js (existing) |
+| Ghost archive/ no insights | mtime >90 дней | Auto-purge с digest line — ghost-cleanup.js (existing) |
 | VPS refresh.log | 50 строк | Auto-rotation (cron) |
 | VPS telegram-reports.archive.log | 30 дней | Auto-trim (report-lifecycle.sh) |
 
@@ -28,6 +31,15 @@
 | Routing map destinations (17 файлов) | 300 строк каждый | Ревью на дубли при session audit |
 
 **Правило:** лимит ≠ "удалить лишнее". Лимит = "проверь на дубли, deprecated, merge". Полезные данные никогда не удаляются — только консолидируются.
+
+## QMD Collection Hygiene
+
+Перед `qmd collection add <name> <path>`:
+1. Проверь не subset ли path уже existing collection (`qmd collection list`)
+2. Если subset существующего scope → не создавай отдельную коллекцию, используй path-filter (`qmd query --path "..." --collection vault`)
+3. Прежде чем добавлять — найди concrete consumer (hook/skill/code reads `--collection <name>`). No consumer = dead weight.
+
+Фиксы overlap: удалить subset collection → `qmd collection remove <name>` → `qmd update`. Embeddings re-used (content hash matches).
 
 ## Memory Decay (automated)
 
@@ -46,6 +58,14 @@ Creative recall: compact-report-injector.js randomly surfaces cold/archive entri
 
 ## Auto-Distillation Trigger
 
-session-audit.js (PreCompact) checks accumulator sizes. If troubleshooting-current.md or
-global-patterns.md exceeds 100 lines → writes `.distill-needed` flag → compact-report-injector.js
-surfaces warning in next session. Flag expires after 7 days.
+session-audit.js (PreCompact) проверяет accumulator + vault drift. Если хоть один порог пробит → `.distill-needed` flag → compact-report-injector surfaces в следующей сессии. Flag expires 7 дней.
+
+| Signal | Threshold | Source |
+|--------|-----------|--------|
+| troubleshooting-current.md | >100 строк | accumulator |
+| global-patterns.md | >100 строк | accumulator |
+| Vault orphan rate | >15% | drift |
+| Folders ≥3 files без _index.md | >3 папок | drift |
+| TG dumps (claudeclaw-features) старше 30d | >50 файлов | drift |
+
+Пороги совпадают с operator playbook в `90-System/vault-health.md`. Менять — здесь и в session-audit.js одновременно (`ORPHAN_THRESHOLD`, `UNINDEXED_THRESHOLD`, `STALE_TG_THRESHOLD`).

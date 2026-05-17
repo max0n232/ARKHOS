@@ -244,18 +244,59 @@ function callSonnet(systemPrompt, userMessage, maxTokens) {
     return callAnthropic('claude-sonnet-4-6', systemPrompt, userMessage, maxTokens || 2048);
 }
 
+// Gemini free-tier quota: 1500 RPD. Soft cap at 1400 leaves 100 headroom for races + manual calls.
+// State: patterns/gemini-quota.json — { date: 'YYYY-MM-DD', calls: N }. Auto-resets daily.
+const GEMINI_DAILY_SOFT_CAP = 1400;
+
+function _quotaFile() {
+    return path.join(os.homedir(), '.claude', 'patterns', 'gemini-quota.json');
+}
+
+function readGeminiQuota() {
+    const today = new Date().toISOString().slice(0, 10);
+    try {
+        const data = JSON.parse(fs.readFileSync(_quotaFile(), 'utf8'));
+        if (data.date !== today) return { date: today, calls: 0 };
+        return data;
+    } catch { return { date: today, calls: 0 }; }
+}
+
+function writeGeminiQuotaAtomic(state) {
+    try {
+        const file = _quotaFile();
+        fs.mkdirSync(path.dirname(file), { recursive: true });
+        const tmp = file + '.' + process.pid + '.tmp';
+        fs.writeFileSync(tmp, JSON.stringify(state), 'utf8');
+        fs.renameSync(tmp, file);
+    } catch {}
+}
+
+function checkGeminiQuota() {
+    return readGeminiQuota().calls < GEMINI_DAILY_SOFT_CAP;
+}
+
+function incrementGeminiQuota() {
+    const state = readGeminiQuota();
+    state.calls += 1;
+    writeGeminiQuotaAtomic(state);
+}
+
 /**
  * Call Google Gemini API. Free tier: gemini-2.5-flash.
  * Same interface as callAnthropic.
  */
 function callGemini(systemPrompt, userMessage, maxTokens = 2048, model = 'gemini-2.5-flash') {
     return new Promise((resolve, reject) => {
+        if (!checkGeminiQuota()) {
+            return reject(new Error('Gemini daily soft-cap reached (1400/1500), skipping to fallback'));
+        }
         const CLAUDE_DIR = path.join(os.homedir(), '.claude');
         let apiKey = process.env.GEMINI_API_KEY;
         if (!apiKey) {
             try { apiKey = fs.readFileSync(path.join(CLAUDE_DIR, 'credentials/gemini-api.key'), 'utf8').trim(); } catch {}
         }
         if (!apiKey) return reject(new Error('GEMINI_API_KEY not set'));
+        incrementGeminiQuota();
 
         const thinkingBudget = maxTokens >= 2048 ? 1024 : 0;
         const body = JSON.stringify({
@@ -307,21 +348,63 @@ function callGemini(systemPrompt, userMessage, maxTokens = 2048, model = 'gemini
  * @param {('sonnet'|'gemini'|null)} [opts.fallback='sonnet']
  * @returns {Promise<{text:string, model:string}>}
  */
+// Telemetry: lazy daily-rotated jsonl. Async write — never blocks the caller.
+// Failure is silent: telemetry must not break the hook.
+function logLlmCall(record) {
+    try {
+        const date = new Date().toISOString().slice(0, 10);
+        const logDir = path.join(os.homedir(), '.claude', 'logs');
+        const logFile = path.join(logDir, `llm-calls-${date}.jsonl`);
+        fs.mkdir(logDir, { recursive: true }, () => {
+            fs.appendFile(logFile, JSON.stringify(record) + '\n', () => {});
+        });
+    } catch {}
+}
+
 async function callWithFallback(systemPrompt, userMessage, maxTokens, opts = {}) {
     const primary = opts.primary || 'gemini';
     const fallback = opts.fallback === undefined ? 'sonnet' : opts.fallback;
+    const caller = opts.caller || 'unknown';
+    const inChars = (systemPrompt?.length || 0) + (userMessage?.length || 0);
     const callers = {
         gemini: () => callGemini(systemPrompt, userMessage, maxTokens),
         sonnet: () => callSonnet(systemPrompt, userMessage, maxTokens)
     };
+    const t0 = Date.now();
     try {
         const text = await callers[primary]();
+        logLlmCall({
+            ts: new Date().toISOString(), caller, primary, chosen: primary,
+            fallback_triggered: false, in_chars: inChars, out_chars: text.length,
+            latency_ms: Date.now() - t0
+        });
         return { text, model: primary };
     } catch (err) {
-        if (!fallback) throw err;
+        if (!fallback) {
+            logLlmCall({
+                ts: new Date().toISOString(), caller, primary, chosen: null,
+                fallback_triggered: false, in_chars: inChars, out_chars: 0,
+                latency_ms: Date.now() - t0, error: err.message
+            });
+            throw err;
+        }
         process.stderr.write(`[llm-fallback] ${primary} failed: ${err.message} → trying ${fallback}\n`);
-        const text = await callers[fallback]();
-        return { text, model: fallback };
+        try {
+            const text = await callers[fallback]();
+            logLlmCall({
+                ts: new Date().toISOString(), caller, primary, chosen: fallback,
+                fallback_triggered: true, in_chars: inChars, out_chars: text.length,
+                latency_ms: Date.now() - t0, primary_error: err.message
+            });
+            return { text, model: fallback };
+        } catch (err2) {
+            logLlmCall({
+                ts: new Date().toISOString(), caller, primary, chosen: null,
+                fallback_triggered: true, in_chars: inChars, out_chars: 0,
+                latency_ms: Date.now() - t0, primary_error: err.message, fallback_error: err2.message
+            });
+            throw err2;
+        }
     }
 }
 

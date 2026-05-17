@@ -337,3 +337,421 @@ Lookup facts for specific projects. Not always in context.
 - требует inline expressions, не $1 params <!-- fact:n8n_postgres_v2_quirk verified:2026-05-07 -->
 - стопит pipeline → alwaysOutputData: true <!-- fact:n8n_select_0_rows_quirk verified:2026-05-07 -->
 - strict typeValidation routes undefined в FALSE <!-- fact:n8n_if_v2_2_quirk verified:2026-05-07 -->
+
+<!-- auto-appended 2026-05-07 -->
+- session-audit.js, compact-report-injector.js, init-memory.js <!-- fact:hook_change_files verified:2026-05-07 -->
+- CLAUDE.md (3 правила), constitution.md (1 exception) <!-- fact:routing_rules_files verified:2026-05-07 -->
+- dc-mechanics, composition×2, troubleshooting, global-patterns, hooks-skil <!-- fact:vault_migrations_destinations_examples verified:2026-05-07 -->
+
+<!-- auto-appended 2026-05-07 -->
+- PD1_1 (oven+MO pencil, 600×671×2178) <!-- fact:canonical_pencil_module verified:2026-05-07 -->
+- BD1_M (custom Studiokook sink) <!-- fact:canonical_sink_base_module verified:2026-05-07 -->
+
+<!-- auto-appended 2026-05-07 -->
+- VPS auth.json от Apr 30 <!-- fact:codex_oauth_host_2 verified:2026-05-07 -->
+
+<!-- auto-appended 2026-05-07 -->
+- 5 entities + 10 definitions <!-- fact:sketchup_scene_entities verified:2026-05-07 -->
+- BG1_M (custom Studiokook sink) <!-- fact:ek_canonical_corner_base_module verified:2026-05-07 -->
+- PD1_1 (600×671×2178) <!-- fact:ek_canonical_oven_mo_pencil_module verified:2026-05-07 -->
+
+<!-- auto-appended 2026-05-07 -->
+- 8 косяков классифицированных по vault doc, 4 action items, 6 lessons <!-- fact:post_mortem_content_summary verified:2026-05-07 -->
+
+<!-- auto-appended 2026-05-07 -->
+- auto-frontmatter on save <!-- fact:obsidian_linter_config verified:2026-05-07 -->
+- folderNoteName: {{folder_name}} <!-- fact:folder_notes_default_config verified:2026-05-07 -->
+- folderNoteName: _index <!-- fact:folder_notes_modified_config verified:2026-05-07 -->
+
+<!-- auto-appended 2026-05-07 -->
+- 32 (drift 6 unindexed) <!-- fact:vault_mocs_before verified:2026-05-07 -->
+- 13 + Templater configured + Folder Notes mapped to `_index` + Find Orphaned configured <!-- fact:plugins_active_after verified:2026-05-07 -->
+- +3 active Templater (trading-chapter / legal-note / ) <!-- fact:templates_after verified:2026-05-07 -->
+
+<!-- auto-appended 2026-05-07 -->
+- Always loaded в каждый context (system prompt) <!-- fact:auto_memory_load_condition verified:2026-05-07 -->
+- Behavioral rules (always-on), index project ст <!-- fact:auto_memory_content verified:2026-05-07 -->
+
+<!-- auto-appended 2026-05-07 -->
+- 16 (8 Trading-Knowledge books + 7 Legal subfolders + ARKHOS components) <!-- fact:templater_folder_template_mappings verified:2026-05-07 -->
+
+<!-- auto-appended 2026-05-07 -->
+- Ghost-сессии (last 7 дней) <!-- fact:memory_consolidation_source verified:2026-05-07 -->
+- vault `pattern-library.md` <!-- fact:memory_consolidation_output_vault verified:2026-05-07 -->
+
+<!-- auto-appended 2026-05-07 -->
+- bash ghost session-start <!-- fact:ghost_cli_session_start_command verified:2026-05-07 -->
+
+<!-- auto-appended 2026-05-09 -->
+- 12 попыток custom-l в kitchens/ (от 01:20 до 12:28) <!-- fact:custom_l_attempts_today verified:2026-05-09 -->
+
+<!-- auto-appended 2026-05-09 -->
+- 4 (researcher, translator, wp-auditor, wp-specialist) <!-- fact:agents_with_sonnet_model verified:2026-05-09 -->
+
+<!-- auto-appended 2026-05-09 -->
+- 12 попыток custom-l в `kitchens/` (от 01:20 до 12:28) <!-- fact:custom_l_attempts_today verified:2026-05-09 -->
+
+<!-- auto-appended 2026-05-09 -->
+- 11 агентов, из них 4 ('researcher', 'translator', 'wp-auditor', 'wp-specialist') используют 'model: sonnet', 7 агентов без поля 'model'. <!-- fact:agent_model_configuration verified:2026-05-09 -->
+- Opus 4.7 является CLI default. <!-- fact:cli_default_model verified:2026-05-09 -->
+
+<!-- auto-appended 2026-05-09 -->
+- 4 агента (`researcher`/`translator`/`wp-auditor`/`wp-specialist`) <!-- fact:agents_with_model_sonnet verified:2026-05-09 -->
+
+<!-- auto-appended 2026-05-09 -->
+- SKK_TG1_R (unsuffixed TG1.skp = right-hand по EK convention) <!-- fact:tg1_right_hand_convention verified:2026-05-09 -->
+
+<!-- auto-appended 2026-05-09 -->
+- Требует живой SketchUp с открытой сценой и MCP-плагином. <!-- fact:mcp_sketchup_eval_ruby_requirement verified:2026-05-09 -->
+
+<!-- auto-appended 2026-05-09 -->
+- 912 / 450 / 900 / 450 <!-- fact:f7_north_row_door_widths verified:2026-05-09 -->
+
+<!-- auto-appended 2026-05-09 -->
+- .before-tracer-20260509 <!-- fact:ek_real_compose_backup_file verified:2026-05-09 -->
+- disabled (tracer_enabled = false) <!-- fact:ek_real_compose_tracer_default_state verified:2026-05-09 -->
+- SKK_TG1_R for NE corner L-kitchen <!-- fact:tg1_canonical_decision verified:2026-05-09 -->
+
+<!-- auto-appended 2026-05-09 -->
+- pre-arkhos-refactor-20260509 <!-- fact:claude_code_global_repo_anchor verified:2026-05-09 -->
+
+<!-- auto-appended 2026-05-09 -->
+- librarian, researcher, gemini-mega-context already on sonnet; 3 other shell-wrapper agents updated to haiku <!-- fact:global_agent_model_updates verified:2026-05-09 -->
+- 4 agents moved from ~/.claude to Studiokook project directory <!-- fact:studiokook_agents_moved verified:2026-05-09 -->
+- 6 merge edits applied to wp-specialist <!-- fact:wp_specialist_merge_edits_applied verified:2026-05-09 -->
+- 60 days for cold to archive <!-- fact:vault_memory_decay_cutoff verified:2026-05-09 -->
+- 46 days ago (2026-03-24) <!-- fact:vault_memory_decay_oldest_entry verified:2026-05-09 -->
+- -7/-14 days boost, keeping entries in cold <!-- fact:vault_memory_decay_touch_promotion_effec verified:2026-05-09 -->
+
+<!-- auto-appended 2026-05-09 -->
+- Sonnet прописан дефолтом в `settings.json`. <!-- fact:default_model_sonnet verified:2026-05-09 -->
+- Команда `/fast` работает только на Opus 4.6. <!-- fact:fast_command_model_requirement verified:2026-05-09 -->
+
+<!-- auto-appended 2026-05-09 -->
+- SKK_TG1_R для NE corner L-kitchen <!-- fact:tg1_canonical_decision verified:2026-05-09 -->
+
+<!-- auto-appended 2026-05-09 -->
+- redraw_with_undo(bg1) hangs SU on 1489 defs <!-- fact:sketchup_hang_root_cause verified:2026-05-09 -->
+- 14mm (10 design + 4 native indent) <!-- fact:backsplash_thickness verified:2026-05-09 -->
+
+<!-- auto-appended 2026-05-09 -->
+- рядом с `ek_acceptance.rb` / `ek_f10_verify.rb` / `ek_standards.rb` <!-- fact:preflight_gate_location verified:2026-05-09 -->
+- `ek_real_compose.rb:221-263` <!-- fact:commit_with_audit_location verified:2026-05-09 -->
+
+<!-- auto-appended 2026-05-09 -->
+- конференция Code with Claude 2026 <!-- fact:claude_dreaming_feature_announcement_eve verified:2026-05-09 -->
+
+<!-- auto-appended 2026-05-09 -->
+- Haiku (changed to Sonnet) <!-- fact:codex_second_opinion_agent_model verified:2026-05-09 -->
+- `ek_real_compose.rb:221-263` (commit_with_audit) <!-- fact:ek_preflight_integration_point verified:2026-05-09 -->
+
+<!-- auto-appended 2026-05-09 -->
+- конференция Code with Claude 2026, начало мая <!-- fact:dreaming_feature_announcement verified:2026-05-09 -->
+
+<!-- auto-appended 2026-05-09 -->
+- SKK_TG1_R (не _L) для NE corner L-kitchen <!-- fact:tg1_canonical_decision verified:2026-05-09 -->
+- 18mm (равно толщине нижних фасадов) <!-- fact:facade_thickness_standard verified:2026-05-09 -->
+
+<!-- auto-appended 2026-05-09 -->
+- Managed Agents API only (не CLI) <!-- fact:anthropic_dreaming_api_availability verified:2026-05-09 -->
+- `claude-opus-4-7`, `claude-sonnet-4-6` <!-- fact:anthropic_dreaming_api_supported_models verified:2026-05-09 -->
+- Стандартные API-токены, пропорционал <!-- fact:anthropic_dreaming_api_cost verified:2026-05-09 -->
+
+<!-- auto-appended 2026-05-09 -->
+- Managed Agents API only — не CLI <!-- fact:dreaming_availability verified:2026-05-09 -->
+
+<!-- auto-appended 2026-05-09 -->
+- ширина 900, глубина 450, высота 900 mm <!-- fact:tg1_scene_dimensions verified:2026-05-09 -->
+- на 28 mm вперёд от задней стенки <!-- fact:bind_front_plane_position_depth verified:2026-05-09 -->
+
+<!-- auto-appended 2026-05-09 -->
+- managed-agents-2026-04-01 <!-- fact:anthropic_beta_access_expected_email_hea verified:2026-05-09 -->
+
+<!-- auto-appended 2026-05-09 -->
+- claude-opus-4-7, claude-sonnet-4-6 <!-- fact:dreaming_api_models verified:2026-05-09 -->
+- Стандартные API-токены, пропорционально <!-- fact:dreaming_api_cost verified:2026-05-09 -->
+- gemini-embedding-001 <!-- fact:gemini_embedding_model verified:2026-05-09 -->
+
+<!-- auto-appended 2026-05-09 -->
+- строка 7: "model": "sonnet" <!-- fact:settings_json_model_line verified:2026-05-09 -->
+- отсутствует (production scene без convention-named walls) <!-- fact:villu_scene_wall_convention verified:2026-05-09 -->
+- I-kitchen вдоль северной стены <!-- fact:villu_scene_topology verified:2026-05-09 -->
+- z=[0, 2400], толщина y=[0, 100], длина x=[-200, 3539] <!-- fact:wall_n_dimensions verified:2026-05-09 -->
+- CT gap 30mm @ 3339-3369mm, TB2 facade y tolerance <!-- fact:villu_open_findings verified:2026-05-09 -->
+
+<!-- auto-appended 2026-05-09 -->
+- 1. Dedupe before load (reuse exclusive_def_name). 2. Auto-purge after save (purge_unused). 3. Baseline warn ([EK WARNING] if pre-compose defs.size > 2000). <!-- fact:f10_fix_changes verified:2026-05-09 -->
+- 16 `make_unique` orphans <!-- fact:f10_purged_orphans verified:2026-05-09 -->
+- Wall_length должен считаться до облицовочной ПАНЕЛИ pencil-а (3024), не до bbox (3042). <!-- fact:f12_wall_length_correction verified:2026-05-09 -->
+- laminate=18 / MDF/Шпон Fres=19 <!-- fact:facade_thickness_standard verified:2026-05-09 -->
+- `facade-gap-standards.md` <!-- fact:panel_thickness_rule_location verified:2026-05-09 -->
+- `kitchen-build-checklist.md` <!-- fact:deprecated_composition_md_replacement verified:2026-05-09 -->
+- F15 (дубли при пересборе) → F16 (eurocut на пенале) → F13 (стыковка через bind_front) <!-- fact:f15_f16_f13_agent_scope verified:2026-05-09 -->
+- residue>0, defs>2000, defs>5000 <!-- fact:hard_stop_2_residue_check_gates verified:2026-05-09 -->
+- no_duplicate_kitchen_instances, eurocut_only_at_corner, ct_does_not_overlap_panels, appliance_z_origin_check, no_floating_appliances <!-- fact:new_validators_added verified:2026-05-09 -->
+- `custom-l-20260509-185005/custom_l_showcase.skp` открыта. Содержит orphan upper-rows из старых сессий на `Layer0` без `run_id`. <!-- fact:current_scene_state verified:2026-05-09 -->
+
+<!-- auto-appended 2026-05-09 -->
+- `dreaming-2026-04-21` + `managed-agents-2026-04-01` <!-- fact:anthropic_beta_headers verified:2026-05-09 -->
+- .ghost-last-prompt (hash+ts) <!-- fact:ghost_dedup_prompt_sidecar_flag verified:2026-05-09 -->
+- .ghost-last-stop (ts) <!-- fact:ghost_dedup_stop_sidecar_flag verified:2026-05-09 -->
+
+<!-- auto-appended 2026-05-09 -->
+- `.ghost-last-prompt` (hash+ts) <!-- fact:ghost_prompt_dedup_sidecar_flag verified:2026-05-09 -->
+- `.ghost-last-stop` (ts) <!-- fact:ghost_stop_dedup_sidecar_flag verified:2026-05-09 -->
+
+<!-- auto-appended 2026-05-09 -->
+- workspace-mcp (Drive/Sheets/Calendar/Docs) <!-- fact:leaked_oauth_scope verified:2026-05-09 -->
+- sorte1912@gmail.com, sortefyy@gmail.com <!-- fact:oauth_tokens_cached verified:2026-05-09 -->
+
+<!-- auto-appended 2026-05-09 -->
+- https://github.com/max0n232/ARKHOS/security/secret-scanning/unblock-secret/3DUzmY4clP51XOaP0R47S4RJ8IG <!-- fact:github_secret_unblock_url verified:2026-05-09 -->
+
+<!-- auto-appended 2026-05-09 -->
+- 14 дней (`observe_until: 2026-05-23`) <!-- fact:observation_window_ghost_dedup_wrappers verified:2026-05-09 -->
+- Google OAuth client secret (workspace-mcp config) <!-- fact:github_leaked_oauth_secret_type verified:2026-05-09 -->
+
+<!-- auto-appended 2026-05-09 -->
+- у левого края TG1, на 28 mm вперёд от задней стенки <!-- fact:tg1_bind_front_position verified:2026-05-09 -->
+
+<!-- auto-appended 2026-05-09 -->
+- distill, дистилляция, librarian <!-- fact:distill_agent_trigger_phrases verified:2026-05-09 -->
+- Read, Grep, Glob, Bash, Edit, Write, obsidian-router <!-- fact:distill_agent_tools verified:2026-05-09 -->
+
+<!-- auto-appended 2026-05-09 -->
+- Sonnet → Gemini fallback <!-- fact:session_audit_llm_fallback verified:2026-05-09 -->
+
+<!-- auto-appended 2026-05-09 -->
+- 18mm (laminate) / 19mm (MDF/Шпон Fres) <!-- fact:facade_thickness_standard verified:2026-05-09 -->
+- 450×900 mm плоскость внутри `MAINFRAME` модуля, у левого края TG1, на 28 mm вперёд от задней стенки <!-- fact:bind_front_dimensions_tg1 verified:2026-05-09 -->
+- residue=0, defs<2000, defs<5000 <!-- fact:hard_stop_2_ruby_gates verified:2026-05-09 -->
+- `no_duplicate_kitchen_instances`, `eurocut_only_at_corner`, `ct_does_not_overlap_panels`, `appliance_z_origin_check`, `no_orphan_components` <!-- fact:new_validators_added verified:2026-05-09 -->
+- `ensure_main_menu` (line 309) <!-- fact:main_menu_import_function verified:2026-05-09 -->
+- `main_menu.skp` из 3 fallback-путей <!-- fact:main_menu_import_source verified:2026-05-09 -->
+- ~12 мин на spawn → completion (80% всего runtime) <!-- fact:pd1_6_cascade_runtime verified:2026-05-09 -->
+
+<!-- auto-appended 2026-05-09 -->
+- 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 <!-- fact:new_oauth_client_secret verified:2026-05-09 -->
+
+<!-- auto-appended 2026-05-09 -->
+- https://console.cloud.google.com/apis/credentials?project=283475319435 <!-- fact:gcp_credentials_list_url verified:2026-05-09 -->
+- https://console.cloud.google.com/auth/clients/create?project=283475319435 <!-- fact:gcp_create_oauth_client_url verified:2026-05-09 -->
+
+<!-- auto-appended 2026-05-09 -->
+- line 911 in harness (ek_showcase_custom_l_kitchen.rb) <!-- fact:harness_f12_bug_line verified:2026-05-09 -->
+- lines 858, 860 in harness (ek_showcase_custom_l_kitchen.rb) <!-- fact:harness_f4_bug_lines verified:2026-05-09 -->
+
+<!-- auto-appended 2026-05-09 -->
+- line 911 in `ek_showcase_custom_l_kitchen.rb` <!-- fact:harness_f12_bug_line verified:2026-05-09 -->
+- lines 858, 860 in `ek_showcase_custom_l_kitchen.rb` <!-- fact:harness_f4_bug_lines verified:2026-05-09 -->
+
+<!-- auto-appended 2026-05-09 -->
+- studiokook@studiokook.iam.gserviceaccount.com <!-- fact:n8n_service_account_email verified:2026-05-09 -->
+
+<!-- auto-appended 2026-05-09 -->
+- line 911 in harness (`ek_showcase_custom_l_kitchen.rb`) <!-- fact:harness_f12_bug_line verified:2026-05-09 -->
+- lines 858, 860 in harness (`ek_showcase_custom_l_kitchen.rb`) <!-- fact:harness_f4_bug_lines verified:2026-05-09 -->
+
+<!-- auto-appended 2026-05-09 -->
+- dreaming-2026-04-21, managed-agents-2026-04-01 <!-- fact:anthropic_dreaming_api_headers verified:2026-05-09 -->
+
+<!-- auto-appended 2026-05-09 -->
+- timestamp <!-- fact:auto_librarian_flag_file_content_key verified:2026-05-09 -->
+
+<!-- auto-appended 2026-05-09 -->
+- https://www.googleapis.com/auth/calendar https://www.googleapis.com/auth/calendar <!-- fact:google_oauth_scope verified:2026-05-09 -->
+
+<!-- auto-appended 2026-05-09 -->
+- Managed Agents API (Research Preview) <!-- fact:anthropic_dreaming_api_access_type verified:2026-05-09 -->
+
+<!-- auto-appended 2026-05-09 -->
+- dreaming-2026-04-21 + managed-agents-2026-04-01 <!-- fact:anthropic_dreaming_api_headers verified:2026-05-09 -->
+
+<!-- auto-appended 2026-05-10 -->
+- ek_real_compose.rb, ek_compose.rb, staged_pi <!-- fact:ek_domain_compose_harness_files verified:2026-05-10 -->
+
+<!-- auto-appended 2026-05-10 -->
+- Excalidraw plugin для Obsidian <!-- fact:recommended_architecture_tool_1 verified:2026-05-10 -->
+
+<!-- auto-appended 2026-05-10 -->
+- Compose harness (`ek_real_compose.rb`, `ek_compose.rb`, `staged_pi`), staged_pipeline, agent-playbook <!-- fact:ek_domain_execution_layers verified:2026-05-10 -->
+- ek_standards.rb:1414-1425 <!-- fact:ek_standards_auto_loader_lines verified:2026-05-10 -->
+
+<!-- auto-appended 2026-05-10 -->
+- Reasoning (с <think>) <!-- fact:ollama_model_deepseek_r1_14b_type verified:2026-05-10 -->
+- Код-специализированная <!-- fact:ollama_model_qwen2_5_coder_14b_type verified:2026-05-10 -->
+- Reasoning (с <think>) <!-- fact:ollama_model_deepseek_r1_8b_type verified:2026-05-10 -->
+
+<!-- auto-appended 2026-05-10 -->
+- module_dc_value_matches_bbox_dim.rb, n_row_lower_uniform_depth.rb, module_dc_value_matches_bind_axis_pos.rb, module_dc_value_matches_lower_row_span.rb <!-- fact:ek_validators_new_files verified:2026-05-10 -->
+
+<!-- auto-appended 2026-05-10 -->
+- Compose harness (ek_real_compose.rb + ek_compose.rb + staged_pi), SketchUp Ruby API, MCP (Multi-Component Platform) <!-- fact:ek_domain_execution_layers verified:2026-05-10 -->
+- perpendicular_upper_row_uses_corner_bind_axis.rb <!-- fact:perpendicular_upper_row_uses_corner_bind verified:2026-05-10 -->
+
+<!-- auto-appended 2026-05-10 -->
+- 127.0.0.1:11434 <!-- fact:ollama_host verified:2026-05-10 -->
+
+<!-- auto-appended 2026-05-10 -->
+- ! winget install terrastruct.d2 <!-- fact:d2_winget_install_command verified:2026-05-10 -->
+
+<!-- auto-appended 2026-05-10 -->
+- a100 + d106 + 2·d101 <!-- fact:bind_front_formula verified:2026-05-10 -->
+- 570 (глубина корпуса) <!-- fact:a100_value verified:2026-05-10 -->
+- 3 (смещение фасада по Y) <!-- fact:d106_value verified:2026-05-10 -->
+- 19 (толщина двери / ширина боковой бленды) <!-- fact:d101_value verified:2026-05-10 -->
+- Vault формула (`a100 + d106 + d101 + k146`) содержит `k146` (22mm = corner-internal carcass offset) вместо `d101` для ширины боковой бленды. <!-- fact:vault_formula_discrepancy verified:2026-05-10 -->
+
+<!-- auto-appended 2026-05-10 -->
+- "parent!x203 - parent!k146 - parent!d101" <!-- fact:bind_front_canonical_formula verified:2026-05-10 -->
+
+<!-- auto-appended 2026-05-10 -->
+- nomic-embed-text, deepseek-r1:8b, qwen2.5-coder:14b, arkhos-ru (based on qwen3.5:9b), qwen3.5:9b, abliterated <!-- fact:ollama_models_installed verified:2026-05-10 -->
+- OLLAMA_FLASH_ATTENTION=1, OLLAMA_KV_CACHE_TYPE=q8_0 <!-- fact:ollama_env_vars_set verified:2026-05-10 -->
+- ENABLE_COMMUNITY_SHARING=False, ENABLE_VERSION_UPDATE_CHECK=False, OFFLINE_MODE=True, WEBUI_AUTH=False, OLLAMA_BASE_URL=http://host.docker.internal:11434 <!-- fact:open_webui_env_vars_set verified:2026-05-10 -->
+
+<!-- auto-appended 2026-05-10 -->
+- main.js, manifest.json, styles.css <!-- fact:excalidraw_plugin_files verified:2026-05-10 -->
+
+<!-- auto-appended 2026-05-10 -->
+- main.js (8.4MB), manifest.json, styles.css <!-- fact:excalidraw_plugin_files verified:2026-05-10 -->
+
+<!-- auto-appended 2026-05-10 -->
+- 3 шт за 5 часов (09:42, 12:13, 14:19) <!-- fact:bsod_count_10_05 verified:2026-05-10 -->
+- c000009a = STATUS_INSUFFICIENT_RESOURCES <!-- fact:bsod_error_code_0x116_parameter verified:2026-05-10 -->
+
+<!-- auto-appended 2026-05-10 -->
+- Нарушено правило feedback_codex_review_gate.md при проведении strategic-critique по architecture <!-- fact:feedback_rule_violation verified:2026-05-10 -->
+- ct_no_physical_overlap, ct_segments_cover_lower_row_no_gap, pencil_top_aligned_with_uppers <!-- fact:anna_scene_violations verified:2026-05-10 -->
+- k143/k144/k145/k146 = nil (def defaults: 500/500/40/40), d201..d204 = 3mm, a103 = nil (def default 2), a100 = 570mm, d101 = 19mm, d106 = 3mm, a101 = 16mm, z101=0, z201=950mm <!-- fact:bg1_default_parameters verified:2026-05-10 -->
+- a100=320mm, a101=18mm, d101=18mm, d106=0, z201=700, k143=k144=320, k147=2 <!-- fact:tg1_default_parameters verified:2026-05-10 -->
+- a100=370mm, a101=16mm, d101=19mm <!-- fact:tg1_updated_parameters_after_menu verified:2026-05-10 -->
+
+<!-- auto-appended 2026-05-10 -->
+- _d102_formula = CHOOSE(parent!a103,2,4) <!-- fact:facade1_opening_side_formula verified:2026-05-10 -->
+
+<!-- auto-appended 2026-05-10 -->
+- Нарушено: strategic-critique по architecture = textbook codex trigger <!-- fact:feedback_codex_review_gate_rule verified:2026-05-10 -->
+- parent!z201-parent!a101*2 <!-- fact:magic_corner_x_span_formula verified:2026-05-10 -->
+- parent!z202-parent!a101 <!-- fact:magic_corner_y_span_formula verified:2026-05-10 -->
+
+<!-- auto-appended 2026-05-10 -->
+- Y -3000mm (3m offset behind) <!-- fact:bg1_left_position_world verified:2026-05-10 -->
+- 1 (corner right, door left) <!-- fact:bg1_left_a103_parameter verified:2026-05-10 -->
+
+<!-- auto-appended 2026-05-10 -->
+- 1168×554×788 (proportional stretch) <!-- fact:left_magic_corner_inside_dimensions verified:2026-05-10 -->
+
+<!-- auto-appended 2026-05-10 -->
+- _x_formula="-55*animate" <!-- fact:el_magic_corner_animation_parameter verified:2026-05-10 -->
+
+<!-- auto-appended 2026-05-10 -->
+- CHOOSE(parent!a103,4,2) <!-- fact:bg1_left_def_corrected_formula verified:2026-05-10 -->
+
+<!-- auto-appended 2026-05-10 -->
+- Compose harness (`ek_real_compose.rb` + `ek_compose.rb` + `staged_pi`), visual rules, def-surgery scaling <!-- fact:ek_domain_layers verified:2026-05-10 -->
+
+<!-- auto-appended 2026-05-10 -->
+- В этой сессии нет инструмента для генерации изображений <!-- fact:image_generation_tool_missing verified:2026-05-10 -->
+
+<!-- auto-appended 2026-05-10 -->
+- bf_y=29mm, formula с d106, d106 на MAINFRAME <!-- fact:bind_front_v2_formula_details verified:2026-05-10 -->
+
+<!-- auto-appended 2026-05-10 -->
+- parent!x203-parent!k146-parent!d101 <!-- fact:bg1_5_mainframe_6_bind_front_y_formula_o verified:2026-05-10 -->
+- parent!x203-parent!k146-parent!d101-parent!d106 <!-- fact:bg1_5_mainframe_6_bind_front_y_formula_n verified:2026-05-10 -->
+
+<!-- auto-appended 2026-05-10 -->
+- Готовые/Villu Jõgi/Scene.skp <!-- fact:loaded_sketchup_file verified:2026-05-10 -->
+
+<!-- auto-appended 2026-05-11 -->
+- compose checklist, orientation, row formulas, custom library, gap standards, countertop eurocut, agent playbook <!-- fact:vault_document_compose_recipe verified:2026-05-11 -->
+
+<!-- auto-appended 2026-05-11 -->
+- X=700..2381.3 (1681.3mm) <!-- fact:n_arm_uppers_span verified:2026-05-11 -->
+- Y=-470..-2380.8 (1910.8mm) <!-- fact:w_arm_uppers_span verified:2026-05-11 -->
+- 0mm (касается TG1 east @ 700) <!-- fact:tg1_face_gap_n_arm verified:2026-05-11 -->
+- 0mm (касается TG1 south @ -470) <!-- fact:tg1_face_gap_w_arm verified:2026-05-11 -->
+
+<!-- auto-appended 2026-05-11 -->
+- только verified successes (5 feedback files без изменений) <!-- fact:canon_auto_memory_content verified:2026-05-11 -->
+- все 9 нарушений D1-D9 как session-specific findings (НЕ canon) <!-- fact:vault_scene_deviations_content verified:2026-05-11 -->
+
+<!-- auto-appended 2026-05-11 -->
+- Step 0, одновременно со стенами (отменено) <!-- fact:outer_side_panels_placement_step verified:2026-05-11 -->
+- dimension-defining constraint <!-- fact:outer_side_panels_constraint_type verified:2026-05-11 -->
+- walls → lowers → pencils → INNER+OUTER облицовка → THEN uppers/CT/фартуки <!-- fact:furniture_recalculation_canon_order verified:2026-05-11 -->
+- BG1[0-1241] → BD3[1241-1841] → BD2[1841-2381] (lenx 559→540) → INNER[2362-2381] → PB3F[2381-2981] → OUTER[2981-3000] <!-- fact:n_arm_final_layout verified:2026-05-11 -->
+- BG1 → BD1_M → BI → BD2#1 (lenx 562→543) → INNER → PD1_1 → OUTER до Y=-3000 <!-- fact:w_arm_final_layout verified:2026-05-11 -->
+- 798×450, k145=k146=17, translated +19 Y (origin -469→-450) <!-- fact:tg1_final_dimensions_and_position verified:2026-05-11 -->
+
+<!-- auto-appended 2026-05-12 -->
+- X=0..370, Y=100..162, Z=16..32 <!-- fact:panel_g_4_dimensions_k143_370mm verified:2026-05-12 -->
+
+<!-- auto-appended 2026-05-12 -->
+- от стыковочной панели <!-- fact:x_axis_gap_location verified:2026-05-12 -->
+- отдельная coordinate от Y <!-- fact:x_axis_gap_coordinate_type verified:2026-05-12 -->
+
+<!-- auto-appended 2026-05-12 -->
+- `CHOOSE(parent!a103, parent!d204, parent!d202)` <!-- fact:canon_lenx_formula_retraction verified:2026-05-12 -->
+- d201=0, d203=0, d202=d204=1.5mm <!-- fact:canon_d_gap_params_studiokook_upper verified:2026-05-12 -->
+- внутреннее -12mm extension (tab) <!-- fact:panel_g_cut_slot_4_def_bug verified:2026-05-12 -->
+
+<!-- auto-appended 2026-05-13 -->
+- _index, agent-playbook, validators-changelog <!-- fact:easykitchen_root_files verified:2026-05-13 -->
+
+<!-- auto-appended 2026-05-13 -->
+- Bash(powershell.exe *) <!-- fact:claude_settings_local_json_bash_permissi verified:2026-05-13 -->
+
+<!-- auto-appended 2026-05-13 -->
+- "Read(//c/Users/sorte/**)" covers .ssh, .gnupg, credentials/, Desktop/* (all projects) <!-- fact:claude_settings_local_json_permission_is verified:2026-05-13 -->
+
+<!-- auto-appended 2026-05-13 -->
+- 8 буллетов в стиле 'X — это Y', без того, ЧТО Claude знает про каждую (где живёт, как вызывается, какой контракт, gotchas) <!-- fact:arkhos_integrations_list_issue verified:2026-05-13 -->
+
+<!-- auto-appended 2026-05-13 -->
+- updated: < 2026-04-13 <!-- fact:vault_audit_stale_threshold verified:2026-05-13 -->
+
+<!-- auto-appended 2026-05-13 -->
+- event-watcher.cjs:256-258 <!-- fact:event_watcher_cjs_emergency_line_vps verified:2026-05-13 -->
+
+<!-- auto-appended 2026-05-14 -->
+- Шлёт `📊 VAULT INSIGHT` / `📋 VAULT DIGEST` про видео-пайплайн <!-- fact:pattern_analyzer_telegram_content verified:2026-05-14 -->
+
+<!-- auto-appended 2026-05-14 -->
+- "WARNING LOOP DETECTED: Command failed N times..." → "⚠️ Цикл: команда упала N раз...","WARNING BUDGET BURN: N tool calls..." → "⚠️ Сжигание бюджета: N вызовов..." <!-- fact:vps_file_modification_details verified:2026-05-14 -->
+
+<!-- auto-appended 2026-05-14 -->
+- Thu 2026-05-14 05:34:20 UTC <!-- fact:claude_claw_vps_service_restart_time verified:2026-05-14 -->
+
+<!-- auto-appended 2026-05-15 -->
+- Gemini → Sonnet fallback chain, Ollama embed <!-- fact:llm_call_site_obsidian_api_models verified:2026-05-15 -->
+
+<!-- auto-appended 2026-05-16 -->
+- "Read(//c/Users/sorte/**)" покрывает .ssh, .gnupg, credentials/, Desktop/* (все проекты) <!-- fact:claude_settings_local_json_permission_is verified:2026-05-16 -->
+- .before-codex-gate-20260514 <!-- fact:vps_claude_settings_json_backup verified:2026-05-16 -->
+
+<!-- auto-appended 2026-05-16 -->
+- googleApi Service Account <!-- fact:n8n_workflow_auth_type verified:2026-05-16 -->
+- sc-domain%3Astudiokook.ee <!-- fact:n8n_workflow_gsc_url_format verified:2026-05-16 -->
+- codex-gate hook + settings + CLAUDE.md <!-- fact:git_commit_0804c07_description verified:2026-05-16 -->
+- game-theory-playbook +44, causal-rules +16, observation +23 <!-- fact:git_commit_e122491_description verified:2026-05-16 -->
+- Session log 2026-05-13-audit-codex-gate.md <!-- fact:git_commit_27f8efb_description verified:2026-05-16 -->
+
+<!-- auto-appended 2026-05-16 -->
+- Service Account (googleApi) <!-- fact:n8n_workflow_seo_audit_credential_type verified:2026-05-16 -->
+- Mon 2026-05-18 09:00 Europe/Tallinn <!-- fact:n8n_workflow_ucb1_bandit_next_signal_tim verified:2026-05-16 -->
+
+<!-- auto-appended 2026-05-17 -->
+- "Bash(powershell.exe *)" <!-- fact:claude_settings_local_bash_permissions verified:2026-05-17 -->
+
+<!-- auto-appended 2026-05-17 -->
+- `new URL(url).pathname` → regex parse <!-- fact:n8n_workflow_ucb1_calculate_fix verified:2026-05-17 -->
+
+<!-- auto-appended 2026-05-17 -->
+- Read(//c/Users/sorte/**), Bash(powershell.exe *) <!-- fact:claude_settings_local_json_permissions verified:2026-05-17 -->
+
+<!-- auto-appended 2026-05-17 -->
+- SensorsOnly=1 <!-- fact:hwinfo64_sensors_only_ini_key verified:2026-05-17 -->
+- StartMinimized=1 <!-- fact:hwinfo64_minimized_ini_key verified:2026-05-17 -->
+- LogInterval=1000 <!-- fact:hwinfo64_log_interval_ini_key verified:2026-05-17 -->

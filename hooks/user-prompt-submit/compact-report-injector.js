@@ -158,9 +158,51 @@ try {
         const data = JSON.parse(fs.readFileSync(distillFlag, 'utf8'));
         const age = Date.now() - new Date(data.timestamp).getTime();
         if (age < 7 * 24 * 60 * 60 * 1000) {
-            output.push(`[DISTILL NEEDED] Accumulators over limit: troubleshooting=${data.troubleshooting} patterns=${data.patterns}. Run "distill" to route to permanent destinations.`);
+            const parts = [];
+            if (data.troubleshooting > 100 || data.patterns > 100) parts.push(`accumulators(troubleshooting=${data.troubleshooting} patterns=${data.patterns})`);
+            if (data.vault?.orphanRate > 15) parts.push(`orphans(${data.vault.orphanRate}%)`);
+            if (data.vault?.unindexedFolders > 3) parts.push(`unindexed-folders(${data.vault.unindexedFolders})`);
+            if (data.vault?.staleTGDumps > 50) parts.push(`stale-TG-dumps(${data.vault.staleTGDumps})`);
+            const detail = parts.length ? parts.join(' ') : `troubleshooting=${data.troubleshooting} patterns=${data.patterns}`;
+            output.push(`[DISTILL NEEDED] Over threshold: ${detail}. Run "distill" to route via librarian (vault routing-map.md).`);
         } else {
             fs.unlinkSync(distillFlag);
+        }
+    }
+} catch {}
+
+// --- Auto-memory routing needed flag ---
+try {
+    const flag = path.join(CLAUDE_DIR, 'hooks', '.auto-memory-routing-needed');
+    if (fs.existsSync(flag)) {
+        const data = JSON.parse(fs.readFileSync(flag, 'utf8'));
+        const age = Date.now() - new Date(data.timestamp).getTime();
+        if (age >= 7 * 24 * 60 * 60 * 1000) {
+            fs.unlinkSync(flag);
+        } else {
+            // Filter to files that still exist + still match recorded sessionId.
+            // Routed/deleted/altered files become stale entries — drop them.
+            // Files referenced in MEMORY.md index = already-routed (KEEP decision) — also drop.
+            const memDir = path.join(CLAUDE_DIR, 'projects/c--Users-sorte--claude/memory');
+            let memIndex = '';
+            try { memIndex = fs.readFileSync(path.join(memDir, 'MEMORY.md'), 'utf8'); } catch {}
+            const live = data.files.filter(f => {
+                if (memIndex.includes(f.name)) return false;
+                try {
+                    const content = fs.readFileSync(path.join(memDir, f.name), 'utf8');
+                    const m = content.match(/^originSessionId:\s*([a-f0-9-]+)/m);
+                    return m && m[1] === data.sessionId;
+                } catch { return false; }
+            });
+            if (live.length === 0) {
+                fs.unlinkSync(flag);
+            } else {
+                const fileList = live.map(f => `${f.name} (${f.type})`).join(', ');
+                output.push(`[AUTO-MEMORY ROUTING] ${live.length} new file(s) created in auto-memory this session: ${fileList}. Per CLAUDE.md routing: behavioral rules → keep as feedback_*.md, project/reference → migrate to vault. Run "distill" or invoke librarian to route.`);
+                if (live.length !== data.files.length) {
+                    fs.writeFileSync(flag, JSON.stringify({ ...data, files: live }), 'utf8');
+                }
+            }
         }
     }
 } catch {}
