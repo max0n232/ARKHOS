@@ -77,3 +77,22 @@ plugins/install-counts-cache.json
 hooks/maintenance/.*-state.json
 hooks/stop/.*-state.json
 hooks/.pending-report-*.txt
+hooks/.checkpoint-*
+hooks/.ghost-last-*
+hooks/.auto-librarian-last-run.json
+hooks/user-prompt-submit/.pre-task-loader-state.json
+.last-cleanup
+
+# Runtime caches (Claude Code managed)
+image-cache/
+paste-cache/
+tasks/
+tmp/
+.claude/worktrees/
+
+# Daily-rotated LLM telemetry (obsidian-api.js)
+logs/llm-calls-*.jsonl
+
+# Pattern data (runtime state, NOT code — code lives at db-helper.js / init-db.js / cleanup-db.js)
+patterns/gemini-quota.json
+patterns/usage-tracker.json
