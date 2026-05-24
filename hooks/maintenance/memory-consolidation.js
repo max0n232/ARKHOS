@@ -64,6 +64,61 @@ function saveState(state) {
   fs.writeFileSync(STATE_FILE, JSON.stringify(state, null, 2));
 }
 
+// ─── Atomic per-mode lock ─────────────────────────────────────────────────
+// Prevents duplicate runs when parallel Claude instances fire SessionStart
+// hooks within the same throttle window: each instance loads state, both see
+// throttle OK, both start the LLM call before either persists lastRun. O_EXCL
+// (wx flag) makes the create-or-fail atomic; stale-TTL lets a crashed run
+// recover. Race witnessed 2026-05-24 as duplicate TG notifications + 4 backup
+// files within 14 seconds.
+
+// Sonnet reorg measured 5-60s typical, edge-case up to 2min. 5min balances
+// stale-recovery latency vs SessionStart UX impact (crashed instance shouldn't
+// block next launch for 10 min). Codex review nit 2026-05-24.
+const LOCK_TTL_MS = 5 * 60 * 1000;
+
+function tryAcquireLock(name) {
+  const lockFile = path.join(CLAUDE_DIR, 'hooks', 'maintenance', `.${name}.lock`);
+  const payload = JSON.stringify({ pid: process.pid, started: Date.now() });
+  try {
+    fs.writeFileSync(lockFile, payload, { flag: 'wx' });
+    return lockFile;
+  } catch (e) {
+    if (e.code !== 'EEXIST') throw e;
+    try {
+      const cur = JSON.parse(fs.readFileSync(lockFile, 'utf8'));
+      if (Date.now() - cur.started > LOCK_TTL_MS) {
+        fs.unlinkSync(lockFile);
+        fs.writeFileSync(lockFile, payload, { flag: 'wx' });
+        return lockFile;
+      }
+    } catch {}
+    return null;
+  }
+}
+
+function releaseLock(lockFile) {
+  if (!lockFile) return;
+  try { fs.unlinkSync(lockFile); } catch {}
+}
+
+async function withLock(name, fn) {
+  const lock = tryAcquireLock(name);
+  if (!lock) {
+    console.log(`[MEMORY-CONSOLIDATION] ${name}: another instance holds lock, skip`);
+    return;
+  }
+  // Belt-and-suspenders: process.exit() inside fn() bypasses try/finally.
+  // 'exit' fires on normal exit + process.exit() + uncaught throw (NOT SIGKILL,
+  // SIGKILL handled by stale TTL). Codex review nit 2026-05-24.
+  const cleanup = () => releaseLock(lock);
+  process.on('exit', cleanup);
+  try { return await fn(); } finally {
+    releaseLock(lock);
+    process.removeListener('exit', cleanup);
+  }
+}
+
 // ─── Ghost session reader (tail-biased) ───────────────────────────────────
 
 function listRecentSessions() {
@@ -496,4 +551,5 @@ const runners = {
   '--anti': antiPatterns,
 };
 
-runners[mode]({ force }).catch(e => process.stderr.write(`[memory-consolidation] fatal (${mode}): ${e.message}\n`));
+withLock(`memory-consolidation${mode}`, () => runners[mode]({ force }))
+  .catch(e => process.stderr.write(`[memory-consolidation] fatal (${mode}): ${e.message}\n`));
