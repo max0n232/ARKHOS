@@ -5,7 +5,7 @@
 ## Core Tenets
 
 1. **Evidence over claims** — Проверяй перед заявлением "готово"
-2. **YAGNI → DRY** — Не добавляй впрок; абстрагируй на 3-й копии
+2. **YAGNI → DRY** — Не строй presumptive features впрок; абстрагируй на 3-й копии. Раньше 3-й копии — только при *committed compatibility surface* (external consumers / production data / API-export contract / дорогая-в-откате миграция) И активном roadmap-пункте. Retrofit-cost НЕ освобождает от File Discipline: любой новый file/skill/agent всё равно требует concrete consumer + approval.
 
 ## Forbidden Operations
 
