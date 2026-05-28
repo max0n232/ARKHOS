@@ -207,6 +207,22 @@ try {
     }
 } catch {}
 
+// --- Stack auditor pending flag ---
+try {
+    const stackFlag = path.join(CLAUDE_DIR, 'hooks', '.stack-auditor-pending.flag');
+    if (fs.existsSync(stackFlag)) {
+        const data = JSON.parse(fs.readFileSync(stackFlag, 'utf8'));
+        const age = Date.now() - new Date(data.timestamp).getTime();
+        if (age < 14 * 24 * 60 * 60 * 1000) {
+            const concerns = (data.concerns || []).slice(0, 5);
+            const tail = concerns.length ? ` Concerns: ${concerns.join('; ')}.` : ' No concerns flagged.';
+            output.push(`[STACK AUDIT ${data.date}] Weekly stack report ready → ${data.auditPath}.${tail} Read it when relevant; delete flag after acknowledging: ~/.claude/hooks/.stack-auditor-pending.flag`);
+        } else {
+            fs.unlinkSync(stackFlag);
+        }
+    }
+} catch {}
+
 // --- Inbox extraction needed flag ---
 try {
     const inboxFlag = path.join(CLAUDE_DIR, 'hooks', '.inbox-extraction-needed');

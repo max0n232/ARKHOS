@@ -173,6 +173,12 @@
             "command": "node C:/Users/sorte/.claude/hooks/maintenance/quirks-staleness-check.js",
             "timeout": 5,
             "statusMessage": "Quirks staleness check..."
+          },
+          {
+            "type": "command",
+            "command": "node C:/Users/sorte/.claude/hooks/maintenance/stack-auditor.js",
+            "timeout": 120,
+            "statusMessage": "Stack auditor (weekly)..."
           }
         ]
       }
