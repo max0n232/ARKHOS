@@ -1,8 +1,13 @@
 ---
 name: post-mortem
 description: >
-  Trigger: post-mortem, ретроспектива, "что пошло не так", "разбор ошибок", "debug session".
-  Systematic session review + knowledge routing.
+  Trigger ONLY on explicit retrospective intent: "post-mortem на сессию X",
+  "разбор ошибок последней задачи", "проанализируй что пошло не так с Y",
+  "ретроспектива incident Z". DO NOT fire on inline bug discussion or
+  passing "что не так" questions — those are debugging not post-mortem.
+  Skill writes structured analysis to logs/post-mortem/. Stop hook
+  session-reflection.js covers auto-detection; this skill is the manual
+  deep-dive complement.
 model: sonnet
 ---
 

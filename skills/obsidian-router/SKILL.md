@@ -1,8 +1,14 @@
 ---
 name: obsidian-router
 description: >
-  Trigger: vault, obsidian, заметки, БЗ, qmd, "найди в заметках", "сохрани в базу знаний",
-  vault paths. Routes to QMD/Nexus/REST API.
+  Trigger ONLY on explicit knowledge-base intent: "найди в заметках/vault",
+  "сохрани в базу знаний/БЗ", "qmd search", "vault audit", "wikilink fix",
+  "vault MOC", "obsidian REST API". DO NOT fire on casual mentions of
+  "vault" or "obsidian" — only when the user is asking you to search,
+  write, or route to the knowledge base. For direct MCP read of a known
+  path, mcp__obsidian__* is sufficient. For ANY write/update/append —
+  still route via this skill (Nexus vs REST decision, search-first guard,
+  Pending Writes Flush logic).
 model: haiku
 ---
 

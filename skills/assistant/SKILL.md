@@ -1,8 +1,11 @@
 ---
 name: assistant
 description: >
-  Trigger: "что делать", "приоритеты", "статус проектов", "weekly/monthly review", "progress",
-  "health check". Check project contexts first. NOT "review" alone (may be output-critic).
+  Trigger ONLY on cross-project orchestration intent: "статус всех проектов",
+  "weekly/monthly review", "health check ARKHOS", "что приоритет сейчас",
+  "progress report по проектам". DO NOT fire on single-project questions
+  (those go to project CLAUDE.md), bare "что делать" (too broad), or "review"
+  (likely output-critic). Reads project CLAUDE.md files first to orient.
 model: sonnet
 ---
 

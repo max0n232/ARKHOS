@@ -1,8 +1,12 @@
 ---
 name: strategic-critique
 description: >
-  Trigger: стратегия, strategy, content plan, контент-план, architecture decision,
-  "со стратегической критикой". Multi-round critique with scoring. NOT "audit"/"roadmap" alone.
+  Trigger ONLY on multi-round strategic-decision intent: "сделай стратегическую
+  критику X", "content plan review with scoring", "architecture decision —
+  трейд-офф", "проверь стратегию запуска Y". DO NOT fire on bare "strategy"
+  mentions, console echo with "strategy" string, "audit"/"roadmap" alone,
+  or single-question planning (use direct Claude reasoning). Multi-round
+  critique with scoring — expensive opus, only for high-leverage decisions.
 model: opus
 ---
 

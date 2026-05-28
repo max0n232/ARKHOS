@@ -1,10 +1,12 @@
 ---
 name: diagram
 description: >
-  Trigger: "/diagram", "нарисуй диаграмму", "обнови диаграмму", "regenerate diagram", "show topology",
-  "agent graph", "knowledge routing", "ek pipeline", "n8n topology". Regenerates an Excalidraw
-  diagram in vault from source-of-truth files. Use when user asks for a fresh visual snapshot
-  of architecture / agents / n8n / EK pipeline / knowledge routing.
+  Trigger ONLY on explicit diagram regeneration intent: "/diagram <topic>",
+  "обнови диаграмму X", "regenerate the X diagram", "нарисуй topology X".
+  DO NOT fire on conversational mentions of "agent graph" / "knowledge routing"
+  / "ek pipeline" / "n8n topology" without the regenerate verb. For one-off
+  visualisation in chat use a mermaid block instead. Skill = Excalidraw vault
+  asset refresh from 5 generator scripts in 90-System/scripts/.
 model: haiku
 ---
 

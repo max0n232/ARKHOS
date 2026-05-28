@@ -1,8 +1,14 @@
 ---
 name: n8n-expert
 description: >
-  Trigger: n8n, воркфлоу, автоматизация, webhook, workflow errors/expressions.
-  Use for correct patterns, validation, and sandbox limitations.
+  Trigger ONLY on intent-explicit n8n work: "построй/build workflow",
+  "построй воркфлоу для X", "автоматизация через n8n",
+  "fix validation error", "debug n8n expression", "Code node syntax",
+  "node configuration property", "$json/$node usage", "sandbox limitation",
+  "workflow JSON structure", "expression не работает". DO NOT fire on
+  casual "n8n" mentions (status reports, infra config, URLs, IDs).
+  For known WF read via MCP — mcp__n8n-mcp__* sufficient. For build,
+  validation-fix, debug — use this skill for pattern routing.
 model: sonnet
 ---
 
