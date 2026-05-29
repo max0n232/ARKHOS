@@ -75,6 +75,7 @@ hooks/.distill-needed
 scripts/.router-state.json
 plugins/install-counts-cache.json
 hooks/maintenance/.*-state.json
+hooks/maintenance/.skill-telemetry.json
 hooks/maintenance/.*.lock
 hooks/stop/.*-state.json
 hooks/.pending-report-*.txt

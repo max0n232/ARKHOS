@@ -43,6 +43,9 @@ const MEMORY_MD = path.join(CLAUDE_DIR, 'projects', 'C--Users-sorte--claude', 'm
 const FEEDBACK_DIR = path.join(CLAUDE_DIR, 'projects', 'C--Users-sorte--claude', 'memory');
 const TRANSCRIPT_DIR = path.join(CLAUDE_DIR, 'projects', 'C--Users-sorte--claude');
 const AGENTS_DIR = path.join(CLAUDE_DIR, 'agents');
+const TELEMETRY_FILE = path.join(CLAUDE_DIR, 'hooks', 'maintenance', '.skill-telemetry.json');
+const REGISTRY_MD = path.join(CLAUDE_DIR, 'skills', 'REGISTRY.md');
+const USAGE_REVIEW_DAYS = 30;
 
 const SKILL_NAMES = ['assistant', 'diagram', 'n8n-expert', 'obsidian-router',
   'output-critic', 'post-mortem', 'strategic-critique'];
@@ -93,8 +96,58 @@ function cosine(a, b) {
   return na && nb ? dot / Math.sqrt(na * nb) : 0;
 }
 
-// Single pass over recent transcripts — feeds checks #1, #2, #3.
-function walkTranscripts() {
+// --- Usage telemetry helpers (REGISTRY lifecycle gate) ---
+
+function loadTelemetry() {
+  try { return JSON.parse(fs.readFileSync(TELEMETRY_FILE, 'utf8')); }
+  catch { return { watermarks: {}, skills: {}, agents: {}, updatedAt: null }; }
+}
+function saveTelemetry(t) { fs.writeFileSync(TELEMETRY_FILE, JSON.stringify(t, null, 2)); }
+
+// Parse ACTIVE skills + agents from skills/REGISTRY.md (Core + Agents sections only).
+// Stops at project-local sections (Studiokook, AiGeneration) — separate transcripts.
+function parseRegistry() {
+  const skills = [], agents = [];
+  let section = null;
+  try {
+    const lines = fs.readFileSync(REGISTRY_MD, 'utf8').split('\n');
+    for (const line of lines) {
+      if (/^##\s+Core/.test(line))   { section = 'skills'; continue; }
+      if (/^##\s+Agents/.test(line)) { section = 'agents'; continue; }
+      if (/^##\s+(Studiokook|AiGeneration|Trigger|Lifecycle)/.test(line)) { section = null; continue; }
+      if (!section) continue;
+      const m = line.match(/^\|\s*([^|]+?)\s*\|\s*\S+\s*\|\s*(ACTIVE|REVIEW|DELETE)\s*\|/);
+      if (!m) continue;
+      const name = m[1].trim();
+      if (name.startsWith('-') || /^(skill|agent)$/i.test(name)) continue; // header/separator
+      if (m[2] === 'ACTIVE') (section === 'skills' ? skills : agents).push(name);
+    }
+  } catch {}
+  if (skills.length === 0 && agents.length === 0)
+    console.warn('[STACK-AUDITOR] parseRegistry: 0 ACTIVE rows — check REGISTRY.md section headings');
+  return { skills, agents };
+}
+
+// Flag ACTIVE artifacts with lastUsed > USAGE_REVIEW_DAYS ago (or never) as REVIEW candidates.
+function checkUsageTelemetry(telemetry, registry) {
+  const cutoff = new Date(Date.now() - USAGE_REVIEW_DAYS * 86400000).toISOString();
+  const reviewCandidates = [];
+  for (const name of registry.skills) {
+    const rec = telemetry.skills[name];
+    if (!rec || !rec.lastUsed || rec.lastUsed < cutoff)
+      reviewCandidates.push({ kind: 'skill', name, lastUsed: rec?.lastUsed || null, count: rec?.count || 0 });
+  }
+  for (const name of registry.agents) {
+    const rec = telemetry.agents[name];
+    if (!rec || !rec.lastUsed || rec.lastUsed < cutoff)
+      reviewCandidates.push({ kind: 'agent', name, lastUsed: rec?.lastUsed || null, count: rec?.count || 0 });
+  }
+  return { reviewCandidates, skills: telemetry.skills, agents: telemetry.agents };
+}
+
+// Single pass over recent transcripts — feeds checks #1, #2, #3 + telemetry accumulation.
+// `telemetry` is updated in place (byte-offset watermarks + lifetime skill/agent counts).
+function walkTranscripts(telemetry) {
   const cutoff = Date.now() - LOOKBACK_DAYS * 86400000;
   const hookCounts = {}; const skillCounts = {}; const mcpServers = {};
   let files = [];
@@ -105,9 +158,29 @@ function walkTranscripts() {
       .filter(f => { try { return fs.statSync(f.path).mtimeMs > cutoff; } catch { return false; } });
   } catch { return { hookCounts, skillCounts, mcpServers, files: 0 }; }
 
+  // GC watermarks only for files deleted from disk — keep old-but-present files so a
+  // resumed session doesn't re-read from offset 0 and double-count.
+  for (const k of Object.keys(telemetry.watermarks)) {
+    try { fs.statSync(path.join(TRANSCRIPT_DIR, k)); }
+    catch { delete telemetry.watermarks[k]; }
+  }
+
   for (const f of files) {
     let raw;
-    try { raw = fs.readFileSync(f.path, 'utf8'); } catch { continue; }
+    try {
+      const stat = fs.statSync(f.path);
+      const stored = telemetry.watermarks[f.name] || 0;
+      const offset = stat.size < stored ? 0 : stored; // file shrank (abnormal) → re-scan
+      const newBytes = stat.size - offset;
+      if (newBytes <= 0) continue; // nothing appended since last run
+      const buf = Buffer.allocUnsafe(newBytes);
+      const fd = fs.openSync(f.path, 'r');
+      fs.readSync(fd, buf, 0, newBytes, offset);
+      fs.closeSync(fd);
+      raw = buf.toString('utf8');
+      telemetry.watermarks[f.name] = stat.size;
+    } catch { continue; }
+
     for (const line of raw.split('\n')) {
       if (!line.trim()) continue;
       let obj; try { obj = JSON.parse(line); } catch { continue; }
@@ -121,7 +194,21 @@ function walkTranscripts() {
         } else if (block.type === 'tool_use') {
           if (block.name === 'Skill') {
             const s = block.input?.skill;
-            if (s) skillCounts[s] = (skillCounts[s] || 0) + 1;
+            if (s) {
+              skillCounts[s] = (skillCounts[s] || 0) + 1;
+              const cur = telemetry.skills[s] || { count: 0, lastUsed: null };
+              cur.count++;
+              if (obj.timestamp && (!cur.lastUsed || obj.timestamp > cur.lastUsed)) cur.lastUsed = obj.timestamp;
+              telemetry.skills[s] = cur;
+            }
+          } else if (block.name === 'Agent') {
+            const ag = block.input?.subagent_type;
+            if (ag && ag !== 'claude') { // generic claude subagents have no registry row
+              const cur = telemetry.agents[ag] || { count: 0, lastUsed: null };
+              cur.count++;
+              if (obj.timestamp && (!cur.lastUsed || obj.timestamp > cur.lastUsed)) cur.lastUsed = obj.timestamp;
+              telemetry.agents[ag] = cur;
+            }
           } else if (block.name && block.name.startsWith('mcp__')) {
             const server = block.name.split('__')[1];
             if (server) mcpServers[server] = (mcpServers[server] || 0) + 1;
@@ -215,7 +302,7 @@ function checkGeminiTrio() {
   return sizes;
 }
 
-function composeReport(r) {
+function composeReport(r, registry) {
   const date = new Date().toISOString().slice(0, 10);
   const concerns = [];
   if (r.memory.over) concerns.push(`MEMORY.md ${r.memory.lines} lines OVER ${MEM_LIMIT}`);
@@ -224,6 +311,8 @@ function composeReport(r) {
   if (r.dedup.dups.length) concerns.push(`${r.dedup.dups.length} feedback dup pair(s)`);
   const skillsZero = SKILL_NAMES.filter(s => !r.transcript.skillCounts[s]);
   if (skillsZero.length) concerns.push(`${skillsZero.length} skill(s) zero fire 7d`);
+  if (r.usage.reviewCandidates.length)
+    concerns.push(`${r.usage.reviewCandidates.length} skill/agent(s) need REVIEW (unused >${USAGE_REVIEW_DAYS}d)`);
 
   const fm = [
     '---',
@@ -264,6 +353,23 @@ function composeReport(r) {
     '',
     '## 7. VPS rsync diff',
     '_(deferred — pending P-NEW-E VPS sync design)_',
+    '',
+    `## 8. Skill/Agent usage telemetry (REGISTRY lifecycle gate)`,
+    `_ACTIVE artifact with lastUsed >${USAGE_REVIEW_DAYS}d or never seen = REVIEW candidate._`,
+    'Core skills:',
+    ...registry.skills.map(s => {
+      const rec = r.usage.skills[s];
+      const lu = rec?.lastUsed ? rec.lastUsed.slice(0, 10) : 'never';
+      const flag = r.usage.reviewCandidates.some(c => c.kind === 'skill' && c.name === s) ? ' ⚠ REVIEW' : '';
+      return `- ${s}: ${rec?.count || 0} calls, last ${lu}${flag}`;
+    }),
+    'Agents:',
+    ...registry.agents.map(a => {
+      const rec = r.usage.agents[a];
+      const lu = rec?.lastUsed ? rec.lastUsed.slice(0, 10) : 'never';
+      const flag = r.usage.reviewCandidates.some(c => c.kind === 'agent' && c.name === a) ? ' ⚠ REVIEW' : '';
+      return `- ${a}: ${rec?.count || 0} calls, last ${lu}${flag}`;
+    }),
     ''
   ].filter(Boolean).join('\n');
 
@@ -293,13 +399,17 @@ function digestForTelegram(r, concerns, date) {
   process.on('exit', () => releaseLock(lock));
 
   try {
-    const transcript = walkTranscripts();
+    const telemetry = loadTelemetry();
+    const registry = parseRegistry();
+    const transcript = walkTranscripts(telemetry); // updates telemetry in place
+    telemetry.updatedAt = new Date().toISOString();
     const stale = checkVaultStale();
     const dedup = await checkFeedbackDedup(state);
     const memory = checkMemorySize();
     const geminiTrio = checkGeminiTrio();
-    const results = { transcript, stale, dedup, memory, geminiTrio };
-    const { fm, body, concerns, date } = composeReport(results);
+    const usage = checkUsageTelemetry(telemetry, registry);
+    const results = { transcript, stale, dedup, memory, geminiTrio, usage };
+    const { fm, body, concerns, date } = composeReport(results, registry);
     const md = fm + body;
     const auditPath = path.join(AUDIT_DIR, `${date}.md`);
 
@@ -320,6 +430,7 @@ function digestForTelegram(r, concerns, date) {
     }), 'utf8');
     try { await sendTelegram(TG_CHAT, digestForTelegram(results, concerns, date)); } catch {}
 
+    saveTelemetry(telemetry);
     saveState({ ...state, lastRun: now });
     console.log(`[STACK-AUDITOR] report → ${auditPath} (${concerns.length} concern(s))`);
   } catch (e) {
