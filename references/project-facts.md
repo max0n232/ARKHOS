@@ -755,3 +755,11 @@ Lookup facts for specific projects. Not always in context.
 - SensorsOnly=1 <!-- fact:hwinfo64_sensors_only_ini_key verified:2026-05-17 -->
 - StartMinimized=1 <!-- fact:hwinfo64_minimized_ini_key verified:2026-05-17 -->
 - LogInterval=1000 <!-- fact:hwinfo64_log_interval_ini_key verified:2026-05-17 -->
+
+<!-- appended 2026-05-29 — Kie.ai API details moved from MEMORY.md L109 (SSOT consolidation) -->
+- generative `POST /api/v1/jobs/createTask` + `GET /api/v1/jobs/recordInfo?taskId=X`, state enum `generating|success|fail` <!-- fact:kie_ai_api_endpoints verified:2026-05-03 -->
+- working video slug `kling-2.6/image-to-video` (~60s), image `google/nano-banana` (~6s) <!-- fact:kie_ai_working_slugs verified:2026-05-03 -->
+- result format `resultJson` → `{"resultUrls":["..."]}` <!-- fact:kie_ai_result_shape verified:2026-05-03 -->
+- chat `/v1/chat/completions` returns 404 — НЕ proxy LLM chat <!-- fact:kie_ai_no_chat_proxy verified:2026-05-03 -->
+- broken slugs (don't use): `google/imagen4*` (500), `kling-3.0-omni`, `kling-2.5/i2v`, `flux/dev`, `runway/gen3`, `sora-2`, `veo3-fast` (422) <!-- fact:kie_ai_broken_slugs verified:2026-05-03 -->
+- Kling 2.6 i2v body `{prompt, image_urls:[url], sound:bool, duration:"5"|"10"}` <!-- fact:kie_ai_kling26_i2v_body verified:2026-05-03 -->
