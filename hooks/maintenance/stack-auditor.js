@@ -253,11 +253,26 @@ async function checkFeedbackDedup(state) {
   catch { return { skipped: true, reason: 'feedback dir read error', dups: [] }; }
   const cache = state.embeddings || {};
   const vecs = {};
+  const adjudicated = new Set(); // librarian "Kept separate" pairs — suppress recurring false positives
   let quotaExhausted = false;
   for (const n of names) {
     let body;
     try { body = fs.readFileSync(path.join(FEEDBACK_DIR, n), 'utf8'); } catch { continue; }
-    const stripped = body.replace(/^---[\s\S]*?---/, '').slice(0, 4000).trim();
+    // Convention: each feedback_*.md named in a "Kept separate" comment pairs with THIS
+    // host file (not cross-paired). Comment prose must not contain literal "-->" (HTML
+    // comment terminator) — use em-dash "—" for arrows, else the match truncates early.
+    for (const c of body.match(/<!--\s*noted-similarity:[\s\S]*?-->/g) || []) {
+      if (!/kept separate/i.test(c)) continue;
+      for (const ref of c.match(/feedback_[\w-]+\.md/g) || []) {
+        if (ref !== n) adjudicated.add([n, ref].sort().join('|'));
+      }
+    }
+    // Embed only the rule body — strip leading noted-similarity comments + frontmatter.
+    // (Comments name other feedback files, which would inflate cross-similarity.)
+    const stripped = body
+      .replace(/^\s*(?:<!--[\s\S]*?-->\s*)+/, '')
+      .replace(/^---[\s\S]*?---/, '')
+      .slice(0, 4000).trim();
     if (!stripped) continue;
     const hash = crypto.createHash('md5').update(stripped).digest('hex').slice(0, 12);
     const key = `nomic:${hash}`;
@@ -276,14 +291,17 @@ async function checkFeedbackDedup(state) {
     }
   }
   state.embeddings = cache;
-  const dups = []; const keys = Object.keys(vecs);
+  const allDups = []; const keys = Object.keys(vecs);
   for (let i = 0; i < keys.length; i++) {
     for (let j = i + 1; j < keys.length; j++) {
       const sim = cosine(vecs[keys[i]], vecs[keys[j]]);
-      if (sim >= SIM_THRESHOLD) dups.push({ a: keys[i], b: keys[j], sim: +sim.toFixed(3) });
+      if (sim >= SIM_THRESHOLD) allDups.push({ a: keys[i], b: keys[j], sim: +sim.toFixed(3) });
     }
   }
-  return { skipped: false, dups, quotaExhausted, scanned: Object.keys(vecs).length };
+  // Suppress pairs a librarian already adjudicated "Kept separate" (recurring false positives).
+  const dups = allDups.filter(d => !adjudicated.has([d.a, d.b].sort().join('|')));
+  const adjudicatedCount = allDups.length - dups.length;
+  return { skipped: false, dups, adjudicated: adjudicatedCount, quotaExhausted, scanned: Object.keys(vecs).length };
 }
 
 function checkMemorySize() {
@@ -345,7 +363,8 @@ function composeReport(r, registry) {
     '## 5. Feedback semantic duplicates',
     r.dedup.skipped ? `_(skipped: ${r.dedup.reason})_` :
       r.dedup.dups.length ? r.dedup.dups.map(d => `- ${d.a} ↔ ${d.b} (${d.sim})`).join('\n')
-        : `_(${r.dedup.scanned} scanned, no pairs ≥${SIM_THRESHOLD})_`,
+        : `_(${r.dedup.scanned} scanned, no NEW pairs ≥${SIM_THRESHOLD})_`,
+    (!r.dedup.skipped && r.dedup.adjudicated) ? `_(${r.dedup.adjudicated} pair(s) suppressed — librarian "Kept separate" markers)_` : '',
     r.dedup.quotaExhausted ? '_(Gemini quota exhausted mid-scan)_' : '',
     '',
     '## 6. MEMORY.md size',
