@@ -23,7 +23,7 @@ Updated: 2026-05-03
 | wp-auditor | P2 | ACTIVE | WordPress diagnostics, read-only (Sonnet) |
 | wp-specialist | P1 | ACTIVE | WordPress REST API modifications (Sonnet) |
 | librarian | P2 | ACTIVE | Vault librarian — distillation, routing review, maintenance (Sonnet) |
-| sketchup-easykitchen-specialist | P1 | ACTIVE | EasyKitchen DC tuning + L/U/I-shape kitchen composition (Sonnet) |
+| sketchup-easykitchen-specialist | P1 | ACTIVE | EasyKitchen DC tuning + L/U/I-shape kitchen composition (Opus). Dual location: Studiokook .claude/agents (canonical) + ~/.claude/agents (global mirror). Knowledge SSOT = vault agent-playbook.md |
 | codex-second-opinion | P2 | ACTIVE | Cross-check via OpenAI Codex CLI (GPT-5) — independent review (Sonnet) |
 | gemini-mega-context | P2 | ACTIVE | Large-context delegate (2M ctx, Gemini 2.5 Pro) — repo audit, transcripts (Sonnet) |
 | gemini-multimodal | P2 | ACTIVE | Native multimodal — image/video/audio analysis via Gemini (Sonnet) |
