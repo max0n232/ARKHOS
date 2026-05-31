@@ -215,6 +215,11 @@
           },
           {
             "type": "command",
+            "command": "node C:/Users/sorte/.claude/hooks/stop/atlas-staleness.js",
+            "timeout": 5
+          },
+          {
+            "type": "command",
             "command": "node C:/Users/sorte/.claude/hooks/stop/session-audit-stop.js",
             "timeout": 120,
             "statusMessage": "Extracting session knowledge..."
@@ -238,6 +243,11 @@
           {
             "type": "command",
             "command": "node C:/Users/sorte/.claude/hooks/pre-tool-use/codex-gate.js",
+            "timeout": 3
+          },
+          {
+            "type": "command",
+            "command": "node C:/Users/sorte/.claude/hooks/pre-tool-use/memory-line-guard.js",
             "timeout": 3
           }
         ]
