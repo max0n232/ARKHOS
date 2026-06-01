@@ -55,7 +55,7 @@ Use it to *see the whole structure and where the gaps are*.
 | Topic | Source | Generator | Output file |
 |-------|--------|-----------|-------------|
 | `atlas` (graph) | `90-System/scripts/atlas-health.json` + computed health | `gen-atlas-graph.js` | `diagrams/atlas-graph.json` → `atlas.html` |
-| `atlas` (brain) | same source + `atlas-brain.template.html` (GLB) | `gen-atlas-graph.js` | `diagrams/atlas-brain.html` |
+| `atlas` (brain) | `90-System/scripts/atlas-brain/` (shell.html + brain.glb pipeline) | `atlas-brain/generate.js` → `gen-atlas-graph.js` | `diagrams/atlas-brain.html` |
 | `atlas` (fallback) | same source | `gen-atlas.js` | `diagrams/arkhos-atlas.excalidraw.md` |
 | `hook-lifecycle` | `~/.claude/settings.json` | `90-System/scripts/gen-hook-lifecycle.js` | `diagrams/hook-lifecycle.excalidraw.md` |
 | `n8n-topology` | n8n REST API (`https://n8n.studiokook.ee/api/v1/workflows`) + `n8n-api.key` | `gen-n8n-topology.js` | `diagrams/n8n-topology.excalidraw.md` |

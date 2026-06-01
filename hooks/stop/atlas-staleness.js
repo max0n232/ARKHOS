@@ -31,8 +31,11 @@ const SOURCES = [
   path.join(VAULT_DIR, '90-System/scripts/atlas-health.json'),
   path.join(VAULT_DIR, '90-System/scripts/gen-atlas.js'),
   path.join(VAULT_DIR, '90-System/scripts/gen-atlas-graph.js'),
-  // Metaphor render template — editing it means the generated brain .html is stale until /atlas.
-  path.join(VAULT_DIR, '10-Projects/ARKHOS/diagrams/atlas-brain.template.html'),
+  // Brain render SSOT — editing shell.html (or rebuilding brain.glb) means the generated
+  // atlas-brain.html is stale until the pipeline reruns. Watch the source, not the artifact.
+  path.join(VAULT_DIR, '90-System/scripts/atlas-brain/shell.html'),
+  path.join(VAULT_DIR, '90-System/scripts/atlas-brain/brain.glb'),
+  path.join(VAULT_DIR, '90-System/scripts/atlas-brain/generate.js'),
   path.join(CLAUDE_DIR, 'settings.json'),
   path.join(CLAUDE_DIR, 'skills/REGISTRY.md'),
   path.join(CLAUDE_DIR, 'agents'),
