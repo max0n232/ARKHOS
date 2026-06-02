@@ -273,6 +273,18 @@ async function consolidate({ force }) {
 
   // Semantic dedup against existing pattern-library entries.
   const cache = state.embeddings || {};
+
+  // Pre-warm Ollama: reorgs run days apart, so the model has always unloaded and the FIRST
+  // embedding pays a 12-20s cold-start — right at the 20s ceiling, so it was timing out and the
+  // whole run fell back to Gemini (cache showed nomic:0/gemini:37 on 2026-06-02). One warm-up call
+  // with a generous tolerance loads the model once; every subsequent call this run is warm (~0.1s).
+  // Best-effort: if Ollama is genuinely down, getEmbedding's per-call Gemini fallback still covers.
+  try {
+    await callOllamaEmbedding('warmup', 'nomic-embed-text', 60000);
+  } catch (e) {
+    process.stderr.write(`[memory-consolidation] ollama pre-warm failed: ${e.message} (will use gemini fallback)\n`);
+  }
+
   const existing = fs.existsSync(PATTERN_LIB) ? fs.readFileSync(PATTERN_LIB, 'utf8') : '';
   const existingPatterns = parseExistingPatterns(existing);
 

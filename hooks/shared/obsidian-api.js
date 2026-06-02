@@ -413,9 +413,10 @@ async function callWithFallback(systemPrompt, userMessage, maxTokens, opts = {})
  * Primary path for semantic dedup — free, ~50-100ms latency.
  * Throws on connection refused / timeout / non-200; caller should fall back to Gemini.
  */
-function callOllamaEmbedding(text, model = 'nomic-embed-text') {
+function callOllamaEmbedding(text, model = 'nomic-embed-text', timeoutMs = 20000) {
     return new Promise((resolve, reject) => {
-        const body = JSON.stringify({ model, input: text.slice(0, 8000) });
+        // keep_alive: '30m' — модель остаётся в памяти 30мин после вызова (default 5min слишком короткий: idle → unload → cold-start).
+        const body = JSON.stringify({ model, input: text.slice(0, 8000), keep_alive: '30m' });
         const req = http.request({
             hostname: '127.0.0.1',
             port: 11434,
@@ -437,8 +438,11 @@ function callOllamaEmbedding(text, model = 'nomic-embed-text') {
             });
         });
         req.on('error', reject);
-        // First call after model unload can take 3-8s for nomic to warm; 8s covers cold-start.
-        req.setTimeout(8000, () => { req.destroy(); reject(new Error('Ollama embed timeout')); });
+        // Cold-start measured 12.2s post-reboot 2026-05-24, 19.7s on 2026-06-02 (creeping toward
+        // the ceiling → reorgs were failing cold and falling to Gemini, nomic:0 in cache). Normal-path
+        // default 20s; callers facing a guaranteed cold model (pre-warm) pass a larger timeoutMs.
+        // Warm: ~0.1s. keep_alive above prevents re-cold-start within the 30-min window.
+        req.setTimeout(timeoutMs, () => { req.destroy(); reject(new Error(`Ollama embed timeout (${timeoutMs}ms)`)); });
         req.write(body);
         req.end();
     });

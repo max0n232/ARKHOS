@@ -23,7 +23,6 @@ const { CLAUDE_DIR, VAULT_DIR } = require('../shared/paths');
 const INTERVAL_HOURS = 6;
 const STATE_FILE = path.join(CLAUDE_DIR, 'hooks', 'maintenance', '.health-check-state.json');
 const HOOKS_DIR = path.join(CLAUDE_DIR, 'hooks');
-const DB_PATH = path.join(CLAUDE_DIR, 'patterns', 'tracker.db');
 
 function loadState() {
   try { return JSON.parse(fs.readFileSync(STATE_FILE, 'utf8')); }
@@ -58,17 +57,7 @@ check('Hooks syntax', () => {
   return true;
 });
 
-// 2. SQLite tracker.db — file exists and has valid SQLite magic header
-check('SQLite tracker.db', () => {
-  if (!fs.existsSync(DB_PATH)) throw new Error('not found');
-  const fd = fs.openSync(DB_PATH, 'r');
-  const buf = Buffer.alloc(16);
-  fs.readSync(fd, buf, 0, 16, 0);
-  fs.closeSync(fd);
-  return buf.toString('utf8', 0, 15) === 'SQLite format 3';
-});
-
-// 3. Vault git — repo intact
+// 2. Vault git — repo intact
 check('Vault git', () => {
   execSync(`git -C "${VAULT_DIR}" rev-parse --is-inside-work-tree`, { timeout: 3000, stdio: 'ignore' });
   return true;
@@ -123,6 +112,23 @@ check('Auto-librarian alive', () => {
   if (!fs.existsSync(log)) return true; // first-run grace
   const ageH = (Date.now() - fs.statSync(log).mtime.getTime()) / 3600000;
   if (ageH > 36) throw new Error(`log mtime ${Math.round(ageH)}h ago (>36h threshold)`);
+  return true;
+});
+
+// 8b. Git maintenance — self-heal loose-object bloat (root cause of 2026-06-02 11GB incident:
+// 3831 loose objects = 3.74GB never packed). This repo commits memory/logs constantly, so loose
+// objects accumulate fast. Runs `git gc --auto` when loose count exceeds the gc.auto threshold;
+// remediates BEFORE the size check below measures, so .claude never bloats from this cause again.
+check('Git loose-object hygiene', () => {
+  const loose = parseInt(
+    execSync(`git -C "${CLAUDE_DIR}" count-objects -v`, { encoding: 'utf8', timeout: 10000 })
+      .match(/^count:\s*(\d+)/m)?.[1] || '0', 10);
+  if (loose > 2000) {
+    // gc WITHOUT --auto: the JS already gates at count>2000; --auto would re-gate at git's own
+    // gc.auto=6700 default and defeat this lower threshold. --prune=now drops unreachable garbage
+    // (safe here: refs/stash is a permanent ref, only expired-reflog dangling objects are pruned early).
+    execSync(`git -C "${CLAUDE_DIR}" gc --prune=now`, { timeout: 120000, stdio: 'ignore' });
+  }
   return true;
 });
 
