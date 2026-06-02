@@ -61,62 +61,36 @@ if (fs.existsSync(PENDING_FILE)) {
 }
 
 // --- Context usage monitor ---
+// SSOT: use harness-native context_window.used_percentage from hook stdin — the SAME
+// source as the status-line (settings.json statusLine: d.context_window.used_percentage).
+// Previously this block computed its own % from JSONL usage tail / hardcoded 1M denominator,
+// which (a) drifted from the status-line by a few pts (different snapshot/source) and
+// (b) under-reported 5x on Sonnet 200K sessions. The agent then extrapolated that one-time
+// stale number manually → false "context >50%" claims (feedback_verify_before_claiming).
 try {
-    // Prefer transcript_path from hook stdin — uniquely identifies THIS session,
-    // avoids reading a parallel session's JSONL (which was causing 94% false alarms).
-    let filePath = hookInput && hookInput.transcript_path;
-    if (!filePath || !fs.existsSync(filePath)) {
-        const projDir = path.join(CLAUDE_DIR, 'projects/C--Users-sorte--claude');
-        const jsonls = fs.readdirSync(projDir)
-            .filter(f => f.endsWith('.jsonl'))
-            .map(f => ({ name: f, mtime: fs.statSync(path.join(projDir, f)).mtimeMs }))
-            .sort((a, b) => b.mtime - a.mtime);
-        filePath = jsonls.length ? path.join(projDir, jsonls[0].name) : null;
-    }
-
-    if (filePath && fs.existsSync(filePath)) {
-        const stat = fs.statSync(filePath);
-        const readSize = Math.min(stat.size, 8192);
-        const buf = Buffer.alloc(readSize);
-        const fd = fs.openSync(filePath, 'r');
-        fs.readSync(fd, buf, 0, readSize, Math.max(0, stat.size - readSize));
-        fs.closeSync(fd);
-        const tail = buf.toString('utf8');
-        const lines = tail.split('\n').filter(l => l.trim());
-        for (let i = lines.length - 1; i >= 0; i--) {
-            try {
-                const obj = JSON.parse(lines[i]);
-                const usage = obj.usage || obj.message?.usage;
-                if (usage && usage.input_tokens) {
-                    const total = (usage.input_tokens || 0) +
-                        (usage.cache_creation_input_tokens || 0) +
-                        (usage.cache_read_input_tokens || 0);
-                    // Opus 4.7 [1M context] = 1,000,000 tokens.
-                    // Thresholds scaled down: Opus attention/recall degrades well before
-                    // the hard limit (noticeable >200K of effective context), so warn early.
-                    const CTX_LIMIT = 1000000;
-                    const pct = Math.round(total * 100 / CTX_LIMIT);
-                    if (pct >= 25) {
-                        output.push(`[CONTEXT] Context at ${pct}% — /compact recommended NOW`);
-                    } else if (pct >= 20) {
-                        output.push('[CONTEXT] Context at ' + pct + '% — consider /compact or finishing current task');
-                        // Auto-checkpoint: spawn worker ONCE per JSONL session
-                        var flagFile = path.join(CLAUDE_DIR, 'hooks', '.checkpoint-' + path.basename(filePath, '.jsonl'));
-                        if (!fs.existsSync(flagFile)) {
-                            fs.writeFileSync(flagFile, new Date().toISOString(), 'utf8');
-                            var child = spawn(process.execPath, [CHECKPOINT_WORKER, filePath], {
-                                stdio: 'ignore',
-                                windowsHide: true
-                            });
-                            child.unref();
-                            output.push('[CHECKPOINT] Auto-saving session state — knowledge preserved in Ghost for next session');
-                        }
-                    } else if (pct >= 15) {
-                        output.push(`[CONTEXT] Context at ${pct}% — approaching soft limit, plan accordingly`);
-                    }
-                    break;
+    const ctxPct = hookInput && hookInput.context_window && hookInput.context_window.used_percentage;
+    if (ctxPct != null && isFinite(ctxPct)) {
+        const pct = Math.round(ctxPct);
+        if (pct >= 50) {
+            output.push(`[CONTEXT] Context at ${pct}% — /compact recommended NOW`);
+        } else if (pct >= 40) {
+            output.push(`[CONTEXT] Context at ${pct}% — consider /compact or finishing current task`);
+            // Auto-checkpoint: spawn worker ONCE per session (keyed on transcript basename)
+            const fp = (hookInput && hookInput.transcript_path) || '';
+            if (fp) {
+                const flagFile = path.join(CLAUDE_DIR, 'hooks', '.checkpoint-' + path.basename(fp, '.jsonl'));
+                if (!fs.existsSync(flagFile)) {
+                    fs.writeFileSync(flagFile, new Date().toISOString(), 'utf8');
+                    const child = spawn(process.execPath, [CHECKPOINT_WORKER, fp], {
+                        stdio: 'ignore',
+                        windowsHide: true
+                    });
+                    child.unref();
+                    output.push('[CHECKPOINT] Auto-saving session state — knowledge preserved in Ghost for next session');
                 }
-            } catch {}
+            }
+        } else if (pct >= 30) {
+            output.push(`[CONTEXT] Context at ${pct}% — approaching soft limit, plan accordingly`);
         }
     }
 } catch {}
