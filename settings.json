@@ -43,6 +43,7 @@
       "Bash(schtasks:*)",
       "Bash(tasklist:*)",
       "Bash(wscript:*)",
+      "mcp__chrome-devtools__*",
       "mcp__claude_ai_Google_Calendar__*",
       "mcp__claude_ai_Google_Drive__*",
       "mcp__claude_ai_WordPress_com__*",
