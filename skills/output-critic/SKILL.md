@@ -102,10 +102,16 @@ List only dimensions scored <= 3. For each:
 
 GAP: [dimension name]
 SCORE: [X/5]
+KIND: [must-fix (affects correctness or a stated requirement) | optional (style/defensive polish)]
 ISSUE: [one sentence — what specifically is wrong]
 FIX: [one sentence — what needs to change]
 
-If ALL dimensions score 4–5 → state "No significant gaps found. v1 output is final." and stop.
+A critic told to find gaps will surface some even in sound work. Only **must-fix**
+gaps (correctness / stated requirement) force a v2. Optional polish (extra defensiveness,
+nice-to-have abstraction, edge cases the task never required) is listed but does NOT
+trigger a rewrite — flagging it as mandatory provokes over-engineering. If no must-fix
+gaps → state "No significant gaps found. v1 output is final." and stop, even if optional
+suggestions exist.
 
 ---
 
@@ -152,6 +158,7 @@ DELTA: [what changed]
 
 ## Hard rules
 
+- **Correctness-floor (closes the KIND loophole):** Error handling, Security, Schema validity, Idempotency scored ≤3 are ALWAYS `KIND: must-fix` — never `optional`, regardless of whether the task explicitly asked for them. These are correctness by definition, not defensive polish. The optional label is for nice-to-haves only, never for a low score on these four.
 - Never inflate scores to seem polite. A weak prompt scores 2/5.
 - Never assume facts about the project. If you didn't load it in Step 0 — you don't know it. "Нет мультиязычности" when the site has 4 languages = critic failure.
 - v2 must be substantively different from v1 if gaps were found. Do not just rephrase.

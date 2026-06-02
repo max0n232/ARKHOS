@@ -51,6 +51,18 @@ Return a structured report:
 <direct action statement>
 ```
 
+**Classify each finding by severity** (engineering-canon adversarial-review scope):
+mark whether it affects **correctness or a stated requirement** (→ must-fix) vs
+is a **reviewer-style / defensive suggestion** (→ optional). A reviewer told to
+find gaps will surface some even in sound work; do NOT inflate optional polish
+into blockers — that provokes over-engineering (needless abstraction, defensive
+code, tests for impossible cases). Only correctness/requirement gaps are
+commit-blockers. **Default each Codex finding to must-fix; downgrade to optional
+only if you can articulate WHY it does not affect correctness or a stated
+requirement** (the asymmetry guards against waving away real bugs). If no must-fix
+findings remain, say so plainly and stop — do not list optional suggestions as if
+they were findings.
+
 ## Constraints
 
 - ChatGPT Plus OAuth (do not pass API keys)
