@@ -1,8 +1,17 @@
 // Production Guard — blocks destructive operations targeting studiokook.ee
-// PreToolUse hook, runs only when tool_name == 'Bash'
-// Reads tool_input from stdin, checks for production write patterns
-// Checks recent user messages in history.jsonl for deploy approval
-// Returns {"decision":"block","reason":"..."} or allows silently
+// PreToolUse hook (NO matcher → receives stdin for every tool call, Bash + MCP alike)
+// Two guarded surfaces:
+//   1. Bash: curl/SSH/PowerShell command strings hitting studiokook.ee with a write verb.
+//   2. MCP:  tool_name carrying a production-mutation verb (n8n execute/publish/update/delete,
+//            any future WP-adapter write/replace/restore/deploy/full-clear). Verb-substring
+//            matching — NOT server-prefix (would over-block read-only build tools) and NOT a
+//            fixed tool list (model can substitute a sibling tool with the same effect).
+// Approval: deploy-codephrase in this session's history.jsonl. NB: history.jsonl is forgeable
+//   by an injected subagent entry (RFC #45427) — this gate is fail-CLOSED (no codephrase =
+//   block) but the signal itself is not tamper-proof; the non-forgeable backstop is the
+//   git commit-msg codex-gate, which covers commits, NOT live MCP writes. Live-write
+//   tamper-proofing is an open MECH item.
+// Returns {"decision":"block","reason":"..."} or allows silently.
 
 const fs = require("fs");
 const path = require("path");
@@ -33,6 +42,26 @@ function hasUserApproval(sessionId) {
   return false;
 }
 
+// MCP production-mutation detection. Match the VERB carried in the tool_name, scoped to
+// servers that can touch production state (n8n WFs, WordPress). Verb-substring (not whole
+// server, not a fixed name list) so: read-only build tools (search_/get_/list_/validate_)
+// pass, and a sibling tool with the same effect (publish vs update+activate) can't slip by.
+// Explicit server allowlist (identity, not substring) — adding a new prod-capable MCP server
+// means adding it here on purpose. Anchored alternation, no catch-all `.*WordPress.*`
+// (that over-matched any server whose name merely contained "WordPress").
+const MCP_PROD_SERVERS = /^mcp__(n8n-native|n8n-mcp|claude_ai_WordPress_com|wordpress[_-]?adapter)__/i;
+// Mutation verbs/op-name fragments that change production state. Covers sibling-substitution
+// (publish vs update+activate) and prefix families (add_/set_/run_/import_). Read verbs
+// (search/get/list/validate/health/suggest/reference/documentation/audit/prepare) are excluded.
+const MCP_MUTATION_VERB = /(execute|run|publish|unpublish|activate|deactivate|deploy|update|delete|archive|create|add|set|insert|import|write|replace|restore|rename|move|copy|patch|manage|full[_-]?clear|autofix)/i;
+
+function isMcpProductionWrite(toolName) {
+  if (!toolName || !MCP_PROD_SERVERS.test(toolName)) return false;
+  // Strip the server prefix; inspect only the operation part for a mutation verb.
+  const op = toolName.replace(MCP_PROD_SERVERS, "");
+  return MCP_MUTATION_VERB.test(op);
+}
+
 function main(raw) {
   let input;
   try {
@@ -41,8 +70,23 @@ function main(raw) {
     return;
   }
 
+  const toolName = input.tool_name || "";
   const cmd = input.tool_input?.command || "";
   const sessionId = input.session_id || "";
+
+  // --- MCP surface: production-mutating tool call (WP/n8n) ---
+  if (isMcpProductionWrite(toolName)) {
+    if (hasUserApproval(sessionId)) return; // deploy codephrase present this session
+    process.stdout.write(JSON.stringify({
+      decision: "block",
+      reason:
+        `Production MCP write BLOCKED: ${toolName}\n` +
+        "This MCP tool can mutate production (n8n workflow / WordPress). " +
+        "Say деплой/deploy/выкатывай in this session to approve. " +
+        "Guard checks last " + HISTORY_LOOKBACK + " messages.",
+    }));
+    return; // decided — don't fall through to Bash inspection
+  }
 
   // Studiokook REST API write endpoints (from MEMORY.md)
   const SK_WRITE_ENDPOINTS = [

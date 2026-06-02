@@ -8,6 +8,8 @@ Reference for hook development. Read on-demand, not always in context.
 - SessionStart, Stop, PreCompact, SubagentStart/Stop — work fine
 - NEW (2.1.85): PreToolUse can now satisfy AskUserQuestion via `updatedInput`
 - **Enforcement reality (verified 2026-06-02):** git-layer `.githooks/commit-msg` (codex-gate mirror) ALIVE — live marker-less commit of a critical file blocked, exit 1. Two live enforcement layers now confirmed: PreToolUse `decision:block` + git commit-msg.
+- **Auto-mode classifier is a THIRD enforcement layer (verified 2026-06-02):** native, intent-aware (NOT regex). Empirically blocked self-modification of settings.json via Write/Edit AND via bash redirect (`cat > settings.json`) AND recognized a channel-probe sweep as "Auto-Mode Bypass" by intent. → A custom regex `self-protect-guard.js` for control-file protection is REDUNDANT with this layer (and was broken on Windows backslash paths anyway) — abandoned 2026-06-02. Residual gap the classifier does NOT cover: **subagent (Task) writes** may not trigger the same signal (RFC #45427 vector c) — still an open MECH item.
+- **MCP tool calls reach the no-matcher PreToolUse hook:** harness routes `mcp__*` events through the same hook layer as Bash (matcher `mcp__.*` is a documented feature; a no-matcher entry receives all). production-guard now guards MCP production-mutation tools (n8n/WP) by verb-substring in tool_name, not just Bash-curl. (Live-confirmed via guard logic test; could not inject a settings probe — classifier blocks it.)
 
 ## New Hook Events (2.1.83-2.1.85)
 - `StopFailure` — fires when Stop hook fails (API error, timeout). We use it to log output-critic failures
