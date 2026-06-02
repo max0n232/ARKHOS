@@ -6,11 +6,15 @@
 //            any future WP-adapter write/replace/restore/deploy/full-clear). Verb-substring
 //            matching — NOT server-prefix (would over-block read-only build tools) and NOT a
 //            fixed tool list (model can substitute a sibling tool with the same effect).
-// Approval: deploy-codephrase in this session's history.jsonl. NB: history.jsonl is forgeable
-//   by an injected subagent entry (RFC #45427) — this gate is fail-CLOSED (no codephrase =
-//   block) but the signal itself is not tamper-proof; the non-forgeable backstop is the
-//   git commit-msg codex-gate, which covers commits, NOT live MCP writes. Live-write
-//   tamper-proofing is an open MECH item.
+// Approval (canon A3): deploy-codephrase, checked via two sources in precedence order:
+//   1. NON-FORGEABLE stamp — deploy-approval-stamp.js (UserPromptSubmit) records the
+//      codephrase from the harness-delivered prompt (stdin), which an agent cannot forge.
+//      15-min freshness window + per-session scope. This closes the live-MCP-write gap.
+//   2. FALLBACK history.jsonl scan — forgeable (append-only file), kept only for sessions
+//      predating the stamp hook. Defense-in-depth: forging it still requires defeating the
+//      auto-mode classifier (which blocks .claude/ control-file writes intent-aware).
+//   Fail-CLOSED: neither source matching = block. Git commit-msg codex-gate remains the
+//   persist-time backstop for commits.
 // Returns {"decision":"block","reason":"..."} or allows silently.
 
 const fs = require("fs");
@@ -18,8 +22,32 @@ const path = require("path");
 
 const DEPLOY_KEYWORDS = /деплой|deploy|выкатывай|выкати|задеплой|разверни|пуш на прод|push to prod/i;
 const HISTORY_LOOKBACK = 10; // check last N user messages
+const STAMP_FRESH_MS = 15 * 60 * 1000; // approval token valid 15 min (shrinks replay window)
 
-function hasUserApproval(sessionId) {
+// Non-forgeable approval (canon A3): the deploy-approval-stamp UserPromptSubmit hook
+// writes this token from the harness-delivered prompt (stdin), which an agent cannot
+// forge — unlike history.jsonl, an append-only file any process can write to. Prefer
+// the stamp; fall back to the history scan only when no stamp exists (sessions
+// predating the stamp hook). Fail-CLOSED: neither source matching → not approved.
+function hasStampApproval(sessionId) {
+  if (!sessionId) return false;
+  const tokenPath = path.join(
+    process.env.HOME || process.env.USERPROFILE,
+    ".claude", "hooks", `.deploy-approval-${sessionId}.json`
+  );
+  try {
+    const tok = JSON.parse(fs.readFileSync(tokenPath, "utf8"));
+    if (tok.sessionId !== sessionId) return false;       // cross-session isolation
+    if (!tok.ts || (Date.now() - tok.ts) > STAMP_FRESH_MS) return false; // staleness
+    return true;
+  } catch { return false; } // no/unreadable token → defer to fallback, not auto-approve
+}
+
+function hasHistoryApproval(sessionId) {
+  // Fail-closed on missing session: without a sessionId the loop below would drop
+  // its session filter (`sessionId && ...`) and approve on ANY session's codephrase
+  // (cross-session unlock). No session → no approval. (codex review 2026-06-02)
+  if (!sessionId) return false;
   const historyPath = path.join(
     process.env.HOME || process.env.USERPROFILE,
     ".claude",
@@ -40,6 +68,12 @@ function hasUserApproval(sessionId) {
     }
   } catch { /* history unreadable — deny */ }
   return false;
+}
+
+function hasUserApproval(sessionId) {
+  // Non-forgeable stamp takes precedence; forgeable history.jsonl is degraded fallback.
+  if (hasStampApproval(sessionId)) return true;
+  return hasHistoryApproval(sessionId);
 }
 
 // MCP production-mutation detection. Match the VERB carried in the tool_name, scoped to
