@@ -81,6 +81,19 @@ node C:/Users/sorte/ObsidianVault/90-System/scripts/gen-atlas.js
 
 Then open `10-Projects/ARKHOS/diagrams/atlas.html` in a browser.
 
+> **Brain render — edit the SSOT, not the artifact.** The 3D brain's source is
+> `90-System/scripts/atlas-brain/shell.html` (+ `brain.glb`). `/atlas` runs ONLY
+> `gen-atlas-graph.js` (stage 3 — re-inlines the data layer). It does **NOT** run
+> `atlas-brain/generate.js` (stage 2 — inlines `shell.html` + vendor libs + GLB into the
+> template). So after editing `shell.html` you MUST run stage 2 first, else your render edits
+> stay trapped in the old template:
+> ```bash
+> node C:/Users/sorte/ObsidianVault/90-System/scripts/atlas-brain/generate.js   # stage 2
+> node C:/Users/sorte/ObsidianVault/90-System/scripts/gen-atlas-graph.js        # stage 3
+> ```
+> The brain reads `ATLAS = {...atlas-health.json, health:<computed>}` — `brainMap` projects each
+> region onto ARKHOS subsystems; `health` recolours the neurons by severity (live system monitor).
+
 For `all`:
 
 ```bash
