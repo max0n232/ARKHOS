@@ -23,6 +23,7 @@ Use the `ghost-sessions` MCP tool with `deep_search` (not `search`). Fallback CL
 
 @rules/constitution.md
 @rules/code-style.md
+@rules/engineering-canon.md
 
 ## Defaults
 
