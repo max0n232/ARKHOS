@@ -129,11 +129,13 @@ function main() {
     const now = Date.now();
     const DAY = 86400000;
 
-    // Checkpoint flags (1 day TTL)
+    // Per-session transient flags (1 day TTL): checkpoint + homeostat once-per-session gates.
+    // (codex E-2: .memunload-* flags accumulated with no cleanup; fold them in here.)
     try {
         const hooksDir = path.join(CLAUDE_DIR, 'hooks');
+        const TRANSIENT = ['.checkpoint-', '.memunload-', '.homeostat-token-'];
         for (const f of fs.readdirSync(hooksDir)) {
-            if (!f.startsWith('.checkpoint-')) continue;
+            if (!TRANSIENT.some(p => f.startsWith(p))) continue;
             const fp = path.join(hooksDir, f);
             const age = now - fs.statSync(fp).mtimeMs;
             if (age > DAY) fs.unlinkSync(fp);

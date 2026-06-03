@@ -1415,3 +1415,25 @@ Anthropic API key ротирован (старый `sk-ant-...sbgwcx87` утёк
 - k146+d101 (без d106). <!-- fact:blend1_lenx_v3_formula auto:2026-06-03 src:session-llm unverified -->
 - Scaling ломает PANEL_FACADE, для него следует использовать DC attrs. <!-- fact:panel_facade_scaling_behavior auto:2026-06-03 src:session-llm unverified -->
 - Scaling верен для CT (TT_STRAIGHT). <!-- fact:tt_straight_scaling_behavior auto:2026-06-03 src:session-llm unverified -->
+
+<!-- auto-appended 2026-06-03 -->
+- Использует `PENCIL_PATHS`/`LOWER_PATHS`/`APPLIANCE_PATHS` с абсолютными путями, а не `MODULES` Hash. `MODULE_SOURCE=:shablony_gola` переопределяет EK_ROOT-блок. <!-- fact:ek_showcase_l_kitchen_module_loading_mec auto:2026-06-03 src:session-llm unverified -->
+- Every EK project scene must contain Главное меню/main_menu.skp at the axes origin as the mm! registry. <!-- fact:main_menu_critical_rule auto:2026-06-03 src:session-llm unverified -->
+- solve_attach(anchor, anchor_key, anchor_socket, moving_key, moving_socket, rot_deg) <!-- fact:ek_socket_solve_attach_signature auto:2026-06-03 src:session-llm unverified -->
+- NW-угол (правый дефолтный `place_l_corner`) <!-- fact:ek_compose_core_l_kitchen_canonical_corn auto:2026-06-03 src:session-llm unverified -->
+
+## n8n Infrastructure Core (canonical — moved from MEMORY.md 2026-06-03)
+<!-- SSOT for n8n infra. MEMORY.md keeps only a pointer. Verified facts (git/user-confirmed), not session-llm. -->
+- VPS `157.180.33.253`. n8n **2.18.5** (latest stable 2026-04-29, verified 2026-05-03), Docker `n8nio/n8n:2.18.5` pinned, postgres `pgvector/pgvector:pg15` <!-- fact:n8n_version_host verified:2026-05-03 -->
+- Native MCP server (n8n 2.14.0+ GA): `https://n8n.studiokook.ee/mcp-server/http` (streamable HTTP), Bearer token `credentials/n8n-mcp-token.txt` (aud=`mcp-server-api`). v1.1.0, 25 tools (`n8n-native`). WF must be explicitly exposed per WF (default zero). Coexists с czlonkowski `n8n-mcp` <!-- fact:n8n_native_mcp_server verified:2026-05-10 -->
+- 45 WF total / 39 active (verified 2026-05-10 via /api/v1/workflows live) <!-- fact:n8n_wf_count verified:2026-05-10 -->
+- `N8N_BLOCK_ENV_ACCESS_IN_NODE=false` — required for `$env` in Code nodes <!-- fact:n8n_env_access_flag verified:2026-05-03 -->
+- `N8N_ENCRYPTION_KEY` in compose env since 2026-05-03 (auto-gen value also in `/opt/n8n/n8n_data/config`). Local backup `credentials/n8n-encryption-key.txt` <!-- fact:n8n_encryption_key verified:2026-05-03 -->
+- Community nodes: `n8n-nodes-google-search-console@1.0.40`, `@mendable/n8n-nodes-firecrawl@2.1.0` <!-- fact:n8n_community_nodes verified:2026-05-03 -->
+- Compose backup `/opt/n8n/docker-compose.yml.before-pin-20260502`. Baseline pg dump `/opt/n8n/backups/n8n-baseline-2.18.5-20260503.dump` (285MB, 692 entries). WF snapshot `C:/tmp/n8n-pre-upgrade-20260502/`. Compose must include `networks: n8n-network` (external `n8n_n8n-network`) <!-- fact:n8n_backups_compose verified:2026-05-03 -->
+- Google OAuth2 cred `0a4JFSW3JyCsi8wo` (GCP studiokook). Telegram cred `mxbg2RUQv7Widfws`, chat `804465999`. Gemini `GEMINI_API_KEY` env, model `gemini-2.5-flash`, GCP ARKHOS (billing). Supabase `SUPABASE_URL=https://app.studiokook.ee`, PostgREST upsert needs `?on_conflict=column`. GCP projects: ARKHOS (billing+Gemini) + studiokook (OAuth2) <!-- fact:n8n_creds_apis verified:2026-05-03 -->
+- Workflow IDs: SEO Audit `EMUTtOI8BWLvDxn0`, Traffic Drop `8ZsWQfxf1oMZYQFe`, Analytics `n4unkzPUqdWklOhc`, Studiokook Video Gen v1 `kyuBLkWS7q6wodAM` (webhook stub only, 0 exec), Video Error Handler v1 `oKMVXx6UX3Ln13Ta`, Video TG Callback Handler v1 `wNkjWy0nT3odT9PP` (webhook `/studiokook-tg-callback`). SSH stitch cred `ESEf68VzIbrarVlP` → `root@172.17.0.1` → ffmpeg → `/opt/n8n/n8n_data/output/{exec_id}.mp4`. Private key `credentials/n8n-host-ssh.key` <!-- fact:n8n_workflow_ids verified:2026-05-10 -->
+- ANTHROPIC_API_KEY (n8n env): credit balance 0 — не использовать api.anthropic.com напрямую без top-up <!-- fact:n8n_anthropic_balance verified:2026-05-03 -->
+
+<!-- auto-appended 2026-06-03 -->
+- X[0..1200] Y[-670..0] <!-- fact:default_corner_coordinates auto:2026-06-03 src:session-llm unverified -->

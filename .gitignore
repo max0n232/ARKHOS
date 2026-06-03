@@ -93,6 +93,10 @@ hooks/user-prompt-submit/.pre-task-loader-state.json
 hooks/.homeostat-token-*
 hooks/.homeostat-spawns-*.json
 hooks/.deploy-approval-*.json
+hooks/.auto-consolidate-last.json
+hooks/.consolidate-surface.json
+hooks/.memunload-*
+patterns/maintenance-ledger.json
 .last-cleanup
 
 # Runtime caches (Claude Code managed)

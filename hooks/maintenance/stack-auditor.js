@@ -30,7 +30,12 @@ const { callOllamaEmbedding, callGeminiEmbedding, sendTelegram } = require('../s
 const INTERVAL_DAYS = 7;
 const LOOKBACK_DAYS = 7;
 const SIM_THRESHOLD = 0.85;
-const MEM_WARN = 180;
+// MEMORY.md size: BYTES is the real metric — the harness truncates the file at ~24.4KB
+// (see hooks/pre-tool-use/memory-line-guard.js comment). Lines are a weak proxy: 184 lines
+// was already 33KB (truncated) but read as "warn" under a 200-LINE limit. Bytes primary.
+const MEM_BYTES_WARN = 22000;     // ~90% of harness limit — act before truncation
+const MEM_BYTES_LIMIT = 24985;    // 24.4KB harness truncation threshold (canonical)
+const MEM_WARN = 180;             // secondary line-count signal (informational)
 const MEM_LIMIT = 200;
 const STALE_DAYS = 30;
 const LOCK_TTL_MS = 5 * 60 * 1000;
@@ -38,6 +43,7 @@ const TG_CHAT = '804465999';
 
 const STATE_FILE = path.join(CLAUDE_DIR, 'hooks', 'maintenance', '.stack-auditor-state.json');
 const FLAG_FILE = path.join(CLAUDE_DIR, 'hooks', '.stack-auditor-pending.flag');
+const LEDGER = path.join(CLAUDE_DIR, 'patterns', 'maintenance-ledger.json');
 const AUDIT_DIR = path.join(VAULT_DIR, '10-Projects/ARKHOS/audits');
 const MEMORY_MD = path.join(CLAUDE_DIR, 'projects', 'C--Users-sorte--claude', 'memory', 'MEMORY.md');
 const FEEDBACK_DIR = path.join(CLAUDE_DIR, 'projects', 'C--Users-sorte--claude', 'memory');
@@ -306,10 +312,29 @@ async function checkFeedbackDedup(state) {
 
 function checkMemorySize() {
   try {
-    const lines = fs.readFileSync(MEMORY_MD, 'utf8').split('\n').length;
-    return { lines, warn: lines >= MEM_WARN, over: lines >= MEM_LIMIT };
-  } catch { return { lines: 0, warn: false, over: false, error: 'unreadable' }; }
+    const raw = fs.readFileSync(MEMORY_MD, 'utf8');
+    const bytes = Buffer.byteLength(raw, 'utf8');
+    const lines = raw.split('\n').length;
+    // over/warn driven by BYTES (real truncation metric); lines kept as a secondary signal.
+    return {
+      lines, bytes,
+      over: bytes >= MEM_BYTES_LIMIT,
+      warn: bytes >= MEM_BYTES_WARN,
+      lineWarn: lines >= MEM_WARN,
+    };
+  } catch { return { lines: 0, bytes: 0, over: false, warn: false, lineWarn: false, error: 'unreadable' }; }
 }
+
+// Read the autonomous-action ledger (efferent actions logged by auto-consolidate +
+// memory-unload-worker since the last weekly report). Returns entries + a clear() to wipe it
+// AFTER the report is sent (so each action is reported exactly once — at-most-once delivery).
+function readLedger() {
+  try {
+    const arr = JSON.parse(fs.readFileSync(LEDGER, 'utf8'));
+    return Array.isArray(arr) ? arr : [];
+  } catch { return []; }
+}
+function clearLedger() { try { fs.unlinkSync(LEDGER); } catch {} }
 
 function checkGeminiTrio() {
   const trio = ['gemini-mega-context.md', 'gemini-multimodal.md', 'gemini-utility.md'];
@@ -323,8 +348,8 @@ function checkGeminiTrio() {
 function composeReport(r, registry) {
   const date = new Date().toISOString().slice(0, 10);
   const concerns = [];
-  if (r.memory.over) concerns.push(`MEMORY.md ${r.memory.lines} lines OVER ${MEM_LIMIT}`);
-  else if (r.memory.warn) concerns.push(`MEMORY.md ${r.memory.lines}/${MEM_LIMIT}`);
+  if (r.memory.over) concerns.push(`MEMORY.md ${r.memory.bytes}B OVER ${MEM_BYTES_LIMIT}`);
+  else if (r.memory.warn) concerns.push(`MEMORY.md ${r.memory.bytes}/${MEM_BYTES_LIMIT}B`);
   if (r.stale.length) concerns.push(`${r.stale.length} stale vault entries`);
   if (r.dedup.dups.length) concerns.push(`${r.dedup.dups.length} feedback dup pair(s)`);
   const skillsZero = SKILL_NAMES.filter(s => !r.transcript.skillCounts[s]);
@@ -368,7 +393,9 @@ function composeReport(r, registry) {
     r.dedup.quotaExhausted ? '_(Gemini quota exhausted mid-scan)_' : '',
     '',
     '## 6. MEMORY.md size',
-    `${r.memory.lines}/${MEM_LIMIT} lines` + (r.memory.over ? ' 🚨 OVER' : r.memory.warn ? ' ⚠ warn' : ' ✅'),
+    `${r.memory.bytes}/${MEM_BYTES_LIMIT}B (${r.memory.lines} lines)` +
+      (r.memory.over ? ' 🚨 OVER — harness truncates' : r.memory.warn ? ' ⚠ warn' : ' ✅') +
+      (r.memory.lineWarn ? ` · lines ≥${MEM_WARN}` : ''),
     '',
     '## 7. VPS rsync diff',
     '_(deferred — pending P-NEW-E VPS sync design)_',
@@ -389,6 +416,17 @@ function composeReport(r, registry) {
       const flag = r.usage.reviewCandidates.some(c => c.kind === 'agent' && c.name === a) ? ' ⚠ REVIEW' : '';
       return `- ${a}: ${rec?.count || 0} calls, last ${lu}${flag}`;
     }),
+    '',
+    '## 9. Autonomous actions taken (efferent loop)',
+    r.ledger.length
+      ? r.ledger.map(e => {
+          if (e.action === 'memory-collapse')
+            return `- MEMORY.md collapse "${e.section}" → ${e.dataHome} (${e.saved}B saved) [${(e.ts||'').slice(0,10)}]`;
+          if (e.action === 'auto-consolidate-commit')
+            return `- auto-commit ${e.count} housekeeping file(s) [${(e.ts||'').slice(0,10)}]`;
+          return `- ${e.action} [${(e.ts||'').slice(0,10)}]`;
+        }).join('\n')
+      : '_(none since last report)_',
     ''
   ].filter(Boolean).join('\n');
 
@@ -397,10 +435,19 @@ function composeReport(r, registry) {
 
 function digestForTelegram(r, concerns, date) {
   const lines = [`📊 Stack Audit ${date}`];
+  // What the system fixed on its own this week (efferent loop) — the user's "report only" ask.
+  if (r.ledger.length) {
+    lines.push('🤖 Автономно сделано:');
+    r.ledger.slice(0, 6).forEach(e => {
+      if (e.action === 'memory-collapse') lines.push(`• MEMORY.md ужата: "${e.section}" (−${e.saved}B)`);
+      else if (e.action === 'auto-consolidate-commit') lines.push(`• авто-коммит ${e.count} housekeeping-файл(ов)`);
+      else lines.push(`• ${e.action}`);
+    });
+  }
   if (concerns.length) {
-    lines.push('Top concerns:');
+    lines.push('⚠️ Требует решения:');
     concerns.slice(0, 5).forEach(c => lines.push(`• ${c}`));
-  } else {
+  } else if (!r.ledger.length) {
     lines.push('No concerns — stack healthy.');
   }
   lines.push(`Vault: 10-Projects/ARKHOS/audits/${date}.md`);
@@ -427,7 +474,8 @@ function digestForTelegram(r, concerns, date) {
     const memory = checkMemorySize();
     const geminiTrio = checkGeminiTrio();
     const usage = checkUsageTelemetry(telemetry, registry);
-    const results = { transcript, stale, dedup, memory, geminiTrio, usage };
+    const ledger = readLedger();
+    const results = { transcript, stale, dedup, memory, geminiTrio, usage, ledger };
     const { fm, body, concerns, date } = composeReport(results, registry);
     const md = fm + body;
     const auditPath = path.join(AUDIT_DIR, `${date}.md`);
@@ -447,7 +495,11 @@ function digestForTelegram(r, concerns, date) {
       auditPath: auditPath.replace(/\\/g, '/'),
       date, concerns,
     }), 'utf8');
-    try { await sendTelegram(TG_CHAT, digestForTelegram(results, concerns, date)); } catch {}
+    // Clear the ledger ONLY after a confirmed TG send (at-most-once delivery — never drop an
+    // autonomous-action report because the send failed; it rolls into next week's digest).
+    let tgSent = false;
+    try { await sendTelegram(TG_CHAT, digestForTelegram(results, concerns, date)); tgSent = true; } catch {}
+    if (tgSent && results.ledger.length) clearLedger();
 
     saveTelemetry(telemetry);
     saveState({ ...state, lastRun: now });

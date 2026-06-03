@@ -30,7 +30,22 @@ const path = require('path');
 const CLAUDE_DIR = path.join(process.env.HOME || process.env.USERPROFILE, '.claude');
 const FLAG = path.join(CLAUDE_DIR, 'hooks', '.auto-consolidate-last.json');
 const SURFACE_FLAG = path.join(CLAUDE_DIR, 'hooks', '.consolidate-surface.json');
+const LEDGER = path.join(CLAUDE_DIR, 'patterns', 'maintenance-ledger.json');
 const THROTTLE_H = 6;
+
+// Append an autonomous-action entry to the shared maintenance ledger (stack-auditor reads it
+// weekly → one TG report "what the system did on its own"). Atomic temp+rename, fail-silent.
+function appendLedger(entry) {
+  let arr = [];
+  try { arr = JSON.parse(fs.readFileSync(LEDGER, 'utf8')); if (!Array.isArray(arr)) arr = []; } catch {}
+  arr.push(entry);
+  try {
+    fs.mkdirSync(path.dirname(LEDGER), { recursive: true });
+    const tmp = LEDGER + '.tmp-' + process.pid;
+    fs.writeFileSync(tmp, JSON.stringify(arr, null, 2), 'utf8');
+    fs.renameSync(tmp, LEDGER);
+  } catch {}
+}
 
 // SAFE to auto-commit: machine housekeeping only. Anchored to known data-homes / log dirs.
 // NB: logs/rollback/ is gitignored already, so it never appears in status — no carve-out needed.
@@ -107,8 +122,16 @@ function main() {
   // --- Auto-commit the SAFE class, with the secret fuse ---
   if (safe.length) {
     const tainted = safe.filter(e => e.status !== ' D' && e.status !== 'D ' && looksSecret(e.path));
+    // codex BONUS must-fix: if the USER pre-staged anything before this session, `git diff
+    // --cached` would include it and our commit would absorb it (and `git reset` would wipe
+    // their staging). Never touch a non-empty pre-existing index — surface and bail entirely.
+    let preStaged = [];
+    try { preStaged = git(['diff', '--cached', '--name-only']).split('\n').filter(Boolean); } catch {}
     if (tainted.length) {
       // Secret fuse tripped — do NOT commit anything; fold into surface for human review.
+      surface.push(...safe);
+    } else if (preStaged.length) {
+      // User has work staged — respect it, do not auto-commit on top of a human's index.
       surface.push(...safe);
     } else {
       try {
@@ -124,6 +147,12 @@ function main() {
             `chore(auto): consolidate ${staged.length} housekeeping change(s)\n\n` +
             `Auto-consolidate hook (SAFE class only: logs/, data-home appends, .gitkeep).\n` +
             `Critical-path is never auto-committed — surfaced for deliberate commit.`]);
+          appendLedger({
+            ts: new Date().toISOString(),
+            action: 'auto-consolidate-commit',
+            count: staged.length,
+            files: staged.slice(0, 10),
+          });
         }
       } catch {
         try { git(['reset', '-q']); } catch {}

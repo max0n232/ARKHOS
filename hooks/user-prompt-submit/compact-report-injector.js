@@ -21,6 +21,9 @@ const CLAUDE_DIR = path.join(os.homedir(), '.claude');
 const PENDING_FILE = path.join(CLAUDE_DIR, 'hooks', '.pending-compact-report.txt');
 const CACHE_FILE = path.join(CLAUDE_DIR, 'hooks', '.autosearch-cache.md');
 const CHECKPOINT_WORKER = path.join(__dirname, 'checkpoint-worker.js');
+const MEMORY_UNLOAD_WORKER = path.join(__dirname, 'memory-unload-worker.js');
+const MEMORY_MD = path.join(CLAUDE_DIR, 'projects', 'C--Users-sorte--claude', 'memory', 'MEMORY.md');
+const MEMORY_BYTE_LIMIT = 24985; // 24.4KB harness truncation (matches stack-auditor + worker)
 
 let output = [];
 
@@ -209,6 +212,49 @@ try {
             output.push(`[STACK AUDIT ${data.date}] Weekly stack report ready → ${data.auditPath}.${tail} Read it when relevant; delete flag after acknowledging: ~/.claude/hooks/.stack-auditor-pending.flag`);
         } else {
             fs.unlinkSync(stackFlag);
+        }
+    }
+} catch {}
+
+// --- Resource-homeostat efferent: MEMORY.md auto-unload (SAFE collapse) ---
+// Closes the maintenance loop for the MEMORY.md contour: when the file crosses the BYTE limit
+// (real harness truncation metric, not lines), spawn the unload worker ONCE per session to
+// auto-collapse SAFE sections (detail proven in a data-home). Worker is detached + fail-open;
+// it never blocks the prompt and never touches critical-class content (index/facts/rules).
+try {
+    let memBytes = 0;
+    try { memBytes = Buffer.byteLength(fs.readFileSync(MEMORY_MD, 'utf8'), 'utf8'); } catch {}
+    const fp = (hookInput && hookInput.transcript_path) || '';
+    // codex E-2: a missing transcript_path must NOT collapse to a shared 'nosession' flag that
+    // permanently blocks all future spawns. No real session id → skip spawning this turn (the
+    // next turn with a real id will handle it); never write a sticky shared flag.
+    const sid = fp ? path.basename(fp, '.jsonl') : null;
+    if (memBytes >= MEMORY_BYTE_LIMIT && sid) {
+        const flagFile = path.join(CLAUDE_DIR, 'hooks', '.memunload-' + sid);
+        if (!fs.existsSync(flagFile)) {
+            // codex E-3: spawn FIRST; only write the once-per-session flag if spawn succeeded.
+            // A throwing spawn must not leave a flag that silently suppresses all retries.
+            try {
+                const child = spawn(process.execPath, [MEMORY_UNLOAD_WORKER], { stdio: 'ignore', windowsHide: true });
+                child.unref();
+                fs.writeFileSync(flagFile, new Date().toISOString(), 'utf8');
+            } catch {
+                output.push('[MEMORY UNLOAD] MEMORY.md over byte limit but auto-unload worker failed to spawn — collapse a section manually (move detail to a data-home → pointer).');
+            }
+        }
+    }
+} catch {}
+
+// --- Memory-unload surface flag (what the worker collapsed / why it couldn't) ---
+try {
+    const muFlag = path.join(CLAUDE_DIR, 'hooks', '.memunload-surface.json');
+    if (fs.existsSync(muFlag)) {
+        const data = JSON.parse(fs.readFileSync(muFlag, 'utf8'));
+        const age = Date.now() - (data.ts || 0);
+        if (age < 24 * 60 * 60 * 1000) {
+            output.push(`[MEMORY UNLOAD] ${data.msg}`);
+        } else {
+            fs.unlinkSync(muFlag);
         }
     }
 } catch {}
