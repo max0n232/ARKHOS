@@ -213,6 +213,20 @@ try {
     }
 } catch {}
 
+// --- Auto-consolidate surface flag (critical-path drift awaiting deliberate commit) ---
+try {
+    const surfFlag = path.join(CLAUDE_DIR, 'hooks', '.consolidate-surface.json');
+    if (fs.existsSync(surfFlag)) {
+        const data = JSON.parse(fs.readFileSync(surfFlag, 'utf8'));
+        const age = Date.now() - (data.ts || 0);
+        if (age < 24 * 60 * 60 * 1000) {
+            output.push(`[CONSOLIDATE] ${data.msg} — commit deliberately (codex-gate applies to critical-path).`);
+        } else {
+            fs.unlinkSync(surfFlag);
+        }
+    }
+} catch {}
+
 // --- Inbox extraction needed flag ---
 try {
     const inboxFlag = path.join(CLAUDE_DIR, 'hooks', '.inbox-extraction-needed');
