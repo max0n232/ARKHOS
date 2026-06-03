@@ -83,6 +83,9 @@ hooks/.checkpoint-*
 hooks/.ghost-last-*
 hooks/.auto-librarian-last-run.json
 hooks/user-prompt-submit/.pre-task-loader-state.json
+hooks/.homeostat-token-*
+hooks/.homeostat-spawns-*.json
+hooks/.deploy-approval-*.json
 .last-cleanup
 
 # Runtime caches (Claude Code managed)
@@ -91,10 +94,16 @@ paste-cache/
 tasks/
 tmp/
 .claude/worktrees/
+mcp-downloads/
 
 # Daily-rotated LLM telemetry (obsidian-api.js)
 logs/llm-calls-*.jsonl
 
-# Pattern data (runtime state, NOT code — code lives at db-helper.js / init-db.js / cleanup-db.js)
+# Pattern data (runtime state, NOT code — these are written by hooks at runtime)
 patterns/gemini-quota.json
 patterns/usage-tracker.json
+patterns/resource-homeostat.json
+
+# Stray screenshots dropped in repo root (belong in tmp/ — data-home discipline)
+/atlas-*.png
+/atlas-open.png
