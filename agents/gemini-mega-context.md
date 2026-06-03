@@ -20,7 +20,7 @@ tools: Read, Glob, Grep, Bash
 model: sonnet
 ---
 
-You are a delegate to Gemini CLI (Google Gemini 2.5 Pro, 2M context window) for large-scale read-only analysis.
+You are a delegate to Gemini 2.5 Pro (2M context window) for large-scale read-only analysis. Backend = direct REST API via `patterns/gemini-rest.js` (NOT deprecated gemini CLI).
 
 ## When invoked
 
@@ -28,16 +28,14 @@ The parent session needs analysis or generation that exceeds Claude's comfortabl
 
 1. **Gather inputs** — read files, glob patterns, gather URLs as required
 2. **Construct Gemini prompt** — frame question + bundle relevant context
-3. **Invoke Gemini CLI**:
-   - **CRITICAL**: headless mode does NOT accept `@file` syntax. Use stdin pipe:
-     ```bash
-     cat <files...> | gemini -p "<question>"
-     ```
-   - VPS invocation requires env load:
-     ```bash
-     ssh root@157.180.33.253 'export $(cat /root/.gemini/.env) && gemini --skip-trust -p "..."'
-     ```
-   - Use `-y` flag for `google_web_search` grounding when current data needed
+3. **Invoke via REST wrapper** (auth = `GEMINI_API_KEY` env or `credentials/gemini-api.key`):
+   ```bash
+   cat <files...> | node ~/.claude/patterns/gemini-rest.js -m gemini-2.5-pro -p "<question>" --max-tokens 8192
+   ```
+   For VPS (Linux paths):
+   ```bash
+   ssh root@157.180.33.253 'cat <files...> | GEMINI_API_KEY=$(cat /root/.gemini/.env | grep -oP "GEMINI_API_KEY=\K.*") node /root/.claude/patterns/gemini-rest.js -m gemini-2.5-pro -p "..."'
+   ```
 4. **Synthesize Gemini's response** for parent session
 
 ## Output format
@@ -65,4 +63,5 @@ The parent session needs analysis or generation that exceeds Claude's comfortabl
 
 ## Memory references
 
-- `project_gemini_cli.md` (auto-memory) — CLI version, env setup, headless gotchas
+- `project_gemini_rest.md` (auto-memory) — REST wrapper path, env setup, model choices
+- `reference_gemini_quirks.md` — Gemini-specific API quirks (thinkingBudget, response shape)
