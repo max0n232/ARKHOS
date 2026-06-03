@@ -45,6 +45,18 @@ const RULES = [
     sections: null,
   },
   {
+    // CT resize/eurocut: pre-load the canonical SSOT so the agent reads the
+    // scaling recipe BEFORE any live eval_ruby probe (incident 2026-06-03 —
+    // 6 ticks of probe because the recipe wasn't read first).
+    name: 'EK countertop / eurocut',
+    // No leading \b: JS \b is ASCII-only and fails at an ASCII↔Cyrillic boundary
+    // (verified: \bстолешниц never matches "сделай столешницу"). Patterns are
+    // specific enough that dropping the boundary is safe for a context-preload.
+    pattern: /(countertop|столешниц\w*|eurocut|еврозапил|place_countertop|TT_STRAIGHT|l8_axe_203|cutoff|резайз\w*\s*столеш|CT\s+(resize|length|depth))/i,
+    file: '10-Projects/3D-Configurators/easykitchen/standards/countertop-eurocut.md',
+    sections: ['TT_STRAIGHT canonical resize protocol — SSOT'],
+  },
+  {
     name: 'Vault routing / distill',
     pattern: /\b(distill|дистилляц|librarian|routing[-\s]?map|topic[-\s]file|accumulator|folder[-\s]MOC)/i,
     file: '90-System/routing-map.md',
