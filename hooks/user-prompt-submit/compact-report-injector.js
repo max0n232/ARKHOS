@@ -67,30 +67,46 @@ if (fs.existsSync(PENDING_FILE)) {
 // which (a) drifted from the status-line by a few pts (different snapshot/source) and
 // (b) under-reported 5x on Sonnet 200K sessions. The agent then extrapolated that one-time
 // stale number manually → false "context >50%" claims (feedback_verify_before_claiming).
+// This is Loop A of the resource-homeostat (hypothalamus / canon token-budget): the SOFT
+// loop. SSOT = used_percentage (same as status-line). At >=50% it emits the canonical
+// "STOP and report" advisory (CLAUDE.md Token Budget rule), NOT just "/compact". Band-throttled
+// (.homeostat-token-<session> records highest band announced) so it fires ONCE per crossing
+// UP into a band, never every prompt — the old code re-emitted the 50% nudge on every turn.
+// SOFT = advisory only, never blocks (the user's own train of thought must not be gated mid-task).
 try {
     const ctxPct = hookInput && hookInput.context_window && hookInput.context_window.used_percentage;
+    const fp = (hookInput && hookInput.transcript_path) || '';
     if (ctxPct != null && isFinite(ctxPct)) {
         const pct = Math.round(ctxPct);
-        if (pct >= 50) {
-            output.push(`[CONTEXT] Context at ${pct}% — /compact recommended NOW`);
-        } else if (pct >= 40) {
-            output.push(`[CONTEXT] Context at ${pct}% — consider /compact or finishing current task`);
-            // Auto-checkpoint: spawn worker ONCE per session (keyed on transcript basename)
-            const fp = (hookInput && hookInput.transcript_path) || '';
-            if (fp) {
-                const flagFile = path.join(CLAUDE_DIR, 'hooks', '.checkpoint-' + path.basename(fp, '.jsonl'));
-                if (!fs.existsSync(flagFile)) {
-                    fs.writeFileSync(flagFile, new Date().toISOString(), 'utf8');
-                    const child = spawn(process.execPath, [CHECKPOINT_WORKER, fp], {
-                        stdio: 'ignore',
-                        windowsHide: true
-                    });
-                    child.unref();
-                    output.push('[CHECKPOINT] Auto-saving session state — knowledge preserved in Ghost for next session');
+        // Highest band already announced this session (band-throttle, mirrors .checkpoint-* flags).
+        const sid = fp ? path.basename(fp, '.jsonl') : 'nosession';
+        const bandFlag = path.join(CLAUDE_DIR, 'hooks', '.homeostat-token-' + sid);
+        let lastBand = 0;
+        try { lastBand = JSON.parse(fs.readFileSync(bandFlag, 'utf8')).band || 0; } catch {}
+
+        const band = pct >= 50 ? 50 : pct >= 40 ? 40 : pct >= 30 ? 30 : 0;
+        if (band > lastBand) {
+            if (band === 50) {
+                output.push(`[TOKEN BUDGET] Context at ${pct}% — per CLAUDE.md (200k / STOP at 50%): STOP, summarize progress, and report to the user before continuing. /compact when ready.`);
+            } else if (band === 40) {
+                output.push(`[TOKEN BUDGET] Context at ${pct}% — approaching the 50% set-point. Wrap up the current task; plan to STOP-and-report soon.`);
+                // Auto-checkpoint: spawn worker ONCE per session (keyed on transcript basename)
+                if (fp) {
+                    const flagFile = path.join(CLAUDE_DIR, 'hooks', '.checkpoint-' + sid);
+                    if (!fs.existsSync(flagFile)) {
+                        fs.writeFileSync(flagFile, new Date().toISOString(), 'utf8');
+                        const child = spawn(process.execPath, [CHECKPOINT_WORKER, fp], {
+                            stdio: 'ignore',
+                            windowsHide: true
+                        });
+                        child.unref();
+                        output.push('[CHECKPOINT] Auto-saving session state — knowledge preserved in Ghost for next session');
+                    }
                 }
+            } else if (band === 30) {
+                output.push(`[TOKEN BUDGET] Context at ${pct}% — approaching soft limit, plan accordingly.`);
             }
-        } else if (pct >= 30) {
-            output.push(`[CONTEXT] Context at ${pct}% — approaching soft limit, plan accordingly`);
+            try { fs.writeFileSync(bandFlag, JSON.stringify({ band, ts: new Date().toISOString() }), 'utf8'); } catch {}
         }
     }
 } catch {}

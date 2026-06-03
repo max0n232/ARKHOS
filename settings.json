@@ -75,6 +75,11 @@
         "hooks": [
           {
             "type": "command",
+            "command": "node C:/Users/sorte/.claude/hooks/user-prompt-submit/deploy-approval-stamp.js",
+            "timeout": 5
+          },
+          {
+            "type": "command",
             "command": "node C:/Users/sorte/.claude/hooks/user-prompt-submit/ghost-prompt-dedup.js",
             "timeout": 5
           },
@@ -243,6 +248,11 @@
           },
           {
             "type": "command",
+            "command": "node C:/Users/sorte/.claude/hooks/pre-tool-use/spend-guard.js",
+            "timeout": 3
+          },
+          {
+            "type": "command",
             "command": "node C:/Users/sorte/.claude/hooks/pre-tool-use/codex-gate.js",
             "timeout": 3
           },
@@ -318,5 +328,6 @@
         "repo": "anthropics/claude-plugins-official"
       }
     }
-  }
+  },
+  "skipWorkflowUsageWarning": true
 }
