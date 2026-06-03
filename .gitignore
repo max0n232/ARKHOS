@@ -45,6 +45,13 @@ Thumbs.db
 # Logs
 *.log
 
+# Rollback snapshots — LOCAL-ONLY backups taken before risky ops (rollback-protocol).
+# NEVER in git: (a) they hold copies of credential-bearing files (.claude.json, oauth
+# tokens, *.key) that .gitignore blocks at their real path but not as rollback copies;
+# (b) 1000+ files would bloat history; (c) they are reproducible only locally anyway.
+logs/rollback/
+logs/post-mortem/*.bak
+
 # Cache
 cache/
 statsig/
