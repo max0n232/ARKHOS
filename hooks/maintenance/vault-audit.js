@@ -208,7 +208,7 @@ function checkStackHealth() {
       }
     }
   } catch {}
-  const sharedMods = ['hooks/shared/paths.js', 'hooks/shared/obsidian-api.js', 'patterns/db-helper.js'];
+  const sharedMods = ['hooks/shared/paths.js', 'hooks/shared/obsidian-api.js'];
   for (const rel of sharedMods) {
     if (!fs.existsSync(path.join(CLAUDE_DIR, rel))) missing.push(rel);
   }
