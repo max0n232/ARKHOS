@@ -46,6 +46,8 @@ Use the `ghost-sessions` MCP tool with `deep_search` (not `search`). Fallback CL
 
 Получил запрос → определи проект по триггерам → читай `{path}/CLAUDE.md`
 
+**Project-скилы видны, только если сессия ЗАПУЩЕНА из cwd проекта** (scope фиксируется на старте, runtime `cd` не пересканирует). Domain-задача проекта (WP/SEO/SMM → Studiokook; контент/Kling → AiGeneration) из сессии в `~/.claude` молча не видит `wordpress`/`seo-aeo`/`content-creator` и т.д. (`{path}/.claude/skills/`, не в system-reminder; авто-инжекта таких скилов сейчас нет). Нужен project-скил → запусти сессию из `{path}`.
+
 ## File Routing
 
 | Зона | Путь | Что хранится |
