@@ -1461,13 +1461,9 @@ Anthropic API key ротирован (старый `sk-ant-...sbgwcx87` утёк
 
 <!-- auto-appended 2026-06-04 -->
 - ⟨SECRET-redacted→credentials/⟩ <!-- fact:new_google_oauth_client_secret_prefix auto:2026-06-04 src:session-llm unverified -->
-- sk-ant-api03-Br7...EAA <!-- fact:anthropic_api_key_current_working_prefix auto:2026-06-04 src:session-llm unverified -->
-- sk-ant-api03-Br7pAgn... <!-- fact:anthropic_api_key_current_working_full_p auto:2026-06-04 src:session-llm unverified -->
+- Рабочий Anthropic ключ → credentials/anthropic-api.key (значение/префикс НЕ хранить здесь) <!-- fact:anthropic_api_key_current_pointer 2026-06-04 -->
 
 <!-- auto-appended 2026-06-04 -->
-- CHECKPOINT-блок (временный, TTL), удаляет старый перед записью <!-- fact:init_memory_js_writes auto:2026-06-04 src:session-llm unverified -->
-- только удаляет legacy PENDING-блоки (cleanup), не пишет контент <!-- fact:session_audit_js_writes auto:2026-06-04 src:session-llm unverified -->
-
-<!-- auto-appended 2026-06-04 -->
-- отсутствует, `ek_socket.rb` определяет `mm2in` сам и не ссылается на `EkRealCompose` <!-- fact:ek_socket_rb_ek_real_compose_dependency auto:2026-06-04 src:session-llm unverified -->
-- изменен с `:req` на `:opt` <!-- fact:ek_kitchen_rb_step_module_at_mm_signatur auto:2026-06-04 src:session-llm unverified -->
+- `at_mm` теперь `:opt` (был `:req`), `after` — `:key`. <!-- fact:ek_socket_at_mm_signature_change auto:2026-06-04 src:session-llm unverified -->
+- Heavy-секция (corner + 2 north + west chain = 4 spawn + cleanup в одном check). <!-- fact:ek_test_32a_description auto:2026-06-04 src:session-llm unverified -->
+- 1800.0 (arm_mm+600). <!-- fact:ek_test_32a_chain_bd2_at_mm_parity auto:2026-06-04 src:session-llm unverified -->

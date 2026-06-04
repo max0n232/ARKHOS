@@ -369,10 +369,17 @@ function checkVaultDrift() {
 // (and on the GitHub remote) until 2026-06-04. Any fact value matching a secret pattern has its
 // value replaced with a redaction pointer; the fact KEY is kept so the reader knows it exists.
 const SECRET_VALUE_RE = /(GOCSPX-[A-Za-z0-9_-]{10,}|sk-ant-(?:api03|admin01)-[A-Za-z0-9_-]{20,}|fc-[a-f0-9]{20,}|AIza[A-Za-z0-9_-]{30,}|ghp_[A-Za-z0-9]{30,}|xox[bparse]-[A-Za-z0-9_-]{10,}|n8n_api_[A-Za-z0-9_-]{10,}|[0-9]{8,12}:AA[A-Za-z0-9_-]{30,}|-----BEGIN [A-Z ]*PRIVATE KEY|eyJ[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{20,})/g;
+// Truncated/elided key fragments — `sk-ant-api03-Br7...EAA`, `GOCSPX-kjd…`, `fc-abc...`. A real
+// working secret is never written truncated, but identification prefixes of LIVE keys must still
+// not land in a synced file (user policy: reference by filename only). Require >=3 token chars
+// before the ellipsis so we don't redact the bare scheme (`sk-ant-api03-`) or prose.
+const SECRET_PREFIX_RE = /((?:GOCSPX-|sk-ant-(?:api03|admin01)-|fc-|AIza|ghp_|n8n_api_)[A-Za-z0-9_-]{3,})(\s*(?:\.{2,}|…)\s*[A-Za-z0-9_-]*)/g;
 // Replace only the secret SUBSTRING (not the whole line) with a redaction marker, so the
 // surrounding insight survives while the secret value never lands in a tracked/synced file.
 function scrubSecretValue(value) {
-    return String(value).replace(SECRET_VALUE_RE, '⟨SECRET-redacted→credentials/⟩');
+    return String(value)
+        .replace(SECRET_VALUE_RE, '⟨SECRET-redacted→credentials/⟩')
+        .replace(SECRET_PREFIX_RE, '⟨SECRET-prefix-redacted→credentials/⟩');
 }
 
 // Append facts to references/project-facts.md under a dated section.

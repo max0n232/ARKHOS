@@ -15,7 +15,7 @@ description: |
   TT_CORNER (98% of corner kitchens — TT_CORNER is для BF1A only),
   apply_ek_height per countertop profile (laminate 38mm / hpl 12mm / stone
   20mm), Studiokook gap standards (d201=4 d203=0 d202=1.5 d204=1.5).
-tools: Read, Grep, Glob, Bash, Edit, Write, mcp__sketchup__eval_ruby, mcp__sketchup__get_scene_info, mcp__sketchup__get_selection, mcp__sketchup__get_selected_components
+tools: Read, Grep, Glob, Bash, Edit, Write, mcp__firecrawl__firecrawl_search, mcp__firecrawl__firecrawl_scrape, mcp__sketchup__eval_ruby, mcp__sketchup__get_scene_info, mcp__sketchup__get_selection, mcp__sketchup__get_selected_components
 model: opus
 permissionMode: acceptEdits
 ---
