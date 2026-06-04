@@ -1281,7 +1281,7 @@ Lookup facts for specific projects. Not always in context.
 <!-- auto-appended 2026-06-02 -->
 - Browser MCP bridge setup (playwright + chrome-devtools on :9334) <!-- fact:chrome_debug_profile_origin verified:2026-06-02 -->
 - setup-chrome-debug.ps1 <!-- fact:chrome_debug_setup_script verified:2026-06-02 -->
-- sk-ant-api03-6L5POd... <!-- fact:claudeclaw_env_anthropic_api_key verified:2026-06-02 -->
+- ClaudeClaw .env Anthropic key (`sk-ant-api03-6L5POd...`) ✅ МЁРТВ — удалён юзером 2026-06-02 в день создания (session-log 2026-06-02: «я уже удалил ключ из Claude.ai»). В консоли отсутствует. Был plaintext в vault git до redact 2026-06-04 — значение мертво, history-purge не нужен. ClaudeClaw на OAuth setup-token, API-key не использует. <!-- fact:claudeclaw_env_anthropic_api_key verified:2026-06-04 -->
 - OAuth setup-token (getSessionToken()) <!-- fact:claudeclaw_auth_method verified:2026-06-02 -->
 
 <!-- auto-appended 2026-06-02 -->
@@ -1449,3 +1449,17 @@ Anthropic API key ротирован (старый `sk-ant-...sbgwcx87` утёк
 
 <!-- auto-appended 2026-06-04 -->
 - ⟨SECRET-redacted→credentials/⟩ <!-- fact:anthropic_api_key_old_leaked_value auto:2026-06-04 src:session-llm unverified -->
+
+<!-- auto-appended 2026-06-04 -->
+- ⟨SECRET-redacted→credentials/⟩ <!-- fact:google_oauth_new_client_secret_prefix auto:2026-06-04 src:session-llm unverified -->
+
+<!-- auto-appended 2026-06-04 -->
+- Файл ek_showcase_l_kitchen.rb не содержит хэша MODULES, вместо этого использует PENCIL_PATHS/LOWER_PATHS/APPLIANCE_PATHS с абсолютными путями, которые переопределяются блоками EK_ROOT и SHABLONY. <!-- fact:ek_showcase_l_kitchen_rb_module_structur auto:2026-06-04 src:session-llm unverified -->
+- Файл ek_showcase_l_kitchen.rb не использует EkRealCompose CATALOG/place/load_module, а грузит модули напрямую по абсолютным путям через свои *_PATHS Hashes. <!-- fact:ek_showcase_l_kitchen_rb_module_loading auto:2026-06-04 src:session-llm unverified -->
+- Design doc §Existing systems и acceptance #5 описывают устаревшее состояние файла ek_showcase_l_kitchen.rb, утверждая наличие MODULES Hash для удаления, которого нет в текущей версии файла. <!-- fact:design_doc_discrepancy auto:2026-06-04 src:session-llm unverified -->
+- Директория ek_regression/ содержит runner.rb, fixtures.rb, mutations.rb. <!-- fact:ek_regression_files auto:2026-06-04 src:session-llm unverified -->
+
+<!-- auto-appended 2026-06-04 -->
+- ⟨SECRET-redacted→credentials/⟩ <!-- fact:new_google_oauth_client_secret_prefix auto:2026-06-04 src:session-llm unverified -->
+- sk-ant-api03-Br7...EAA <!-- fact:anthropic_api_key_current_working_prefix auto:2026-06-04 src:session-llm unverified -->
+- sk-ant-api03-Br7pAgn... <!-- fact:anthropic_api_key_current_working_full_p auto:2026-06-04 src:session-llm unverified -->
