@@ -97,6 +97,7 @@ hooks/.auto-consolidate-last.json
 hooks/.consolidate-surface.json
 hooks/.memunload-*
 patterns/maintenance-ledger.json
+scheduled_tasks.lock
 .last-cleanup
 
 # Runtime caches (Claude Code managed)
