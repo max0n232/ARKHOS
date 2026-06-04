@@ -1442,3 +1442,7 @@ Anthropic API key ротирован (старый `sk-ant-...sbgwcx87` утёк
 - `showcase-lib spawn.rb` <!-- fact:ensure_main_menu_location auto:2026-06-04 src:session-llm unverified -->
 - Regex `^Главное меню` <!-- fact:main_menu_instance_detection_method auto:2026-06-04 src:session-llm unverified -->
 - Грузит 4 файла: COMPOSE/ASSERT/RENDER/STANDARDS. Не включает showcase-lib. <!-- fact:ek_showcase_custom_l_kitchen_load_deps_c auto:2026-06-04 src:session-llm unverified -->
+
+<!-- auto-appended 2026-06-04 -->
+- EkShowcaseCustomLKitchen.ensure_main_menu(...) <!-- fact:ensure_main_menu_call_form auto:2026-06-04 src:session-llm unverified -->
+- EkShowcaseCustomLKitchen.dc_redraw(inst) <!-- fact:dc_redraw_call_form auto:2026-06-04 src:session-llm unverified -->

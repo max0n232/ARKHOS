@@ -364,6 +364,17 @@ function checkVaultDrift() {
     } catch { return null; }
 }
 
+// Secret-scrub: NEVER write a secret VALUE into a tracked file (A2 + constitution § Credentials).
+// Root-cause fix — a live OAuth client_secret was auto-appended here on 2026-05-09 and sat in git
+// (and on the GitHub remote) until 2026-06-04. Any fact value matching a secret pattern has its
+// value replaced with a redaction pointer; the fact KEY is kept so the reader knows it exists.
+const SECRET_VALUE_RE = /(GOCSPX-[A-Za-z0-9_-]{10,}|sk-ant-(?:api03|admin01)-[A-Za-z0-9_-]{20,}|fc-[a-f0-9]{20,}|AIza[A-Za-z0-9_-]{30,}|ghp_[A-Za-z0-9]{30,}|xox[bparse]-[A-Za-z0-9_-]{10,}|n8n_api_[A-Za-z0-9_-]{10,}|[0-9]{8,12}:AA[A-Za-z0-9_-]{30,}|-----BEGIN [A-Z ]*PRIVATE KEY|eyJ[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{20,})/g;
+// Replace only the secret SUBSTRING (not the whole line) with a redaction marker, so the
+// surrounding insight survives while the secret value never lands in a tracked/synced file.
+function scrubSecretValue(value) {
+    return String(value).replace(SECRET_VALUE_RE, '⟨SECRET-redacted→credentials/⟩');
+}
+
 // Append facts to references/project-facts.md under a dated section.
 // Never touches MEMORY.md — prevents index bloat past 200-line cap.
 function appendNicheFacts(filePath, facts, today) {
@@ -382,7 +393,7 @@ function appendNicheFacts(filePath, facts, today) {
     // Provenance: these are LLM-extracted from the session transcript, NOT user-confirmed.
     // The old `verified:` token was a mislabel — nothing in this pipeline verifies a fact.
     // `auto:` + `src:session-llm` tells a future reader (human or LLM) this is unverified.
-    const appendBlock = auto + toAppend.map(f => `- ${f.value} <!-- fact:${String(f.key).slice(0,40)} auto:${today} src:session-llm unverified -->`).join('\n') + '\n';
+    const appendBlock = auto + toAppend.map(f => `- ${scrubSecretValue(f.value)} <!-- fact:${String(f.key).slice(0,40)} auto:${today} src:session-llm unverified -->`).join('\n') + '\n';
     try { fs.appendFileSync(filePath, appendBlock, 'utf8'); } catch (e) {
         console.error(`Session audit: niche append failed — ${e.message}`);
     }
@@ -506,7 +517,9 @@ Rules:
         if (droppedLowQ > 0) console.error(`Session audit: filtered ${droppedLowQ} low-quality error(s) (vague resolution)`);
         counts.errors = extracted.errors.length;
         if (extracted.errors.length) {
-            const content = extracted.errors.map(e => `- [${today}] ${e}`).join('\n');
+            // Scrub: troubleshooting-current.md is tracked in the vault git repo (its OWN GitHub
+            // remote) — same leak class as the original incident, different write path (codex).
+            const content = extracted.errors.map(e => `- [${today}] ${scrubSecretValue(e)}`).join('\n');
             await appendToVault(TROUBLESHOOTING, content);
         }
     }
@@ -520,7 +533,8 @@ Rules:
         if (dropped > 0) console.error(`Session audit: filtered ${dropped} generic pattern(s)`);
         counts.patterns = extracted.patterns.length;
         if (extracted.patterns.length) {
-            const content = extracted.patterns.map(p => `- [${today}] ${p}`).join('\n');
+            // Scrub: a pattern in prose can embed a secret ("set X=GOCSPX-..."). Redact value.
+            const content = extracted.patterns.map(p => `- [${today}] ${scrubSecretValue(p)}`).join('\n');
             await appendToVault(PATTERNS, content);
         }
     }
@@ -558,15 +572,15 @@ Rules:
 
     if (extracted.errors?.length) {
         parts.push('');
-        extracted.errors.forEach(e => parts.push(`  ! ${e}`));
+        extracted.errors.forEach(e => parts.push(`  ! ${scrubSecretValue(e)}`));
     }
     if (extracted.patterns?.length) {
         parts.push('');
-        extracted.patterns.forEach(p => parts.push(`  ~ ${p}`));
+        extracted.patterns.forEach(p => parts.push(`  ~ ${scrubSecretValue(p)}`));
     }
     if (extracted.facts?.length) {
         parts.push('');
-        extracted.facts.forEach(f => parts.push(`  # ${f.key}: ${f.value}`));
+        extracted.facts.forEach(f => parts.push(`  # ${f.key}: ${scrubSecretValue(f.value)}`));
     }
 
     const vaultSummary = [
