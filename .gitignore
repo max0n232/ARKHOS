@@ -51,6 +51,7 @@ Thumbs.db
 # (b) 1000+ files would bloat history; (c) they are reproducible only locally anyway.
 logs/rollback/
 logs/post-mortem/*.bak
+references/*.bak
 
 # Cache
 cache/

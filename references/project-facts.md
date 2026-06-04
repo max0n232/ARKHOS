@@ -1387,7 +1387,6 @@ Anthropic API key ротирован (старый `sk-ant-...sbgwcx87` утёк
 - l8_axe_203_lenx_fix <!-- fact:dynamic_component_tabletop_straight_leng auto:2026-06-03 src:session-llm unverified -->
 
 <!-- auto-appended 2026-06-03 -->
-- Читается showcase'ом, сохранена. <!-- fact:ek_root_constant_usage auto:2026-06-03 src:session-llm unverified -->
 - `ATTR_SCHEMA['TT_STRAIGHT'][:length][:driver] = 'l8_axe_203_lenx_fix'` <!-- fact:countertop_length_driver_in_attr_schema auto:2026-06-03 src:session-llm unverified -->
 
 <!-- auto-appended 2026-06-03 -->
@@ -1410,11 +1409,7 @@ Anthropic API key ротирован (старый `sk-ant-...sbgwcx87` утёк
 <!-- auto-appended 2026-06-03 -->
 - Модули грузятся напрямую по абсолютным путям через *_PATHS Hashes (Shablony Gola варианты, ASCII 8.3 пути), не использует EkRealCompose CATALOG/place/load_module. <!-- fact:ek_showcase_l_kitchen_module_loading_met auto:2026-06-03 src:session-llm unverified -->
 - Отсутствует MODULES Hash, который design doc §Existing systems и acceptance #5 утверждали для удаления. <!-- fact:ek_showcase_l_kitchen_modules_hash_prese auto:2026-06-03 src:session-llm unverified -->
-- Ноль внешних вызывающих сторон для CATALOG. <!-- fact:catalog_callers_count auto:2026-06-03 src:session-llm unverified -->
 - EK_ROOT читается showcase'ом. <!-- fact:ek_root_usage_in_showcase auto:2026-06-03 src:session-llm unverified -->
-- k146+d101 (без d106). <!-- fact:blend1_lenx_v3_formula auto:2026-06-03 src:session-llm unverified -->
-- Scaling ломает PANEL_FACADE, для него следует использовать DC attrs. <!-- fact:panel_facade_scaling_behavior auto:2026-06-03 src:session-llm unverified -->
-- Scaling верен для CT (TT_STRAIGHT). <!-- fact:tt_straight_scaling_behavior auto:2026-06-03 src:session-llm unverified -->
 
 <!-- auto-appended 2026-06-03 -->
 - Использует `PENCIL_PATHS`/`LOWER_PATHS`/`APPLIANCE_PATHS` с абсолютными путями, а не `MODULES` Hash. `MODULE_SOURCE=:shablony_gola` переопределяет EK_ROOT-блок. <!-- fact:ek_showcase_l_kitchen_module_loading_mec auto:2026-06-03 src:session-llm unverified -->
@@ -1434,9 +1429,6 @@ Anthropic API key ротирован (старый `sk-ant-...sbgwcx87` утёк
 - Google OAuth2 cred `0a4JFSW3JyCsi8wo` (GCP studiokook). Telegram cred `mxbg2RUQv7Widfws`, chat `804465999`. Gemini `GEMINI_API_KEY` env, model `gemini-2.5-flash`, GCP ARKHOS (billing). Supabase `SUPABASE_URL=https://app.studiokook.ee`, PostgREST upsert needs `?on_conflict=column`. GCP projects: ARKHOS (billing+Gemini) + studiokook (OAuth2) <!-- fact:n8n_creds_apis verified:2026-05-03 -->
 - Workflow IDs: SEO Audit `EMUTtOI8BWLvDxn0`, Traffic Drop `8ZsWQfxf1oMZYQFe`, Analytics `n4unkzPUqdWklOhc`, Studiokook Video Gen v1 `kyuBLkWS7q6wodAM` (webhook stub only, 0 exec), Video Error Handler v1 `oKMVXx6UX3Ln13Ta`, Video TG Callback Handler v1 `wNkjWy0nT3odT9PP` (webhook `/studiokook-tg-callback`). SSH stitch cred `ESEf68VzIbrarVlP` → `root@172.17.0.1` → ffmpeg → `/opt/n8n/n8n_data/output/{exec_id}.mp4`. Private key `credentials/n8n-host-ssh.key` <!-- fact:n8n_workflow_ids verified:2026-05-10 -->
 - ANTHROPIC_API_KEY (n8n env): credit balance 0 — не использовать api.anthropic.com напрямую без top-up <!-- fact:n8n_anthropic_balance verified:2026-05-03 -->
-
-<!-- auto-appended 2026-06-03 -->
-- X[0..1200] Y[-670..0] <!-- fact:default_corner_coordinates auto:2026-06-03 src:session-llm unverified -->
 
 <!-- auto-appended 2026-06-04 -->
 - `showcase-lib spawn.rb` <!-- fact:ensure_main_menu_location auto:2026-06-04 src:session-llm unverified -->
@@ -1465,5 +1457,3 @@ Anthropic API key ротирован (старый `sk-ant-...sbgwcx87` утёк
 
 <!-- auto-appended 2026-06-04 -->
 - `at_mm` теперь `:opt` (был `:req`), `after` — `:key`. <!-- fact:ek_socket_at_mm_signature_change auto:2026-06-04 src:session-llm unverified -->
-- Heavy-секция (corner + 2 north + west chain = 4 spawn + cleanup в одном check). <!-- fact:ek_test_32a_description auto:2026-06-04 src:session-llm unverified -->
-- 1800.0 (arm_mm+600). <!-- fact:ek_test_32a_chain_bd2_at_mm_parity auto:2026-06-04 src:session-llm unverified -->

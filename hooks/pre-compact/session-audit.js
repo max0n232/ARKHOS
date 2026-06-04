@@ -159,6 +159,53 @@ function isJunkFact(fact) {
     return false;
 }
 
+// --- Fragment-fact filter ---
+// isJunkFact rejects by VALUE FORM (length, path, number, enum). It does NOT catch
+// "fragment-facts": grammatical phrases with context that are one-time session DEBUG findings
+// with no standalone lookup value — e.g. "NE-ориентация (длинное плечо по north/X)",
+// "1800.0 (arm_mm+600).", "Scaling верен для CT (TT_STRAIGHT)." These are exactly the class the
+// system prompt forbids ("one-time debug findings") but the LLM extracts anyway. ~35 such lines
+// accumulated in project-facts.md (2026-06-04). This is a SIBLING predicate (isJunkFact contract
+// preserved for its callers). Design: anchor-FIRST — any config-anchor hit short-circuits to KEEP
+// before any fragment test runs. Bias toward keeping when ambiguous (false-positive = silent
+// knowledge loss). Encoding: no `\b` adjacent to Cyrillic (JS \b is ASCII-only — prior bug, see
+// META_RECURSION lines below); value-side patterns use \p{L}/u or anchor on ASCII structure.
+
+// Config-anchor: value carries a stable lookup datum a future reader would search by → KEEP.
+const FRAGMENT_KEY_NOLOOKUP = /(_description$|_orientation$|_usage$|_behavior$|_count$|_state$|_findings?$|_parity$|_formula$|_coordinates$)/i;
+function hasConfigAnchor(key, value) {
+    if (SHORT_VALUE_OK_KEY_PATTERNS.test(key)) return true;          // A1: version/port/id/key/token keys
+    if (/\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b/.test(value)) return true; // A2: IPv4
+    if (/https?:\/\//.test(value)) return true;                     // A3: URL
+    if (/\d+\.\d+\.\d+/.test(value)) return true;                   // A4: dotted-triple semver anywhere (key-agnostic) → "n8n 2.18.5 ..."
+    if (/[A-Za-z0-9_-]{16,}/.test(value) && /(_id$|_cred|_token|_key)/i.test(key)) return true; // A5: cred/long IDs
+    if (/(UTC|GMT|Europe\/|America\/|Asia\/)/i.test(value)) return true; // A6: timezone
+    if (value.length >= 140) return true;                           // A7: long-form prose = real captured knowledge
+    return false;
+}
+
+function isFragmentFact(fact) {
+    if (!fact || !fact.key || !fact.value) return false; // isJunkFact already drops empties; not our job
+    const key = String(fact.key).toLowerCase();
+    const value = String(fact.value).trim();
+    if (hasConfigAnchor(key, value)) return false;       // anchor-first: any lookup datum → KEEP
+
+    // Self-evidently lookup-less VALUE SHAPES — reject regardless of key (the value form alone
+    // carries no searchable identifier). Anchor-first above already protected real config.
+    const coordBlob = /^[XY]\[[-\d. ]+\][ XY[\]\-\d.]*$/.test(value);     // "X[0..1200] Y[-670..0]"
+    const quotedToken = /^[«"'`][\w.-]{1,18}[»"'`]\.?$/.test(value);      // "'lenx'" (only if key not _key, caught by anchor A1)
+    if (coordBlob || quotedToken) return true;
+
+    // Otherwise require a value-shape fragment signal AND a no-lookup key (conjunctive = safer).
+    const parenthetical = /^[«"'`]?[\p{L}\p{N}][\p{L}\p{N}'’._+-]*\s*\(.*\)\.?$/u.test(value);
+    const shortSentence = /\.$/.test(value) && value.split(/\s+/).length <= 12;
+    const formulaParen = /^[A-Za-z0-9._+-]+\s*\([^)]*(parity|arm_mm|без|formula|chain|spawn)\b/i.test(value);
+    const sShape = parenthetical || shortSentence || formulaParen;
+    const sNolookup = FRAGMENT_KEY_NOLOOKUP.test(key);
+
+    return sShape && sNolookup;
+}
+
 // --- Pattern/error post-filtering ---
 // LLM sometimes returns generic advice as "patterns" despite system prompt.
 // Reject: prescriptive forms without concrete session context.
@@ -388,11 +435,12 @@ function appendNicheFacts(filePath, facts, today) {
     if (!facts?.length) return;
     let content = '';
     try { content = fs.readFileSync(filePath, 'utf8'); } catch {}
+    // Match the file's existing EOL so a heal (which preserves CRLF) + this append don't mix EOLs.
+    const eol = content.includes('\r\n') ? '\r\n' : '\n';
     const SECTION = `## Niche Project Facts (moved from MEMORY.md 2026-04-23)`;
-    if (!content.includes(SECTION)) {
-        content = (content.trimEnd() || '# Project Facts') + `\n\n${SECTION}\n\n`;
-    }
-    const auto = `\n<!-- auto-appended ${today} -->\n`;
+    const needSection = !content.includes(SECTION);
+    const sectionHeader = needSection ? `${eol}${eol}${SECTION}${eol}${eol}` : '';
+    const auto = `${eol}<!-- auto-appended ${today} -->${eol}`;
     // Dedup: skip values already present in the file
     const normalized = content.toLowerCase();
     const toAppend = facts.filter(f => !normalized.includes(String(f.value).trim().toLowerCase().slice(0, 60)));
@@ -400,9 +448,107 @@ function appendNicheFacts(filePath, facts, today) {
     // Provenance: these are LLM-extracted from the session transcript, NOT user-confirmed.
     // The old `verified:` token was a mislabel — nothing in this pipeline verifies a fact.
     // `auto:` + `src:session-llm` tells a future reader (human or LLM) this is unverified.
-    const appendBlock = auto + toAppend.map(f => `- ${scrubSecretValue(f.value)} <!-- fact:${String(f.key).slice(0,40)} auto:${today} src:session-llm unverified -->`).join('\n') + '\n';
+    const appendBlock = sectionHeader + auto + toAppend.map(f => `- ${scrubSecretValue(f.value)} <!-- fact:${String(f.key).slice(0,40)} auto:${today} src:session-llm unverified -->`).join(eol) + eol;
     try { fs.appendFileSync(filePath, appendBlock, 'utf8'); } catch (e) {
         console.error(`Session audit: niche append failed — ${e.message}`);
+    }
+}
+
+// Self-heal: vacuum already-accumulated fragment-facts from project-facts.md on each run.
+// Established vault pattern ("self-healing hooks" — clean existing junk, not just filter new).
+// Runs INSIDE this hook's single-threaded execution, BEFORE its own append → no write-race with
+// manual editing (which is why manual cleanup failed: it raced the hook). SAFETY:
+//  - SCOPE: only `src:session-llm unverified` auto-append bullets are candidates. The 632 legacy
+//    `verified:` lines, `## ` headers, `<!-- SSOT -->`, bare-date pointers are structurally
+//    unmatchable → never touched (canon §12 don't-break-consumers, user-approved blast radius).
+//  - CARVE-OUT: `⟨SECRET…⟩` redaction-record lines match scope but are HARD-KEPT (audit trail).
+//  - canon §1 backup before mutate; atomic temp+rename; canon §4 idempotent (clean file = no-op).
+const HEAL_AUTO_TAG = / <!-- fact:([^\s]+) auto:(\d{4}-\d{2}-\d{2}) src:session-llm unverified -->\s*$/;
+function selfHealFragmentFacts(filePath) {
+    let raw;
+    try { raw = fs.readFileSync(filePath, 'utf8'); } catch { return; } // no file → nothing to heal
+    const eol = raw.includes('\r\n') ? '\r\n' : '\n';
+    const lines = raw.split(/\r?\n/);
+
+    const droppedIdx = new Set(); // indices in `lines` we removed (to detect now-empty auto-blocks)
+    const out = [];
+    let vacuumed = 0;
+    for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+        const m = HEAL_AUTO_TAG.exec(line);
+        if (!m) { out.push(line); continue; }                 // SCOPE GUARD: only session-llm bullets
+        const bulletStart = line.indexOf('- ');
+        const value = (bulletStart >= 0 ? line.slice(bulletStart + 2, m.index) : '').trim();
+        if (value.startsWith('⟨SECRET')) { out.push(line); continue; } // CARVE-OUT: keep redaction record
+        if (!value) { out.push(line); continue; }                       // malformed → never drop
+        if (isFragmentFact({ key: m[1], value })) {            // SAME predicate as new-fact path
+            droppedIdx.add(i); vacuumed++;                     // drop (do not push)
+        } else {
+            out.push(line);
+        }
+    }
+    if (vacuumed === 0) return; // idempotent: nothing matched → no write, no backup
+
+    // Re-collapse auto-append headers whose every bullet was just vacuumed.
+    const isAutoHeader = s => /^<!-- auto-appended \d{4}-\d{2}-\d{2} -->$/.test(s.trim());
+    const isBoundary = s => isAutoHeader(s) || /^##\s/.test(s) || /^<!-- SSOT/.test(s.trim());
+    const collapsed = [];
+    for (let i = 0; i < out.length; i++) {
+        if (isAutoHeader(out[i])) {
+            // peek forward past blank lines for the next meaningful line
+            let j = i + 1;
+            while (j < out.length && out[j].trim() === '') j++;
+            if (j >= out.length || isBoundary(out[j])) {
+                // header has no surviving bullets → skip it and one trailing blank
+                if (i + 1 < out.length && out[i + 1].trim() === '') i++;
+                continue;
+            }
+        }
+        collapsed.push(out[i]);
+    }
+
+    const newContent = collapsed.join(eol);
+    if (newContent === raw) return; // belt-and-suspenders idempotency
+
+    // canon §1: preserve full pre-image before mutating. Backup goes to logs/rollback/ (gitignored,
+    // canon Rollback Protocol) — NEVER beside the tracked file, or the .bak risks being committed
+    // (it holds a full copy of all session-llm facts).
+    const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const rollbackDir = path.join(CLAUDE_DIR, 'logs', 'rollback');
+    const bakPath = path.join(rollbackDir, path.basename(filePath) + '.heal-' + stamp + '.bak');
+    try {
+        fs.mkdirSync(rollbackDir, { recursive: true });
+        fs.writeFileSync(bakPath, raw, 'utf8');
+    } catch (e) { console.error(`Session audit: self-heal backup failed, ABORT — ${e.message}`); return; }
+
+    // Atomic write: temp + rename (no torn file on crash).
+    const tmp = filePath + '.heal.tmp.' + process.pid;
+    try {
+        fs.writeFileSync(tmp, newContent, 'utf8');
+        fs.renameSync(tmp, filePath);
+    } catch (e) {
+        console.error(`Session audit: self-heal write failed, ABORT — ${e.message}`);
+        try { fs.unlinkSync(tmp); } catch {}
+        return;
+    }
+
+    // Re-verify + structural invariants (canon §3 fail loud). Roll back from backup on mismatch.
+    try {
+        const check = fs.readFileSync(filePath, 'utf8');
+        const countOf = (s, sub) => s.split(sub).length - 1;
+        const ok =
+            check === newContent &&
+            check.length < raw.length &&                                 // only ever removed
+            countOf(check, '⟨SECRET') === countOf(raw, '⟨SECRET') &&    // never lost a redaction record
+            countOf(check, '## ') === countOf(raw, '## ');              // never lost a section header
+        if (!ok) {
+            fs.writeFileSync(filePath, raw, 'utf8'); // restore
+            console.error('Session audit: self-heal verification FAILED — restored from pre-image');
+            return;
+        }
+        console.error(`[SELF-HEAL] vacuumed ${vacuumed} fragment-fact line(s) → ${path.basename(bakPath)}`);
+    } catch (e) {
+        console.error(`Session audit: self-heal re-verify error — ${e.message}`);
     }
 }
 
@@ -549,14 +695,20 @@ Rules:
     // Facts are NOT written to MEMORY.md (that's an index, not a landfill).
     // All extracted facts go to references/project-facts.md as on-demand journal.
     // MEMORY.md grows only via deliberate one-line index entries added by the user.
+    const REFERENCES_FILE = path.join(CLAUDE_DIR, 'references', 'project-facts.md');
+    // Self-heal BEFORE append: vacuum accumulated fragment-facts inside this run (no manual-edit
+    // race). Runs every session regardless of whether new facts were extracted.
+    selfHealFragmentFacts(REFERENCES_FILE);
     let cleanFacts = [];
     if (extracted.facts?.length) {
         const verifiedFacts = extracted.facts.filter(f => !f.confidence || f.confidence !== 'low');
-        cleanFacts = verifiedFacts.filter(f => !isJunkFact(f) && !isMetaRecursion(`${f.key} ${f.value}`));
-        const dropped = verifiedFacts.length - cleanFacts.length;
-        if (dropped > 0) console.error(`Session audit: filtered ${dropped} junk fact(s)`);
+        const afterJunk = verifiedFacts.filter(f => !isJunkFact(f) && !isMetaRecursion(`${f.key} ${f.value}`));
+        const droppedJunk = verifiedFacts.length - afterJunk.length;
+        if (droppedJunk > 0) console.error(`Session audit: filtered ${droppedJunk} junk fact(s)`);
+        cleanFacts = afterJunk.filter(f => !isFragmentFact(f));
+        const droppedFrag = afterJunk.length - cleanFacts.length;
+        if (droppedFrag > 0) console.error(`Session audit: filtered ${droppedFrag} fragment fact(s)`);
         if (cleanFacts.length) {
-            const REFERENCES_FILE = path.join(CLAUDE_DIR, 'references', 'project-facts.md');
             appendNicheFacts(REFERENCES_FILE, cleanFacts, today);
             console.error(`Session audit: routed ${cleanFacts.length} fact(s) → references/project-facts.md`);
         }
