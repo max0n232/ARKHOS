@@ -1457,3 +1457,19 @@ Anthropic API key ротирован (старый `sk-ant-...sbgwcx87` утёк
 
 <!-- auto-appended 2026-06-04 -->
 - `at_mm` теперь `:opt` (был `:req`), `after` — `:key`. <!-- fact:ek_socket_at_mm_signature_change auto:2026-06-04 src:session-llm unverified -->
+
+
+## Niche Project Facts (moved from MEMORY.md 2026-04-23)
+
+
+<!-- auto-appended 2026-06-04 -->
+- каркас + d106 + толщина_фасада + ширина_бленды <!-- fact:bind_front_formula auto:2026-06-04 src:session-llm unverified -->
+
+<!-- auto-appended 2026-06-04 -->
+- parent!x202+parent!x203-parent!k146-parent!d101-parent!d106 <!-- fact:final_bind_front_formula auto:2026-06-04 src:session-llm unverified -->
+
+<!-- auto-appended 2026-06-04 -->
+- `parent!x202+parent!x203-parent!k146-parent!d101-parent!d106` <!-- fact:bg1_bind_front_formula_final auto:2026-06-04 src:session-llm unverified -->
+
+<!-- auto-appended 2026-06-04 -->
+- боковая бленда в нахлёст 2мм на прямой модуль <!-- fact:problem_description auto:2026-06-04 src:session-llm unverified -->
