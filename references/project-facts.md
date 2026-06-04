@@ -531,7 +531,7 @@ Lookup facts for specific projects. Not always in context.
 - ~12 мин на spawn → completion (80% всего runtime) <!-- fact:pd1_6_cascade_runtime verified:2026-05-09 -->
 
 <!-- auto-appended 2026-05-09 -->
-- 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 <!-- fact:new_oauth_client_secret verified:2026-05-09 -->
+- New OAuth client_secret → `credentials/google-workspace.env` (reference by filename, constitution § Credentials; значение НЕ хранить тут). ⚠️ Было plaintext в git с 2026-05-09 до redact 2026-06-04 → ротировать (GCP 283475319435, url ниже). Consumers: workspace-mcp в `.claude.json` + `Studiokook/.mcp.json` + этот env. Контекст: `project_oauth_rotation_20260509`. <!-- fact:new_oauth_client_secret verified:2026-06-04 -->
 
 <!-- auto-appended 2026-05-09 -->
 - https://console.cloud.google.com/apis/credentials?project=283475319435 <!-- fact:gcp_credentials_list_url verified:2026-05-09 -->
@@ -1437,3 +1437,8 @@ Anthropic API key ротирован (старый `sk-ant-...sbgwcx87` утёк
 
 <!-- auto-appended 2026-06-03 -->
 - X[0..1200] Y[-670..0] <!-- fact:default_corner_coordinates auto:2026-06-03 src:session-llm unverified -->
+
+<!-- auto-appended 2026-06-04 -->
+- `showcase-lib spawn.rb` <!-- fact:ensure_main_menu_location auto:2026-06-04 src:session-llm unverified -->
+- Regex `^Главное меню` <!-- fact:main_menu_instance_detection_method auto:2026-06-04 src:session-llm unverified -->
+- Грузит 4 файла: COMPOSE/ASSERT/RENDER/STANDARDS. Не включает showcase-lib. <!-- fact:ek_showcase_custom_l_kitchen_load_deps_c auto:2026-06-04 src:session-llm unverified -->
