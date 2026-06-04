@@ -1473,3 +1473,6 @@ Anthropic API key ротирован (старый `sk-ant-...sbgwcx87` утёк
 
 <!-- auto-appended 2026-06-04 -->
 - боковая бленда в нахлёст 2мм на прямой модуль <!-- fact:problem_description auto:2026-06-04 src:session-llm unverified -->
+
+<!-- auto-appended 2026-06-04 -->
+- 4 ссылки (строки 147, 183, 789, 803) и 1 определение (строка 82) <!-- fact:ek_showcase_l_kitchen_catalog_references auto:2026-06-04 src:session-llm unverified -->
