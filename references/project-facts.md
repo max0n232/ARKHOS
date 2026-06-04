@@ -531,7 +531,7 @@ Lookup facts for specific projects. Not always in context.
 - ~12 мин на spawn → completion (80% всего runtime) <!-- fact:pd1_6_cascade_runtime verified:2026-05-09 -->
 
 <!-- auto-appended 2026-05-09 -->
-- New OAuth client_secret → `credentials/google-workspace.env` (reference by filename, constitution § Credentials; значение НЕ хранить тут). ⚠️ Было plaintext в git с 2026-05-09 до redact 2026-06-04 → ротировать (GCP 283475319435, url ниже). Consumers: workspace-mcp в `.claude.json` + `Studiokook/.mcp.json` + этот env. Контекст: `project_oauth_rotation_20260509`. <!-- fact:new_oauth_client_secret verified:2026-06-04 -->
+- OAuth client_secret → `credentials/google-workspace.env` (reference by filename; значение НЕ хранить тут). ✅ РОТИРОВАН 2026-06-04: старый клиент удалён в GCP (старый `GOCSPX-kjd...` мёртв), создан новый — client_id ТОТ ЖЕ (`283475319435-m90m...`), новый secret. Consumers обновлены: `credentials/google-workspace.env` + `Studiokook/.mcp.json` + cached OAuth token `~/.google_workspace_mcp/credentials/sorte1912@gmail.com.json`. Старое значение было plaintext в git history с 2026-05-09 — мёртво после удаления клиента. Контекст: `project_oauth_rotation_20260509`. <!-- fact:new_oauth_client_secret verified:2026-06-04 -->
 
 <!-- auto-appended 2026-05-09 -->
 - https://console.cloud.google.com/apis/credentials?project=283475319435 <!-- fact:gcp_credentials_list_url verified:2026-05-09 -->
@@ -1446,3 +1446,6 @@ Anthropic API key ротирован (старый `sk-ant-...sbgwcx87` утёк
 <!-- auto-appended 2026-06-04 -->
 - EkShowcaseCustomLKitchen.ensure_main_menu(...) <!-- fact:ensure_main_menu_call_form auto:2026-06-04 src:session-llm unverified -->
 - EkShowcaseCustomLKitchen.dc_redraw(inst) <!-- fact:dc_redraw_call_form auto:2026-06-04 src:session-llm unverified -->
+
+<!-- auto-appended 2026-06-04 -->
+- ⟨SECRET-redacted→credentials/⟩ <!-- fact:anthropic_api_key_old_leaked_value auto:2026-06-04 src:session-llm unverified -->
