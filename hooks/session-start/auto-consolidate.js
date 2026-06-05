@@ -30,22 +30,11 @@ const path = require('path');
 const CLAUDE_DIR = path.join(process.env.HOME || process.env.USERPROFILE, '.claude');
 const FLAG = path.join(CLAUDE_DIR, 'hooks', '.auto-consolidate-last.json');
 const SURFACE_FLAG = path.join(CLAUDE_DIR, 'hooks', '.consolidate-surface.json');
-const LEDGER = path.join(CLAUDE_DIR, 'patterns', 'maintenance-ledger.json');
 const THROTTLE_H = 6;
 
-// Append an autonomous-action entry to the shared maintenance ledger (stack-auditor reads it
-// weekly → one TG report "what the system did on its own"). Atomic temp+rename, fail-silent.
-function appendLedger(entry) {
-  let arr = [];
-  try { arr = JSON.parse(fs.readFileSync(LEDGER, 'utf8')); if (!Array.isArray(arr)) arr = []; } catch {}
-  arr.push(entry);
-  try {
-    fs.mkdirSync(path.dirname(LEDGER), { recursive: true });
-    const tmp = LEDGER + '.tmp-' + process.pid;
-    fs.writeFileSync(tmp, JSON.stringify(arr, null, 2), 'utf8');
-    fs.renameSync(tmp, LEDGER);
-  } catch {}
-}
+// Shared maintenance-ledger bus (upsert by key, locked RMW). stack-auditor reads it weekly →
+// one TG report "what the system did on its own" (§9 acted) + "needs decision" (§10 detected).
+const { appendLedger } = require('../shared/ledger');
 
 // SAFE to auto-commit: machine housekeeping only. Anchored to known data-homes / log dirs.
 // NB: logs/rollback/ is gitignored already, so it never appears in status — no carve-out needed.
@@ -147,11 +136,16 @@ function main() {
             `chore(auto): consolidate ${staged.length} housekeeping change(s)\n\n` +
             `Auto-consolidate hook (SAFE class only: logs/, data-home appends, .gitkeep).\n` +
             `Critical-path is never auto-committed — surfaced for deliberate commit.`]);
+          let sha = 'unknown';
+          try { sha = git(['rev-parse', '--short', 'HEAD']).trim(); } catch {}
           appendLedger({
-            ts: new Date().toISOString(),
+            key: `auto-consolidate:${sha}`,   // commit sha → unique event, retry-safe (Law 4)
+            hook: 'auto-consolidate',
+            kind: 'acted',
+            severity: 'info',
             action: 'auto-consolidate-commit',
-            count: staged.length,
-            files: staged.slice(0, 10),
+            title: `Auto-committed ${staged.length} housekeeping change(s)`,
+            detail: { count: staged.length, files: staged.slice(0, 10), sha },
           });
         }
       } catch {

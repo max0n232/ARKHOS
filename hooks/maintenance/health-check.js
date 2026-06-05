@@ -19,6 +19,7 @@ const path = require('path');
 const { execSync } = require('child_process');
 const https = require('https');
 const { CLAUDE_DIR, VAULT_DIR } = require('../shared/paths');
+const { appendLedger } = require('../shared/ledger');
 
 const INTERVAL_HOURS = 6;
 const STATE_FILE = path.join(CLAUDE_DIR, 'hooks', 'maintenance', '.health-check-state.json');
@@ -151,6 +152,20 @@ if (failures.length === 0) {
 
 const failNames = failures.map(f => `${f.name}${f.error ? ': ' + f.error : ''}`);
 console.log(`[HEALTH] ❌ ${failures.length}/${results.length}: ${failNames.join(' | ')}`);
+
+// Immediate TG stays — health failures are urgent (disk/credentials/git-corruption). The bus
+// ALSO records each for the weekly recap. DETECT-ONLY: env failures have no safe deterministic
+// fix (the one self-heal — git gc — already runs in-hook). Key on check name → re-fail upserts.
+for (const f of failures) {
+  appendLedger({
+    key: `health-check:${f.name}`,
+    hook: 'health-check',
+    kind: 'detected',
+    severity: 'error',
+    title: `Health: ${f.name}${f.error ? ' — ' + f.error : ' failed'}`,
+    detail: { check: f.name, error: f.error || null },
+  });
+}
 
 // Alert to Telegram
 try {

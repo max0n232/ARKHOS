@@ -42,8 +42,9 @@ const DEFAULT_MEMORY = path.join(CLAUDE_DIR, 'projects', 'C--Users-sorte--claude
 const PROJECT_FACTS = path.join(CLAUDE_DIR, 'references', 'project-facts.md');
 const SETTINGS = path.join(CLAUDE_DIR, 'settings.json');
 const TMP_DIR = path.join(CLAUDE_DIR, 'tmp');
-const LEDGER = path.join(CLAUDE_DIR, 'patterns', 'maintenance-ledger.json');
 const SURFACE_FLAG = path.join(CLAUDE_DIR, 'hooks', '.memunload-surface.json');
+// Shared maintenance-ledger bus (upsert by key, locked RMW) — see hooks/shared/ledger.js.
+const { appendLedger } = require('../shared/ledger');
 
 const BYTE_LIMIT = 24985;           // 24.4KB harness truncation threshold (matches stack-auditor)
 const MIN_BODY_LINES = 3;           // a "multi-line" section worth collapsing
@@ -159,19 +160,6 @@ function buildPointer(cand) {
   return `Детали → \`references/${homeName}\` (auto-collapsed ${nowIso().slice(0, 10)}).`;
 }
 
-function appendLedger(entry) {
-  let arr = [];
-  try { arr = JSON.parse(fs.readFileSync(LEDGER, 'utf8')); if (!Array.isArray(arr)) arr = []; } catch {}
-  arr.push(entry);
-  try {
-    fs.mkdirSync(path.dirname(LEDGER), { recursive: true });
-    // atomic-ish: write temp then rename (avoids partial ledger on crash / concurrent worker)
-    const tmp = LEDGER + '.tmp-' + process.pid;
-    fs.writeFileSync(tmp, JSON.stringify(arr, null, 2), 'utf8');
-    fs.renameSync(tmp, LEDGER);
-  } catch {}
-}
-
 function surface(msg) {
   try {
     fs.writeFileSync(SURFACE_FLAG, JSON.stringify({ ts: Date.now(), msg }), 'utf8');
@@ -237,16 +225,21 @@ function main() {
 
   const newBytes = Buffer.byteLength(newRaw, 'utf8');
   const homeName = path.basename(cand.home);
-  const ledgerEntry = {
-    ts: nowIso(),
+  appendLedger({
+    key: `memory-collapse:${cand.section.heading}:${nowIso()}`,  // section+ts → unique event (Law 4)
+    hook: 'memory-unload-worker',
+    kind: 'acted',
+    severity: 'info',
     action: 'memory-collapse',
-    section: cand.section.heading,
-    dataHome: homeName,
-    bytesBefore: bytes,
-    bytesAfter: newBytes,
-    saved: bytes - newBytes,
-  };
-  appendLedger(ledgerEntry);
+    title: `Collapsed "${cand.section.heading}" → ${homeName} (saved ${bytes - newBytes}B)`,
+    detail: {
+      section: cand.section.heading,
+      dataHome: homeName,
+      bytesBefore: bytes,
+      bytesAfter: newBytes,
+      saved: bytes - newBytes,
+    },
+  });
 
   // Provenance surface (A2): always tell the user what was folded and where the detail lives.
   surface(`Auto-collapsed MEMORY.md section "${cand.section.heading}" → детали verified in ` +

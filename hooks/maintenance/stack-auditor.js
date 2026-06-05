@@ -26,6 +26,7 @@ const path = require('path');
 const crypto = require('crypto');
 const { CLAUDE_DIR, VAULT_DIR } = require('../shared/paths');
 const { callOllamaEmbedding, callGeminiEmbedding, sendTelegram } = require('../shared/obsidian-api');
+const { readLedger, clearLedger } = require('../shared/ledger');
 
 const INTERVAL_DAYS = 7;
 const LOOKBACK_DAYS = 7;
@@ -43,7 +44,6 @@ const TG_CHAT = '804465999';
 
 const STATE_FILE = path.join(CLAUDE_DIR, 'hooks', 'maintenance', '.stack-auditor-state.json');
 const FLAG_FILE = path.join(CLAUDE_DIR, 'hooks', '.stack-auditor-pending.flag');
-const LEDGER = path.join(CLAUDE_DIR, 'patterns', 'maintenance-ledger.json');
 const AUDIT_DIR = path.join(VAULT_DIR, '10-Projects/ARKHOS/audits');
 const MEMORY_MD = path.join(CLAUDE_DIR, 'projects', 'C--Users-sorte--claude', 'memory', 'MEMORY.md');
 const FEEDBACK_DIR = path.join(CLAUDE_DIR, 'projects', 'C--Users-sorte--claude', 'memory');
@@ -325,16 +325,10 @@ function checkMemorySize() {
   } catch { return { lines: 0, bytes: 0, over: false, warn: false, lineWarn: false, error: 'unreadable' }; }
 }
 
-// Read the autonomous-action ledger (efferent actions logged by auto-consolidate +
-// memory-unload-worker since the last weekly report). Returns entries + a clear() to wipe it
-// AFTER the report is sent (so each action is reported exactly once — at-most-once delivery).
-function readLedger() {
-  try {
-    const arr = JSON.parse(fs.readFileSync(LEDGER, 'utf8'));
-    return Array.isArray(arr) ? arr : [];
-  } catch { return []; }
-}
-function clearLedger() { try { fs.unlinkSync(LEDGER); } catch {} }
+// Ledger I/O moved to hooks/shared/ledger.js (upsert+lock). readLedger/clearLedger imported.
+// The weekly report partitions entries by `kind`: 'acted' (efferent §9, cleared after a
+// confirmed TG send — at-most-once) vs 'detected' (afferent §10, PERSISTS until the producing
+// hook stops re-detecting it; a stale-sweep ages out resolved ones — see the clear call below).
 
 function checkGeminiTrio() {
   const trio = ['gemini-mega-context.md', 'gemini-multimodal.md', 'gemini-utility.md'];
@@ -418,36 +412,69 @@ function composeReport(r, registry) {
     }),
     '',
     '## 9. Autonomous actions taken (efferent loop)',
-    r.ledger.length
-      ? r.ledger.map(e => {
-          if (e.action === 'memory-collapse')
-            return `- MEMORY.md collapse "${e.section}" → ${e.dataHome} (${e.saved}B saved) [${(e.ts||'').slice(0,10)}]`;
-          if (e.action === 'auto-consolidate-commit')
-            return `- auto-commit ${e.count} housekeeping file(s) [${(e.ts||'').slice(0,10)}]`;
-          return `- ${e.action} [${(e.ts||'').slice(0,10)}]`;
-        }).join('\n')
+    r.acted.length
+      ? r.acted.map(e => `- ${actedLine(e)} [${(e.lastSeen||e.ts||'').slice(0,10)}]`).join('\n')
       : '_(none since last report)_',
+    '',
+    '## 10. Detected — needs your decision (afferent loop)',
+    r.detected.length
+      ? Object.entries(groupBy(r.detected, e => e.hook || 'unknown'))
+          .map(([hook, items]) =>
+            `**${hook}**\n` + items.map(e => {
+              const sev = e.severity === 'error' ? '🔴' : e.severity === 'warn' ? '🟡' : '⚪';
+              const seen = e.count > 1 ? ` · seen ${e.count}× since ${(e.firstSeen||'').slice(0,10)}` : '';
+              return `- ${sev} ${e.title || e.key}${seen}`;
+            }).join('\n')
+          ).join('\n')
+      : '_(nothing outstanding)_',
     ''
   ].filter(Boolean).join('\n');
 
   return { fm, body, concerns, date };
 }
 
+// Render an 'acted' ledger entry, tolerant of BOTH the new {detail:{}} shape and the legacy
+// flat shape (entries written before the shared-ledger migration may still be in a live file).
+function actedLine(e) {
+  const d = e.detail || e;
+  if (e.action === 'memory-collapse')
+    return `MEMORY.md collapse "${d.section}" → ${d.dataHome} (${d.saved}B saved)`;
+  if (e.action === 'auto-consolidate-commit')
+    return `auto-commit ${d.count} housekeeping file(s)`;
+  return e.title || e.action || e.key || 'autonomous action';
+}
+
+function groupBy(arr, keyFn) {
+  const m = {};
+  for (const x of arr) { const k = keyFn(x); (m[k] = m[k] || []).push(x); }
+  return m;
+}
+
 function digestForTelegram(r, concerns, date) {
   const lines = [`📊 Stack Audit ${date}`];
   // What the system fixed on its own this week (efferent loop) — the user's "report only" ask.
-  if (r.ledger.length) {
+  if (r.acted.length) {
     lines.push('🤖 Автономно сделано:');
-    r.ledger.slice(0, 6).forEach(e => {
-      if (e.action === 'memory-collapse') lines.push(`• MEMORY.md ужата: "${e.section}" (−${e.saved}B)`);
-      else if (e.action === 'auto-consolidate-commit') lines.push(`• авто-коммит ${e.count} housekeeping-файл(ов)`);
-      else lines.push(`• ${e.action}`);
+    r.acted.slice(0, 6).forEach(e => {
+      const d = e.detail || e;
+      if (e.action === 'memory-collapse') lines.push(`• MEMORY.md ужата: "${d.section}" (−${d.saved}B)`);
+      else if (e.action === 'auto-consolidate-commit') lines.push(`• авто-коммит ${d.count} housekeeping-файл(ов)`);
+      else lines.push(`• ${e.title || e.action}`);
+    });
+  }
+  // What the system DETECTED but won't act on autonomously — needs a human decision.
+  if (r.detected.length) {
+    lines.push('🔎 Обнаружено (нужно решение):');
+    r.detected.slice(0, 6).forEach(e => {
+      const sev = e.severity === 'error' ? '🔴' : e.severity === 'warn' ? '🟡' : '⚪';
+      const seen = e.count > 1 ? ` (×${e.count})` : '';
+      lines.push(`• ${sev} ${e.title || e.key}${seen}`);
     });
   }
   if (concerns.length) {
-    lines.push('⚠️ Требует решения:');
+    lines.push('⚠️ Метрики:');
     concerns.slice(0, 5).forEach(c => lines.push(`• ${c}`));
-  } else if (!r.ledger.length) {
+  } else if (!r.acted.length && !r.detected.length) {
     lines.push('No concerns — stack healthy.');
   }
   lines.push(`Vault: 10-Projects/ARKHOS/audits/${date}.md`);
@@ -475,7 +502,9 @@ function digestForTelegram(r, concerns, date) {
     const geminiTrio = checkGeminiTrio();
     const usage = checkUsageTelemetry(telemetry, registry);
     const ledger = readLedger();
-    const results = { transcript, stale, dedup, memory, geminiTrio, usage, ledger };
+    const acted = ledger.filter(e => e.kind !== 'detected');     // legacy entries (no kind) = acted
+    const detected = ledger.filter(e => e.kind === 'detected');
+    const results = { transcript, stale, dedup, memory, geminiTrio, usage, ledger, acted, detected };
     const { fm, body, concerns, date } = composeReport(results, registry);
     const md = fm + body;
     const auditPath = path.join(AUDIT_DIR, `${date}.md`);
@@ -495,11 +524,23 @@ function digestForTelegram(r, concerns, date) {
       auditPath: auditPath.replace(/\\/g, '/'),
       date, concerns,
     }), 'utf8');
-    // Clear the ledger ONLY after a confirmed TG send (at-most-once delivery — never drop an
-    // autonomous-action report because the send failed; it rolls into next week's digest).
+    // Partitioned clear, ONLY after a confirmed TG send (at-most-once — never drop the report
+    // because the send failed; it rolls into next week's digest):
+    //   • 'acted'    → an event reported once, then cleared.
+    //   • 'detected' → a STANDING condition; keep so it keeps surfacing (with growing count)
+    //                  until the producing hook stops re-detecting it. A stale-sweep ages out
+    //                  resolved ones: a detected entry not re-seen within RESOLVED_DAYS (2× the
+    //                  7d audit cycle — the slowest producer cadence) is treated as fixed.
+    // Law 3 boundary: if the send fails we do NOT clear (preserve the report). The sweep runs
+    // only on the success path, so a failed send never silently evicts a detected entry either.
+    const RESOLVED_DAYS = 14;
     let tgSent = false;
     try { await sendTelegram(TG_CHAT, digestForTelegram(results, concerns, date)); tgSent = true; } catch {}
-    if (tgSent && results.ledger.length) clearLedger();
+    if (tgSent && results.ledger.length) {
+      const cutoff = Date.now() - RESOLVED_DAYS * 86400_000;
+      // keep == true → retain: only detected entries still fresh enough to be unresolved
+      clearLedger(e => e.kind === 'detected' && new Date(e.lastSeen || e.ts || 0).getTime() >= cutoff);
+    }
 
     saveTelemetry(telemetry);
     saveState({ ...state, lastRun: now });

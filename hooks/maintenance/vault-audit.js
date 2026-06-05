@@ -15,6 +15,7 @@
 const fs = require('fs');
 const path = require('path');
 const { CLAUDE_DIR, VAULT_DIR } = require('../shared/paths');
+const { appendLedger } = require('../shared/ledger');
 
 const INTERVAL_DAYS = 1;
 const STATE_FILE = path.join(CLAUDE_DIR, 'hooks', 'maintenance', '.vault-audit-state.json');
@@ -184,12 +185,26 @@ const graphReport = analyzeGraphHealth(files);
 const orphanProjects = graphReport.filter(p => p.connections < 2);
 if (orphanProjects.length > 0) {
   output.push(`> ⚠ **Orphan projects**: ${orphanProjects.map(p => `${p.name} (${p.connections} connections)`).join(', ')}`);
+  // DETECT-ONLY: linking projects is a content judgment (A2). Key per project name → upsert.
+  for (const p of orphanProjects) {
+    appendLedger({
+      key: `vault-audit:orphan:${p.name}`, hook: 'vault-audit', kind: 'detected', severity: 'info',
+      title: `Orphan project: ${p.name} (${p.connections} connections)`,
+      detail: { name: p.name, connections: p.connections, target: 'vault-content' },
+    });
+  }
 }
 
 // 3. Broken links (just count, don't list all)
 const broken = detectBrokenLinks(files);
 if (broken.length > 20) {
   output.push(`> ⚠ **${broken.length} broken wikilinks** in vault — run \`node ObsidianVault/90-System/scripts/vault-audit.js\` for details`);
+  // Single rolled-up detected entry (count fluctuates → one stable key, not one per link).
+  appendLedger({
+    key: 'vault-audit:brokenlinks', hook: 'vault-audit', kind: 'detected', severity: 'warn',
+    title: `${broken.length} broken wikilinks in vault`,
+    detail: { count: broken.length, target: 'vault-content' },
+  });
 }
 
 // 3.5. Stack health — verify hook files referenced in settings.json exist
@@ -218,6 +233,15 @@ function checkStackHealth() {
 const missingStack = checkStackHealth();
 if (missingStack.length > 0) {
   output.push(`> 🚨 **Stack health**: missing ${missingStack.length} referenced file(s): ${missingStack.join(', ')}`);
+  // DETECT-ONLY: a referenced hook is gone — could be intentional deletion OR breakage. Never
+  // auto-restore (would resurrect deleted code). Key per missing file → upsert.
+  for (const f of missingStack) {
+    appendLedger({
+      key: `vault-audit:stack:${f}`, hook: 'vault-audit', kind: 'detected', severity: 'error',
+      title: `Referenced file missing: ${f}`,
+      detail: { file: f, target: 'config' },
+    });
+  }
 }
 
 // 4. Auto-triage inbox files — classify, archive low-value, report high-value

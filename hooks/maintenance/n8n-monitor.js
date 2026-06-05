@@ -14,6 +14,7 @@ const path = require('path');
 const https = require('https');
 const { CLAUDE_DIR } = require('../shared/paths');
 const { sendTelegram } = require('../shared/obsidian-api');
+const { appendLedger } = require('../shared/ledger');
 
 const INTERVAL_HOURS = 1;
 const WINDOW_HOURS = 24;
@@ -175,6 +176,20 @@ async function run() {
   const suppressNote = suppressed > 0 ? `\n\n(${suppressed} duplicate root cause suppressed)` : '';
   const msg = `⚠️ n8n failures (${fresh.length} new, last ${WINDOW_HOURS}h)\n\n${lines}${suppressNote}`;
   console.log(`[N8N-MONITOR] ${fresh.length} new failure(s) in ${Object.keys(groups).length} workflow(s)${suppressed ? `, ${suppressed} dup suppressed` : ''}`);
+
+  // Immediate TG stays — n8n failures are time-sensitive (A3). The bus ALSO records them so the
+  // weekly unified report recaps them; DETECT-ONLY (fixing a remote WF is an external side-effect
+  // needing a human gate — A3/A5). Key on workflowId → re-failures upsert, not duplicate.
+  for (const [id, g] of Object.entries(groups)) {
+    appendLedger({
+      key: `n8n-monitor:${id}`,
+      hook: 'n8n-monitor',
+      kind: 'detected',
+      severity: 'error',
+      title: `n8n WF failing: ${g.name} ×${g.count} (last ${g.lastHHMM} UTC)`,
+      detail: { workflowId: id, count: g.count, lastTime: g.lastTime, target: 'remote-n8n' },
+    });
+  }
 
   try { await sendTelegram(TG_CHAT, msg); } catch {}
 
