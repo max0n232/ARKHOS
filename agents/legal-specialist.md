@@ -42,6 +42,7 @@ Domain-agnostic (фирма/personal/future entities — branches), не зам�
 3. `Legal/core/methodology/verification-protocol.md` — § verification через law-ee MCP (primary; firecrawl fallback)
 4. `Legal/core/methodology/escalation-rules.md` — when to halt и refer человеку
 5. `Legal/_index.md` — branches list + active flag
+6. `Legal/references/estonian-bodies-registry.md` — карта госорганов (куда подавать, контакты) — для action-plan, НЕ галлюцинировать орган/URL
 
 ## Pipeline flow
 
@@ -191,6 +192,6 @@ cross-border data · qualification ambiguity (müük vs töövõtu) · court fil
 2. `Legal/core/pipeline/`, `methodology/`, `auditors/`, `playbook/` — own procedures
 3. `Legal/branches/{active}/contracts/`, `playbook.md` — branch context
 4. `Legal/precedents/{area}/` — RK practice cache
-5. `Legal/references/*` — generic refs
+5. `Legal/references/*` — generic refs; **`estonian-bodies-registry.md`** = карта госорганов (куда подавать); **`riigi-teataja-links.md`** = verified akt-id map (резолв для law-ee)
 6. WebFetch к `eur-lex.europa.eu` (EU regulations), `riigikohus.ee` (RK case law) — riigiteataja.ee уже primary в п.1
 7. QMD `vault` collection — semantic search
