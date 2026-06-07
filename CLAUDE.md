@@ -68,7 +68,7 @@ Path: `C:/Users/sorte/ObsidianVault` (PARA). Доступ → skill `obsidian-ro
 
 ## Session Audit
 
-Автомат: `hooks/pre-compact/session-audit.js` извлекает facts/errors/patterns → MEMORY.md + vault. Ghost перехватывает decisions/mistakes/knowledge.
+Автомат: `hooks/pre-compact/session-audit.js` извлекает errors/patterns → vault. Facts больше НЕ авто-пишутся в persistent-память (canon A2: LLM-факт из сессии = writeback без инструкции юзера; убрано 2026-06-07) — показываются в эфемерном AUDIT-отчёте, в `project-facts.md` заносятся вручную/по инструкции. Ghost перехватывает decisions/mistakes/knowledge.
 
 Ручное: создан/изменён компонент инфры (VPS service, hook, n8n, MCP, bot) → `10-Projects/ARKHOS/components/{name}.md` (см. `components-registry.md`).
 
@@ -80,7 +80,7 @@ Path: `C:/Users/sorte/ObsidianVault` (PARA). Доступ → skill `obsidian-ro
 |------------|-----------|--------|
 | Поведенческое правило (always-on) | **auto-memory** `feedback_*.md` | Заряжен в каждый context — критичные safety/quality rules |
 | Чеклист / процедура (вызывается) | **Существующий Skill** | Расширяй, не создавай новый |
-| Факт (live ID/config/API) | **MEMORY.md index one-liner** + детали в `references/project-facts.md` | session-audit hook автоматически append'ит детали туда; MEMORY.md остаётся индексом ≤200 строк |
+| Факт (live ID/config/API) | **MEMORY.md index one-liner** + детали в `references/project-facts.md` | заносится ВРУЧНУЮ/по инструкции юзера (canon A2 — авто-аппенд убран 2026-06-07); MEMORY.md остаётся индексом ≤200 строк |
 | Анализ инцидента | **logs/post-mortem/** | Историческая справка |
 | Правило для hook/script | **patterns/** | Hook читает программно |
 | Reference material / project knowledge | **Obsidian vault** (MCP: obsidian) | Searchable on-demand, saves tokens |

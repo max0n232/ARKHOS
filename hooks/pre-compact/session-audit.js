@@ -429,30 +429,10 @@ function scrubSecretValue(value) {
         .replace(SECRET_PREFIX_RE, '⟨SECRET-prefix-redacted→credentials/⟩');
 }
 
-// Append facts to references/project-facts.md under a dated section.
-// Never touches MEMORY.md — prevents index bloat past 200-line cap.
-function appendNicheFacts(filePath, facts, today) {
-    if (!facts?.length) return;
-    let content = '';
-    try { content = fs.readFileSync(filePath, 'utf8'); } catch {}
-    // Match the file's existing EOL so a heal (which preserves CRLF) + this append don't mix EOLs.
-    const eol = content.includes('\r\n') ? '\r\n' : '\n';
-    const SECTION = `## Niche Project Facts (moved from MEMORY.md 2026-04-23)`;
-    const needSection = !content.includes(SECTION);
-    const sectionHeader = needSection ? `${eol}${eol}${SECTION}${eol}${eol}` : '';
-    const auto = `${eol}<!-- auto-appended ${today} -->${eol}`;
-    // Dedup: skip values already present in the file
-    const normalized = content.toLowerCase();
-    const toAppend = facts.filter(f => !normalized.includes(String(f.value).trim().toLowerCase().slice(0, 60)));
-    if (!toAppend.length) return;
-    // Provenance: these are LLM-extracted from the session transcript, NOT user-confirmed.
-    // The old `verified:` token was a mislabel — nothing in this pipeline verifies a fact.
-    // `auto:` + `src:session-llm` tells a future reader (human or LLM) this is unverified.
-    const appendBlock = sectionHeader + auto + toAppend.map(f => `- ${scrubSecretValue(f.value)} <!-- fact:${String(f.key).slice(0,40)} auto:${today} src:session-llm unverified -->`).join(eol) + eol;
-    try { fs.appendFileSync(filePath, appendBlock, 'utf8'); } catch (e) {
-        console.error(`Session audit: niche append failed — ${e.message}`);
-    }
-}
+// REMOVED 2026-06-07 (canon A2): appendNicheFacts auto-wrote LLM-extracted session facts into
+// references/project-facts.md — persistent writeback without a user instruction, the exact A2 trap.
+// Facts now live only in the ephemeral AUDIT report. New facts enter project-facts.md by hand /
+// direct user instruction. selfHealFragmentFacts drains the bullets this used to write.
 
 // Self-heal: vacuum already-accumulated fragment-facts from project-facts.md on each run.
 // Established vault pattern ("self-healing hooks" — clean existing junk, not just filter new).
@@ -481,11 +461,12 @@ function selfHealFragmentFacts(filePath) {
         const value = (bulletStart >= 0 ? line.slice(bulletStart + 2, m.index) : '').trim();
         if (value.startsWith('⟨SECRET')) { out.push(line); continue; } // CARVE-OUT: keep redaction record
         if (!value) { out.push(line); continue; }                       // malformed → never drop
-        if (isFragmentFact({ key: m[1], value })) {            // SAME predicate as new-fact path
-            droppedIdx.add(i); vacuumed++;                     // drop (do not push)
-        } else {
-            out.push(line);
-        }
+        // DESIGN 2026-06-07 (canon A2): session-llm facts are persistent writeback WITHOUT a user
+        // instruction — they should never have been auto-appended. We removed the writer
+        // (appendNicheFacts). This heal now vacuums EVERY `src:session-llm unverified` bullet
+        // unconditionally (⟨SECRET⟩ carve-out above is the only keep), draining the 136 already
+        // accumulated. Becomes a no-op once the file is clean (idempotent, canon §4).
+        droppedIdx.add(i); vacuumed++;                     // drop (do not push)
     }
     if (vacuumed === 0) return; // idempotent: nothing matched → no write, no backup
 
@@ -699,20 +680,19 @@ Rules:
     // Self-heal BEFORE append: vacuum accumulated fragment-facts inside this run (no manual-edit
     // race). Runs every session regardless of whether new facts were extracted.
     selfHealFragmentFacts(REFERENCES_FILE);
+    // DESIGN 2026-06-07 (canon A2): facts are NO LONGER auto-appended to project-facts.md.
+    // LLM-extracted facts from session content are persistent writeback WITHOUT a user instruction
+    // — A2 names this file as the trap. Facts now survive ONLY in this run's ephemeral AUDIT report
+    // (below), never in always-loaded persistent memory. New facts enter project-facts.md by hand or
+    // direct user instruction (CLAUDE.md Knowledge Routing: "Факт = live ID/config/API"). The junk/
+    // fragment filters are kept solely to keep the ephemeral report readable; they no longer gate a
+    // file write. selfHealFragmentFacts (above) drains the 136 already accumulated.
     let cleanFacts = [];
     if (extracted.facts?.length) {
         const verifiedFacts = extracted.facts.filter(f => !f.confidence || f.confidence !== 'low');
         const afterJunk = verifiedFacts.filter(f => !isJunkFact(f) && !isMetaRecursion(`${f.key} ${f.value}`));
-        const droppedJunk = verifiedFacts.length - afterJunk.length;
-        if (droppedJunk > 0) console.error(`Session audit: filtered ${droppedJunk} junk fact(s)`);
         cleanFacts = afterJunk.filter(f => !isFragmentFact(f));
-        const droppedFrag = afterJunk.length - cleanFacts.length;
-        if (droppedFrag > 0) console.error(`Session audit: filtered ${droppedFrag} fragment fact(s)`);
-        if (cleanFacts.length) {
-            appendNicheFacts(REFERENCES_FILE, cleanFacts, today);
-            console.error(`Session audit: routed ${cleanFacts.length} fact(s) → references/project-facts.md`);
-        }
-        counts.facts = cleanFacts.length;
+        counts.facts = cleanFacts.length; // report-only count; nothing written to file
     }
     extracted.facts = cleanFacts;
 
@@ -746,7 +726,7 @@ Rules:
         counts.errors && `errors(${counts.errors})`,
         counts.patterns && `patterns(${counts.patterns})`
     ].filter(Boolean).join(' ');
-    const factsSummary = counts.facts ? `project-facts.md: facts(${counts.facts})` : '';
+    const factsSummary = counts.facts ? `facts(${counts.facts}) shown above — NOT persisted (canon A2; add by hand if needed)` : '';
     parts.push('');
     parts.push(`  → vault: ${vaultSummary || 'none'} | ${factsSummary || 'no facts'}`);
     if (newAutoMemFilesPost?.length) {
