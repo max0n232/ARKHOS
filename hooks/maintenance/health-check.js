@@ -25,6 +25,50 @@ const INTERVAL_HOURS = 6;
 const STATE_FILE = path.join(CLAUDE_DIR, 'hooks', 'maintenance', '.health-check-state.json');
 const HOOKS_DIR = path.join(CLAUDE_DIR, 'hooks');
 
+// CLI tools invoked from hooks. A tool can break silently when its package manager
+// upgrades and regenerates a broken bin-shim (2026-06-07: bun upgrade corrupted ghost's
+// PE shim → 'No such file or directory', undetected for an unknown period because nothing
+// probed the tool). Each probe runs the tool and matches expected output.
+//
+// Probes use the LAUNCHER form (bash + full path to the package entry script), NOT the
+// command form (`ghost`/`qmd` via PATH). Reason: the command form resolves differently
+// across environments (interactive bash vs Node execSync vs cmd) and the bin-shim itself
+// is the fragile part that breaks on package-manager upgrade. The launcher form is exactly
+// how the settings.json hooks call these tools, so a green probe means the hooks work.
+// expect = regex the trimmed stdout must match.
+const BUN_BIN = path.join(CLAUDE_DIR, '..', '.bun', 'bin', 'bun.exe').replace(/\\/g, '/');
+const GHOST_LAUNCHER = path.join(CLAUDE_DIR, '..', '.bun', 'install', 'global', 'node_modules', 'ghost', 'ghost')
+  .replace(/\\/g, '/');
+const QMD_LAUNCHER = path.join(CLAUDE_DIR, '..', 'AppData', 'Roaming', 'npm', 'node_modules', '@tobilu', 'qmd', 'bin', 'qmd')
+  .replace(/\\/g, '/');
+// Absolute paths, not PATH command-form: a probe must test the tool the way hooks reach it,
+// and command-form resolution varies across shells (the 2026-06-07 false-alert lesson).
+const CLI_PROBES = [
+  { name: 'bun', cmd: `"${BUN_BIN}" --version`, expect: /^\d+\.\d+/ },
+  { name: 'ghost', cmd: `bash "${GHOST_LAUNCHER}" --version`, expect: /^\d+\.\d+/ },
+  { name: 'qmd', cmd: `bash "${QMD_LAUNCHER}" status`, expect: /files indexed|QMD Status/i },
+];
+
+// Run a probe with one retry on failure. Windows file ops hit TRANSIENT EPERM/EBUSY when a
+// file is briefly locked (antivirus scan, search indexer, a package-manager postinstall still
+// settling — e.g. right after `bun add`). Codex caught a transient EPERM on zod/v4 during review
+// that vanished seconds later. A single retry with a short pause distinguishes a real dead tool
+// (fails twice) from a momentary lock (passes on retry), preventing flaky Telegram alerts.
+function probeCli(cmd, expect) {
+  let lastErr;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const out = execSync(cmd, { encoding: 'utf8', timeout: 10000, stdio: ['ignore', 'pipe', 'pipe'] }).trim();
+      if (!expect.test(out)) throw new Error(`unexpected output: ${out.slice(0, 60)}`);
+      return true;
+    } catch (e) {
+      lastErr = e;
+      if (attempt === 0) execSync('node -e "setTimeout(()=>{},800)"', { timeout: 2000, stdio: 'ignore' });
+    }
+  }
+  throw lastErr;
+}
+
 function loadState() {
   try { return JSON.parse(fs.readFileSync(STATE_FILE, 'utf8')); }
   catch { return { lastRun: 0 }; }
@@ -140,6 +184,12 @@ check('.claude size <2GB', () => {
   const bytes = parseInt(out, 10);
   return Number.isFinite(bytes) && bytes < 2 * 1024 * 1024 * 1024;
 });
+
+// 10. CLI tools reachable — invoke each as hooks invoke it, match expected output.
+// Catches silent shim/path breakage (bun/npm upgrade regenerating a broken bin-shim).
+for (const probe of CLI_PROBES) {
+  check(`CLI: ${probe.name}`, () => probeCli(probe.cmd, probe.expect));
+}
 
 // Persist run timestamp regardless
 saveState({ lastRun: now });
