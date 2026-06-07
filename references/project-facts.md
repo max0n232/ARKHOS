@@ -1623,3 +1623,17 @@ Anthropic API key ротирован (старый `sk-ant-...sbgwcx87` утёк
 
 <!-- auto-appended 2026-06-07 -->
 - текст эстонских законов через официальный REST API Riigi Teataja <!-- fact:mcp_law_ee_description auto:2026-06-07 src:session-llm unverified -->
+
+<!-- auto-appended 2026-06-07 -->
+- business/, civil/, expanded references/, and matter #1 now includes review_perspectives/ A-D + dissent_log.md <!-- fact:legal_department_directory_structure_add auto:2026-06-07 src:session-llm unverified -->
+
+<!-- auto-appended 2026-06-07 -->
+- max0n232/obsidian-vault на GitHub <!-- fact:obsidian_vault_git_remote auto:2026-06-07 src:session-llm unverified -->
+- коммит 008abea, 89 коммитов от HEAD, затрагивает только backlog-manual.md <!-- fact:gemini_key_leaked_commit auto:2026-06-07 src:session-llm unverified -->
+- e1e4d (мёртвый, активный заканчивается на 625e7) <!-- fact:openrouter_leaked_key_suffix auto:2026-06-07 src:session-llm unverified -->
+
+<!-- auto-appended 2026-06-07 -->
+- refs/remotes/origin/master (= 1be2583) <!-- fact:git_remote_tracking_ref_before_force_pus auto:2026-06-07 src:session-llm unverified -->
+
+<!-- manual 2026-06-07 -->
+- ✅ ЗАКРЫТО: Gemini-ключ ротирован (новый `AQ.Ab8…G8g`, старый revoked), VPS .env обновлён, история переписана (filter-branch) + force-push (`1be2583→b57ae22`), новый pre-commit secret-guard. OpenRouter-ключ был мёртв. Детали: [[project_vault_secret_leak_20260607]] <!-- fact:vault_secret_leak_20260607_resolved manual:2026-06-07 src:session verified -->
