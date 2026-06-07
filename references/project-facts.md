@@ -1476,3 +1476,150 @@ Anthropic API key ротирован (старый `sk-ant-...sbgwcx87` утёк
 
 <!-- auto-appended 2026-06-04 -->
 - 4 ссылки (строки 147, 183, 789, 803) и 1 определение (строка 82) <!-- fact:ek_showcase_l_kitchen_catalog_references auto:2026-06-04 src:session-llm unverified -->
+
+<!-- auto-appended 2026-06-04 -->
+- BLEND1#1 instance: добавлен `- parent!d106` → Y сдвинут с [-629,-570] на [-632,-573], боковая бленда в одной плоскости с фасадом (Y=-632). <!-- fact:bg1_blend1_d106_fix_description auto:2026-06-04 src:session-llm unverified -->
+
+<!-- auto-appended 2026-06-04 -->
+- изменен с `:req` на `:opt` (строка 430: `at_mm = nil`) <!-- fact:ek_kitchen_rb_step_module_at_mm_signatur auto:2026-06-04 src:session-llm unverified -->
+
+<!-- auto-appended 2026-06-05 -->
+- Ноль внешних вызовов <!-- fact:ek_showcase_l_kitchen_catalog_callers auto:2026-06-05 src:session-llm unverified -->
+
+<!-- auto-appended 2026-06-05 -->
+- X-arm modules yaxis=[1,0,0] <!-- fact:bg1_corner_orientation_convention_x_arm auto:2026-06-05 src:session-llm unverified -->
+- Y-arm modules yaxis=[0,-1,0] <!-- fact:bg1_corner_orientation_convention_y_arm auto:2026-06-05 src:session-llm unverified -->
+- Отсутствует проброс `_d106_formula` и `x202` в def MAINFRAME#7. <!-- fact:bg1_6_mainframe_d106_x202_propagation auto:2026-06-05 src:session-llm unverified -->
+- Отсутствует проброс `_d106_formula` и `x202` в def MAINFRAME#8. <!-- fact:bg1_8_mainframe_d106_x202_propagation auto:2026-06-05 src:session-llm unverified -->
+
+<!-- auto-appended 2026-06-05 -->
+- отсутствует, ek_socket.rb определяет mm2in сам и не ссылается на EkRealCompose <!-- fact:ek_socket_rb_ek_real_compose_dependency auto:2026-06-05 src:session-llm unverified -->
+- изменен с :req на :opt <!-- fact:ek_kitchen_rb_step_module_at_mm_signatur auto:2026-06-05 src:session-llm unverified -->
+
+<!-- auto-appended 2026-06-05 -->
+- BG1.skp (полка-реверс), BG1_LL.skp (механизм левый), BG1_RL.skp (механизм правый) <!-- fact:fres_corner_modules auto:2026-06-05 src:session-llm unverified -->
+- BG1_G.skp (полка-реверс), BG1_RL_G.skp (механизм правый) <!-- fact:gola_corner_modules auto:2026-06-05 src:session-llm unverified -->
+
+<!-- auto-appended 2026-06-05 -->
+- прямое по абсолютным путям через *_PATHS Hashes <!-- fact:ek_showcase_l_kitchen_rb_module_loading_ auto:2026-06-05 src:session-llm unverified -->
+- читается showcase'ом, сохранена <!-- fact:ek_root_constant_usage auto:2026-06-05 src:session-llm unverified -->
+
+<!-- auto-appended 2026-06-05 -->
+- parent!z102-CHOOSE(parent!y102,0,parent!y103*2) <!-- fact:blend_y_formula_canonical auto:2026-06-05 src:session-llm unverified -->
+
+<!-- auto-appended 2026-06-05 -->
+- CHOOSE(a102, parent!z102 − CHOOSE(parent!y102,0,parent!y103*2), CURRENT("Y")*2.54) <!-- fact:y_formula_applied auto:2026-06-05 src:session-llm unverified -->
+
+<!-- auto-appended 2026-06-05 -->
+- parent!z103+CHOOSE(b108,0,LenY) <!-- fact:blende_z_formula auto:2026-06-05 src:session-llm unverified -->
+
+<!-- auto-appended 2026-06-06 -->
+- не двигает геометрию без _lenz_formula или scaling-драйвера <!-- fact:axe_position_lenz_attribute_effect auto:2026-06-06 src:session-llm unverified -->
+
+<!-- auto-appended 2026-06-06 -->
+- [0..1242, 0..670, 0..862] <!-- fact:mainframe_bbox auto:2026-06-06 src:session-llm unverified -->
+- parent!z201-parent!k143-parent!x203 <!-- fact:bind_front_lenx_formula auto:2026-06-06 src:session-llm unverified -->
+
+<!-- auto-appended 2026-06-06 -->
+- `parent!z201-parent!k143-parent!x203` <!-- fact:bind_front_formula_old auto:2026-06-06 src:session-llm unverified -->
+- `k143 + d106 + d101 + k146` <!-- fact:bind_front_formula_new auto:2026-06-06 src:session-llm unverified -->
+
+<!-- auto-appended 2026-06-06 -->
+- parent!k143+parent!d106+parent!d101+parent!k146 <!-- fact:bind_front_formula auto:2026-06-06 src:session-llm unverified -->
+
+<!-- auto-appended 2026-06-06 -->
+- Добавлены `business/`, `civil/`, расширенные `references/`, и в matter #1 `review_perspectives/` A-D + `dissent_log.md`. <!-- fact:legal_vault_structure_updates auto:2026-06-06 src:session-llm unverified -->
+- Создан `precedents/_index.md` (MOC) и 6 area-заглушек. <!-- fact:precedents_moc_files_created auto:2026-06-06 src:session-llm unverified -->
+- Недоступен в текущей сессии. <!-- fact:mcp_estonian_law_availability auto:2026-06-06 src:session-llm unverified -->
+
+<!-- auto-appended 2026-06-06 -->
+- `parent!k143+parent!d106+parent!d101+parent!k146` <!-- fact:module_bg1_7_bind_front_formula auto:2026-06-06 src:session-llm unverified -->
+- k143=570, d106=3, d101=19, k146=50 <!-- fact:module_bg1_7_bind_front_formula_terms auto:2026-06-06 src:session-llm unverified -->
+- `if(l8_axe_203_lenx_fix=0, LenX, l8_axe_203_lenx_fix)` <!-- fact:mechanism_magic_corner_right_var_l0_lenx auto:2026-06-06 src:session-llm unverified -->
+- `if(x104=0, LenX-x102-x103, x104)` <!-- fact:module_z201_formula auto:2026-06-06 src:session-llm unverified -->
+
+<!-- auto-appended 2026-06-06 -->
+- Волшебный уголок правый <!-- fact:module_bg1_7_mechanism_type auto:2026-06-06 src:session-llm unverified -->
+
+<!-- auto-appended 2026-06-06 -->
+- `resolveSnippets` парсит `{{snippet:id@ver}}` и склеивает body, игнорируя frontmatter сниппетов <!-- fact:renderer_snippet_parsing_mechanism auto:2026-06-06 src:session-llm unverified -->
+
+<!-- auto-appended 2026-06-06 -->
+- driver-атрибут длины для axe-механизмов <!-- fact:mechanism_l8_axe_203_lenx_fix_driver_att auto:2026-06-06 src:session-llm unverified -->
+
+<!-- auto-appended 2026-06-06 -->
+- примыкает к правой боковине, на дне <!-- fact:module_bg1_7_mechanism_position auto:2026-06-06 src:session-llm unverified -->
+
+<!-- auto-appended 2026-06-06 -->
+- business/, civil/, references/ <!-- fact:legal_department_subdirectories_added auto:2026-06-06 src:session-llm unverified -->
+- review_perspectives/ A-D, dissent_log.md <!-- fact:matter_1_subdirectories_added auto:2026-06-06 src:session-llm unverified -->
+
+<!-- auto-appended 2026-06-06 -->
+- ek_kitchen.rb (не ek_compose_core.rb). <!-- fact:ek_kitchen_step_api_location auto:2026-06-06 src:session-llm unverified -->
+- Строит east-стену только если spec[:east_wall_mm] задан. <!-- fact:step_walls_east_wall_condition auto:2026-06-06 src:session-llm unverified -->
+- {nw:90, ne:0, se:270, sw:180}. <!-- fact:corner_rotation_bg1_values auto:2026-06-06 src:session-llm unverified -->
+- {x_max:east_x, y_max:0}. <!-- fact:place_l_corner_ne_anchor auto:2026-06-06 src:session-llm unverified -->
+- {x_max:east_x, y_min:south_y}. <!-- fact:place_l_corner_se_anchor auto:2026-06-06 src:session-llm unverified -->
+- {x_min:0, y_min:south_y}. <!-- fact:place_l_corner_sw_anchor auto:2026-06-06 src:session-llm unverified -->
+- X=632 (плоскость), Y[-1200..-568]. <!-- fact:nw_corner_bind_front_world_axis auto:2026-06-06 src:session-llm unverified -->
+- -1200 (bbox min.y длинного плеча). <!-- fact:nw_corner_bind_front_world_y_mm_helper_v auto:2026-06-06 src:session-llm unverified -->
+- Custom Shablony = primary source, Default = fallback только для отсутствующих ключей (BA/BF3A/BG2/TA). <!-- fact:registry_module_source_priority auto:2026-06-06 src:session-llm unverified -->
+- lowers/panels/pencils (Нижние/Fres/ vs Нижние/Gola/); uppers + countertops — shared (без style). <!-- fact:registry_style_impacted_modules auto:2026-06-06 src:session-llm unverified -->
+- Вызывает Registry.style=. <!-- fact:ek_kitchen_apply_run_style_mechanism auto:2026-06-06 src:session-llm unverified -->
+- BG1_G.skp (для BG1). <!-- fact:shablony_gola_corner_module_key auto:2026-06-06 src:session-llm unverified -->
+
+<!-- auto-appended 2026-06-06 -->
+- north, west, east, south <!-- fact:spawn_module_supported_directions auto:2026-06-06 src:session-llm unverified -->
+- north, west, east, south <!-- fact:step_module_supported_directions auto:2026-06-06 src:session-llm unverified -->
+
+<!-- auto-appended 2026-06-06 -->
+- nw:90° ne:0° se:270° sw:180° <!-- fact:corner_rotation_table_bg1_family auto:2026-06-06 src:session-llm unverified -->
+
+<!-- auto-appended 2026-06-06 -->
+- OAuth 2.1 (dynamic-client-registration) <!-- fact:mcp_new_endpoint_auth_type auto:2026-06-06 src:session-llm unverified -->
+- 🇪🇪 Estonia — 1.6K laws, в категории Baltics (Tier B/C) <!-- fact:mcp_new_endpoint_estonian_law_coverage auto:2026-06-06 src:session-llm unverified -->
+
+<!-- auto-appended 2026-06-06 -->
+- riigiteataja.ee (WebFetch) <!-- fact:primary_verification_source auto:2026-06-06 src:session-llm unverified -->
+
+<!-- auto-appended 2026-06-06 -->
+- Прямая загрузка по абсолютным путям через `*_PATHS` Hashes (Shablony Gola варианты, ASCII 8.3 пути), не использует `EkRealCompose` CATALOG/place/load_module. <!-- fact:ek_showcase_l_kitchen_module_loading_met auto:2026-06-06 src:session-llm unverified -->
+
+<!-- auto-appended 2026-06-06 -->
+- X[0..5000] Y[−4400..0] <!-- fact:room_dimensions auto:2026-06-06 src:session-llm unverified -->
+
+<!-- auto-appended 2026-06-06 -->
+- [codex-reviewed: ...] <!-- fact:commit_marker auto:2026-06-06 src:session-llm unverified -->
+
+<!-- auto-appended 2026-06-06 -->
+- legal lepingu (только договоры) <!-- fact:causal_rule_trigger_old auto:2026-06-06 src:session-llm unverified -->
+- legal lepingu ИЛИ юр.спор/инцидент-разбор=consultation <!-- fact:causal_rule_trigger_new auto:2026-06-06 src:session-llm unverified -->
+
+<!-- auto-appended 2026-06-06 -->
+- BD / BG / BJ / BB / BA / BF <!-- fact:cabinet_classes_lower_row auto:2026-06-06 src:session-llm unverified -->
+- BACK_Y=670 needs-per-def for modules with depth ≠ 670 <!-- fact:optimization_plan_back_y_constraint auto:2026-06-06 src:session-llm unverified -->
+- X=[0,600] Y=[-1,670] Z=[0,8 <!-- fact:bd1_def_geometry auto:2026-06-06 src:session-llm unverified -->
+- BB1, BC, BD1, BD2, BA <!-- fact:registered_straight_lower_keys auto:2026-06-06 src:session-llm unverified -->
+- X=[0, 400] Y=[0, 670] Z=[0, 862], BACK_Y=670 <!-- fact:bb1_geometry auto:2026-06-06 src:session-llm unverified -->
+- X=[0, 600] Y=[-1, 670] Z=[0, 863], BACK_Y=670 <!-- fact:bc_geometry auto:2026-06-06 src:session-llm unverified -->
+- X=[0, 400] Y=[0, 650] Z=[0, 82], BACK_Y=650 <!-- fact:ba_geometry auto:2026-06-06 src:session-llm unverified -->
+
+<!-- auto-appended 2026-06-07 -->
+- [sink cooktop hood oven fridge dishwasher microwave] <!-- fact:mandatory_appliances_list auto:2026-06-07 src:session-llm unverified -->
+- BI → dishwasher_module, BD1/BD1_M → sink_base, BD3 → cooktop_base_when_oven_in_pencil, PD1_6 → oven_pencil <!-- fact:appliance_role_map auto:2026-06-07 src:session-llm unverified -->
+- sink_base (BD1), cooktop_base (BC/BCDD), dishwasher (BI/BIA), oven_pencil (PD1) <!-- fact:authoritative_role_symbols auto:2026-06-07 src:session-llm unverified -->
+
+<!-- auto-appended 2026-06-07 -->
+- Появились `business/`, `civil/`, расширенные `references/`, и в matter #1 уже есть `review_perspectives/` A-D + `dissent_log.md`. <!-- fact:legal_department_vault_structure_updates auto:2026-06-07 src:session-llm unverified -->
+- Верификация теперь через law-ee MCP (riigiteataja.ee first-source; для законов вне registry — firecrawl, не plain WebFetch). <!-- fact:verification_method_update auto:2026-06-07 src:session-llm unverified -->
+
+<!-- auto-appended 2026-06-07 -->
+- Отсутствует MODULES Hash, вопреки утверждениям design doc §Existing systems. <!-- fact:ek_showcase_l_kitchen_modules_hash_prese auto:2026-06-07 src:session-llm unverified -->
+- BD1 / BD1_M <!-- fact:ek_standards_sink_base_role_key auto:2026-06-07 src:session-llm unverified -->
+- BD3 (when oven in pencil) <!-- fact:ek_standards_cooktop_base_role_key auto:2026-06-07 src:session-llm unverified -->
+- [sink_base, cooktop_base, oven_pencil] <!-- fact:ek_validators_no_duplicate_appliance_mod auto:2026-06-07 src:session-llm unverified -->
+- [sink_base, cooktop_base, oven_pencil, dishwasher] <!-- fact:ek_validators_no_duplicate_appliance_mod auto:2026-06-07 src:session-llm unverified -->
+- :dishwasher <!-- fact:classify_role_emitted_dishwasher_symbol auto:2026-06-07 src:session-llm unverified -->
+
+<!-- auto-appended 2026-06-07 -->
+- текст эстонских законов через официальный REST API Riigi Teataja <!-- fact:mcp_law_ee_description auto:2026-06-07 src:session-llm unverified -->
