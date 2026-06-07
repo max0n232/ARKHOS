@@ -81,6 +81,23 @@ Three sub-tasks:
 - Verify each linked note exists
 - Report broken links
 
+**Stale `СЛЕД:`/next-task Detection (MEMORY.md lifecycle):**
+- `СЛЕД:`/`СЛЕД. ЗАДАЧА`/`next-task` index lines in MEMORY.md have NO auto-lifecycle —
+  a closed task's pointer keeps hanging as if open (confirmed drift 2026-06-07: 2 of 5
+  `СЛЕД:` lines were orphaned — one a literal dup of a `ЗАКРЫТО` line on the same topic-file).
+- For each `СЛЕД:`/next-task index line: judge CLOSED vs OPEN by **git/topic-file evidence,
+  NOT by the word** — read the linked topic-file's status + grep the relevant repo
+  (`~/Desktop/easykitchen` for EK, `~/.claude` for infra) for the commits/feature it names.
+  A line is CLOSED only if its named deliverable is committed AND the topic-file has no
+  surviving "отложено/ЗАДАЧА B/pending" tail.
+- CAUTION (why regex-by-word is wrong): a `СЛЕД:` line may name a DONE core but a topic-file
+  may still hold a legitimate deferred sub-task (e.g. `project_ek_live_build_next` core done
+  but `ЗАДАЧА B: north-свес` still open). Those are NOT orphans — reclassify to `ОТЛОЖЕНО:`,
+  do not delete.
+- Report findings as `index_candidate`-style suggestions (CLOSED → propose delete-or-rewrite-to-
+  `ЗАКРЫТО:`; deferred-tail → propose rewrite-to-`ОТЛОЖЕНО:`). **NEVER auto-edit MEMORY.md**
+  (same boundary as step 6 of distill) — present to user with git evidence per line; user confirms.
+
 ## Pre-Flight (every invocation)
 
 1. Verify Obsidian REST API available. **Use the HTTP port 27123, NOT the HTTPS port 27124** for health-check on this machine:
