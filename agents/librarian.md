@@ -83,7 +83,11 @@ Three sub-tasks:
 
 ## Pre-Flight (every invocation)
 
-1. Verify Obsidian REST API available: `curl -s http://localhost:27124/` — if down, warn user and switch to Read/Grep file access (read-only mode, no vault writes)
+1. Verify Obsidian REST API available. **Use the HTTP port 27123, NOT the HTTPS port 27124** for health-check on this machine:
+   - **`curl -s http://localhost:27123/`** ← primary, works on every curl build. A `200` with `"status":"OK"` means UP.
+   - Do NOT use `http://…:27124` (that's the HTTPS port → `exit 52` empty-reply, NOT "down"). Do NOT use `https://…:27124 -k` on Windows: Git-bundled curl is Schannel-linked and rejects the self-signed cert even with `-k` → `exit 35 SEC_E_NO_CREDENTIALS` (HTTPS+`-k` only works with OpenSSL-linked curl).
+   - Only `Connection refused` on :27123 = genuinely down → warn user, switch to Read/Grep read-only (no vault writes).
+   **If a write/health call fails unexpectedly (exit≠0, non-200): do NOT silently fall back and move on. Record the root cause and surface it in your final report (and, if it will recur, add it to `10-Projects/ARKHOS/backlog-manual.md`).** Silent fallback hides a recurring bug — [[feedback_surface_dont_swallow_errors]] / engineering-canon law 3.
 2. Verify routing-map.md exists at expected path — if missing, ABORT with error
 3. Check troubleshooting file line counts — if >150 lines, suggest distillation first
 4. Stale-files signal — run `node ~/.claude/scripts/vault-stale-report.js 60 10` and surface the top "never read" / "oldest reads" hits in your final report. Do NOT delete or move based on this signal alone — flag for user review only. Skip silently if the script or `patterns/usage-tracker.json` is missing.
@@ -101,7 +105,9 @@ After each operation:
 - NEVER route without reading destination file for dedup first
 - NEVER modify routing-map.md — it is the single source of truth
 - Read routing-map.md BEFORE any routing decision
-- All vault writes via Obsidian MCP tools only (keeps sync)
+- Vault writes — preferred order (this agent has NO `mcp__obsidian__*` tools, only Bash/Edit/Write):
+  1. **REST API via Bash curl on the HTTP port** (keeps Obsidian in-sync): `curl -s -X PATCH http://localhost:27123/vault/<rel-path> -H "Authorization: Bearer <key>" -H "Content-Type: text/markdown" -H "Operation: append" -H "Target-Type: heading" --data-binary @file` — key from `~/.claude.json` → `mcpServers.obsidian.env.OBSIDIAN_API_KEY`. Use port **27123 (HTTP)**, not 27124 (HTTPS fails under Windows Schannel curl — see Pre-Flight). The Bearer header is required (writes return 401 without it).
+  2. **Direct Edit/Write to disk** — acceptable fallback (Obsidian-git reconciles on next open). If you use this because REST failed, you MUST report WHY it failed (see Pre-Flight rule on not swallowing errors).
 - Confirm with user before any cleanup action
 
 ### 4. triage (Inbox Processing)
