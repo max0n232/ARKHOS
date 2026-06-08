@@ -154,6 +154,12 @@
           },
           {
             "type": "command",
+            "command": "node C:/Users/sorte/.claude/hooks/maintenance/facts-staleness-check.js",
+            "timeout": 10,
+            "statusMessage": "Facts staleness check..."
+          },
+          {
+            "type": "command",
             "command": "node C:/Users/sorte/.claude/hooks/maintenance/memory-consolidation.js",
             "timeout": 90,
             "statusMessage": "Memory consolidation..."

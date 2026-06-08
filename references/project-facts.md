@@ -10,7 +10,7 @@ Lookup facts for specific projects. Not always in context.
 - UFW: port 3001 open for 172.19.0.0/24 + 172.22.0.0/24 (docker subnets only)
 - Systemd: `video-service.service` (enabled, restart=always)
 - Stack: youtube-transcript-api (fast) → yt-dlp + Whisper API (fallback)
-- Token: `<redacted-video-token>`
+- Token: see `credentials/video-service.token` (redacted from git 2026-06-08)
 
 ## YouTube Vault Pipeline
 - VPS IP blocked by YouTube → video-service (port 3001) uses Whisper for transcription
@@ -106,7 +106,7 @@ Lookup facts for specific projects. Not always in context.
 - Исправление проблем с агентами и планировщиком задач Windows <!-- fact:git_commit_3714ca6_description verified:2026-05-03 -->
 
 <!-- auto-appended 2026-05-03 -->
-- admin / <redacted-n8n-pass> <!-- fact:n8n_admin_credentials verified:2026-05-03 -->
+- admin / see `credentials/n8n-admin.pass` (redacted from git 2026-06-08) <!-- fact:n8n_admin_credentials verified:2026-05-03 stale_after:30d -->
 
 <!-- auto-appended 2026-05-03 -->
 - Miele KM 6322 PowerFlex <!-- fact:miele_hob_model verified:2026-05-03 -->
@@ -348,7 +348,7 @@ Lookup facts for specific projects. Not always in context.
 - BD1_M (custom Studiokook sink) <!-- fact:canonical_sink_base_module verified:2026-05-07 -->
 
 <!-- auto-appended 2026-05-07 -->
-- VPS auth.json от Apr 30 <!-- fact:codex_oauth_host_2 verified:2026-05-07 -->
+- VPS auth.json от Apr 30 <!-- fact:codex_oauth_host_2 verified:2026-05-07 stale_after:30d -->
 
 <!-- auto-appended 2026-05-07 -->
 - 5 entities + 10 definitions <!-- fact:sketchup_scene_entities verified:2026-05-07 -->
@@ -409,7 +409,7 @@ Lookup facts for specific projects. Not always in context.
 
 <!-- auto-appended 2026-05-09 -->
 - .before-tracer-20260509 <!-- fact:ek_real_compose_backup_file verified:2026-05-09 -->
-- disabled (tracer_enabled = false) <!-- fact:ek_real_compose_tracer_default_state verified:2026-05-09 -->
+- disabled (tracer_enabled = false) <!-- fact:ek_real_compose_tracer_default_state verified:2026-05-09 stale_after:14d -->
 - SKK_TG1_R for NE corner L-kitchen <!-- fact:tg1_canonical_decision verified:2026-05-09 -->
 
 <!-- auto-appended 2026-05-09 -->
@@ -489,7 +489,7 @@ Lookup facts for specific projects. Not always in context.
 - F15 (дубли при пересборе) → F16 (eurocut на пенале) → F13 (стыковка через bind_front) <!-- fact:f15_f16_f13_agent_scope verified:2026-05-09 -->
 - residue>0, defs>2000, defs>5000 <!-- fact:hard_stop_2_residue_check_gates verified:2026-05-09 -->
 - no_duplicate_kitchen_instances, eurocut_only_at_corner, ct_does_not_overlap_panels, appliance_z_origin_check, no_floating_appliances <!-- fact:new_validators_added verified:2026-05-09 -->
-- `custom-l-20260509-185005/custom_l_showcase.skp` открыта. Содержит orphan upper-rows из старых сессий на `Layer0` без `run_id`. <!-- fact:current_scene_state verified:2026-05-09 -->
+- `custom-l-20260509-185005/custom_l_showcase.skp` открыта. Содержит orphan upper-rows из старых сессий на `Layer0` без `run_id`. <!-- fact:current_scene_state verified:2026-05-09 stale_after:14d -->
 
 <!-- auto-appended 2026-05-09 -->
 - `dreaming-2026-04-21` + `managed-agents-2026-04-01` <!-- fact:anthropic_beta_headers verified:2026-05-09 -->
@@ -1365,14 +1365,14 @@ Anthropic API key ротирован (старый `sk-ant-...sbgwcx87` утёк
 
 ## n8n Infrastructure Core (canonical — moved from MEMORY.md 2026-06-03)
 <!-- SSOT for n8n infra. MEMORY.md keeps only a pointer. Verified facts (git/user-confirmed), not session-llm. -->
-- VPS `157.180.33.253`. n8n **2.18.5** (latest stable 2026-04-29, verified 2026-05-03), Docker `n8nio/n8n:2.18.5` pinned, postgres `pgvector/pgvector:pg15` <!-- fact:n8n_version_host verified:2026-05-03 -->
-- Native MCP server (n8n 2.14.0+ GA): `https://n8n.studiokook.ee/mcp-server/http` (streamable HTTP), Bearer token `credentials/n8n-mcp-token.txt` (aud=`mcp-server-api`). v1.1.0, 25 tools (`n8n-native`). WF must be explicitly exposed per WF (default zero). Coexists с czlonkowski `n8n-mcp` <!-- fact:n8n_native_mcp_server verified:2026-05-10 -->
+- VPS `157.180.33.253`. n8n **2.18.5** (latest stable 2026-04-29, verified 2026-05-03), Docker `n8nio/n8n:2.18.5` pinned, postgres `pgvector/pgvector:pg15` <!-- fact:n8n_version_host verified:2026-05-03 stale_after:21d -->
+- Native MCP server (n8n 2.14.0+ GA): `https://n8n.studiokook.ee/mcp-server/http` (streamable HTTP), Bearer token `credentials/n8n-mcp-token.txt` (aud=`mcp-server-api`). v1.1.0, 25 tools (`n8n-native`). WF must be explicitly exposed per WF (default zero). Coexists с czlonkowski `n8n-mcp` <!-- fact:n8n_native_mcp_server verified:2026-05-10 stale_after:30d -->
 - 45 WF total / 39 active (verified 2026-05-10 via /api/v1/workflows live) <!-- fact:n8n_wf_count verified:2026-05-10 -->
 - `N8N_BLOCK_ENV_ACCESS_IN_NODE=false` — required for `$env` in Code nodes <!-- fact:n8n_env_access_flag verified:2026-05-03 -->
-- `N8N_ENCRYPTION_KEY` in compose env since 2026-05-03 (auto-gen value also in `/opt/n8n/n8n_data/config`). Local backup `credentials/n8n-encryption-key.txt` <!-- fact:n8n_encryption_key verified:2026-05-03 -->
-- Community nodes: `n8n-nodes-google-search-console@1.0.40`, `@mendable/n8n-nodes-firecrawl@2.1.0` <!-- fact:n8n_community_nodes verified:2026-05-03 -->
+- `N8N_ENCRYPTION_KEY` in compose env since 2026-05-03 (auto-gen value also in `/opt/n8n/n8n_data/config`). Local backup `credentials/n8n-encryption-key.txt` <!-- fact:n8n_encryption_key verified:2026-05-03 stale_after:30d -->
+- Community nodes: `n8n-nodes-google-search-console@1.0.40`, `@mendable/n8n-nodes-firecrawl@2.1.0` <!-- fact:n8n_community_nodes verified:2026-05-03 stale_after:30d -->
 - Compose backup `/opt/n8n/docker-compose.yml.before-pin-20260502`. Baseline pg dump `/opt/n8n/backups/n8n-baseline-2.18.5-20260503.dump` (285MB, 692 entries). WF snapshot `C:/tmp/n8n-pre-upgrade-20260502/`. Compose must include `networks: n8n-network` (external `n8n_n8n-network`) <!-- fact:n8n_backups_compose verified:2026-05-03 -->
-- Google OAuth2 cred `0a4JFSW3JyCsi8wo` (GCP studiokook). Telegram cred `mxbg2RUQv7Widfws`, chat `804465999`. Gemini `GEMINI_API_KEY` env, model `gemini-2.5-flash`, GCP ARKHOS (billing). Supabase `SUPABASE_URL=https://app.studiokook.ee`, PostgREST upsert needs `?on_conflict=column`. GCP projects: ARKHOS (billing+Gemini) + studiokook (OAuth2) <!-- fact:n8n_creds_apis verified:2026-05-03 -->
+- Google OAuth2 cred `0a4JFSW3JyCsi8wo` (GCP studiokook). Telegram cred `mxbg2RUQv7Widfws`, chat `804465999`. Gemini `GEMINI_API_KEY` env, model `gemini-2.5-flash`, GCP ARKHOS (billing). Supabase `SUPABASE_URL=https://app.studiokook.ee`, PostgREST upsert needs `?on_conflict=column`. GCP projects: ARKHOS (billing+Gemini) + studiokook (OAuth2) <!-- fact:n8n_creds_apis verified:2026-05-03 stale_after:30d -->
 - Workflow IDs: SEO Audit `EMUTtOI8BWLvDxn0`, Traffic Drop `8ZsWQfxf1oMZYQFe`, Analytics `n4unkzPUqdWklOhc`, Studiokook Video Gen v1 `kyuBLkWS7q6wodAM` (webhook stub only, 0 exec), Video Error Handler v1 `oKMVXx6UX3Ln13Ta`, Video TG Callback Handler v1 `wNkjWy0nT3odT9PP` (webhook `/studiokook-tg-callback`). SSH stitch cred `ESEf68VzIbrarVlP` → `root@172.17.0.1` → ffmpeg → `/opt/n8n/n8n_data/output/{exec_id}.mp4`. Private key `credentials/n8n-host-ssh.key` <!-- fact:n8n_workflow_ids verified:2026-05-10 -->
 - ANTHROPIC_API_KEY (n8n env): credit balance 0 — не использовать api.anthropic.com напрямую без top-up <!-- fact:n8n_anthropic_balance verified:2026-05-03 -->
 
