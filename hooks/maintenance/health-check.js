@@ -177,6 +177,40 @@ check('Git loose-object hygiene', () => {
   return true;
 });
 
+// 8c. Rollback retention — logs/rollback/ 30-day TTL self-heal. Incident snapshots (Law 1
+// backups) lose restore value once the change they covered has survived; without a TTL the dir
+// only grows (2026-06-09 audit: 402MB). An entry's age = its NEWEST inner mtime, so an
+// actively-written dir is never reaped. Runs BEFORE the size check so it measures post-GC.
+check('Rollback retention (30d)', () => {
+  const dir = path.join(CLAUDE_DIR, 'logs', 'rollback');
+  if (!fs.existsSync(dir)) return true;
+  const cutoff = Date.now() - 30 * 24 * 3600 * 1000;
+  const newestMtime = (p) => {
+    try {
+      const st = fs.statSync(p);
+      if (!st.isDirectory()) return st.mtimeMs;
+      return fs.readdirSync(p).reduce((mx, f) => Math.max(mx, newestMtime(path.join(p, f))), st.mtimeMs);
+    } catch { return Infinity; } // unreadable → treat as fresh, never reap blind (Law 1)
+  };
+  const reaped = [];
+  for (const f of fs.readdirSync(dir)) {
+    const fp = path.join(dir, f);
+    if (newestMtime(fp) < cutoff) {
+      fs.rmSync(fp, { recursive: true, force: true });
+      reaped.push(f);
+    }
+  }
+  if (reaped.length) {
+    appendLedger({
+      key: 'health-check:rollback-gc', hook: 'health-check', kind: 'acted', severity: 'info',
+      action: 'rollback-gc',
+      title: `Rollback GC: reaped ${reaped.length} snapshot(s) older than 30d`,
+      detail: { reaped },
+    });
+  }
+  return true;
+});
+
 // 9. .claude size sanity (warn if >2GB — ghost archives + memory + patterns)
 check('.claude size <2GB', () => {
   const out = execSync(`powershell -NoProfile -Command "(Get-ChildItem '${CLAUDE_DIR}' -Recurse -ErrorAction SilentlyContinue | Measure-Object -Property Length -Sum).Sum"`,

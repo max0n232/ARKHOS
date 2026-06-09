@@ -5,9 +5,10 @@ const fs = require('fs');
 const path = require('path');
 const { appendLedger } = require('../shared/ledger');
 
-const root = 'C:/Users/sorte';
-const claudeDir = path.join(root, '.claude');
-const script = path.join(root, 'ObsidianVault', '10-Projects', 'ARKHOS', 'tools', 'check-drift.ps1');
+const { CLAUDE_DIR, VAULT_DIR } = require('../shared/paths');
+
+const claudeDir = CLAUDE_DIR;
+const script = path.join(VAULT_DIR, '10-Projects', 'ARKHOS', 'tools', 'check-drift.ps1');
 const stateFile = path.join(claudeDir, 'hooks', 'maintenance', '.drift-check-state.json');
 const intervalHours = 6;
 const codexIntervalHours = 24;

@@ -103,8 +103,29 @@ function today() {
 // NOTE: subagent spawns are tracked SEPARATELY (per-session file, see loadSpawnState) so a
 // session crossing midnight doesn't get its spawn counter wiped by the daily reset (codex F3).
 function loadLedger() {
-  let l;
-  try { l = JSON.parse(fs.readFileSync(LEDGER, "utf8")); } catch { l = null; }
+  let l = null;
+  let corrupted = false;
+  try { l = JSON.parse(fs.readFileSync(LEDGER, "utf8")); }
+  catch (e) { corrupted = e.code !== "ENOENT"; } // missing file = normal first run, not corruption
+  // Parse-valid but wrong shape (truncated write, manual edit) is corruption too — it would
+  // silently reset the daily counter just like unparseable JSON (codex 2026-06-10).
+  if (l !== null && (typeof l !== "object" || typeof l.date !== "string" || typeof l.billed_calls !== "number")) {
+    corrupted = true;
+    l = null;
+  }
+  if (corrupted) {
+    // Stay fail-open (meter must not brick work) but FAIL LOUD (canon law 3 / A6): a corrupted
+    // ledger silently resetting the daily counter = unlimited spend with zero signal. Surface it
+    // on the maintenance bus so stack-auditor / weekly report shows the reset.
+    try {
+      require("../shared/ledger").appendLedger({
+        key: "spend-guard:ledger-corruption", hook: "spend-guard", kind: "detected", severity: "error",
+        title: "Spend-guard daily ledger unreadable — billed counter reset to 0 (fail-open)",
+        detail: { file: LEDGER },
+      });
+    } catch { /* bus unavailable — stderr below is the last resort */ }
+    try { process.stderr.write("spend-guard: ledger corrupted, counter reset\n"); } catch {}
+  }
   if (!l || l.date !== today()) {
     l = { date: today(), billed_calls: 0, by_surface: {}, seen_ids: [] };
   }
@@ -200,5 +221,11 @@ function main(raw) {
 let chunks = [];
 process.stdin.setEncoding("utf8");
 process.stdin.on("data", (d) => chunks.push(d));
-process.stdin.on("end", () => { try { main(chunks.join("")); } catch { /* fail-open */ } });
+process.stdin.on("end", () => {
+  try { main(chunks.join("")); }
+  catch (e) {
+    // fail-open by design (meter must not brick work) — but not SILENT (canon law 3)
+    try { process.stderr.write(`spend-guard: ${e.message}\n`); } catch {}
+  }
+});
 process.stdin.on("error", () => process.exit(0));

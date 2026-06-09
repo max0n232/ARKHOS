@@ -37,8 +37,12 @@ const os = require('os');
 const CLAUDE_DIR = path.join(os.homedir(), '.claude');
 const LEDGER = path.join(CLAUDE_DIR, 'patterns', 'maintenance-ledger.json');
 const LOCK = LEDGER + '.lock';
-const LOCK_TTL_MS = 30_000;   // steal a lock older than this (dead writer)
+const LOCK_TTL_MS = 60_000;   // steal a lock older than this (dead writer); 60s tolerates slow
+                              // writers (Gemini-embed dedup held >30s → live lock stolen → lost update)
 const LOCK_TRIES = 50;        // bounded retry budget (Law 9) — no infinite spin
+const WAIT_BUDGET_MS = 2000;  // hard cap on TOTAL lock wait: PreToolUse callers (spend-guard) run
+                              // under a 3s harness timeout (settings.json) — the spin must fail-open
+                              // INSIDE that window or the harness kills the write mid-flight silently
 
 function nowIso() { return new Date().toISOString(); }
 
@@ -47,6 +51,7 @@ function nowIso() { return new Date().toISOString(); }
 // acquired within the budget, run fn() anyway (a possible lost-update on a non-critical bus is
 // strictly better than a maintenance hook hanging or throwing into a session).
 function withLock(fn) {
+  const start = Date.now();
   for (let i = 0; i < LOCK_TRIES; i++) {
     try {
       fs.writeFileSync(LOCK, JSON.stringify({ pid: process.pid, started: Date.now() }), { flag: 'wx' });
@@ -59,7 +64,10 @@ function withLock(fn) {
         const cur = JSON.parse(fs.readFileSync(LOCK, 'utf8'));
         if (Date.now() - (cur.started || 0) > LOCK_TTL_MS) { fs.unlinkSync(LOCK); continue; }
       } catch { try { fs.unlinkSync(LOCK); continue; } catch {} }
-      const t = Date.now(); while (Date.now() - t < 100) { /* spin ~100ms */ }
+      if (Date.now() - start >= WAIT_BUDGET_MS) break;   // total budget spent → fail-open NOW
+      // Growing bounded wait (Law 9: backoff, no fixed-rate hammering). 50ms→400ms cap.
+      const waitMs = Math.min(50 * (i + 1), 400);
+      const t = Date.now(); while (Date.now() - t < waitMs) { /* bounded spin */ }
     }
   }
   return fn();   // last resort after budget exhausted — fail-open

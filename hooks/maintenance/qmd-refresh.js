@@ -3,11 +3,14 @@ const { execFileSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 
-const base = 'C:/Users/sorte/.claude/hooks/maintenance';
-const qmd = 'C:/Users/sorte/AppData/Roaming/npm/node_modules/@tobilu/qmd/dist/cli/qmd.js';
+const os = require('os');
+const { CLAUDE_DIR } = require('../shared/paths');
+
+const base = path.join(CLAUDE_DIR, 'hooks', 'maintenance');
+const qmd = path.join(os.homedir(), 'AppData', 'Roaming', 'npm', 'node_modules', '@tobilu', 'qmd', 'dist', 'cli', 'qmd.js');
 const stateFile = path.join(base, '.qmd-refresh-state.json');
 const lockFile = path.join(base, '.qmd-refresh.lock');
-const logFile = 'C:/Users/sorte/.claude/logs/qmd-refresh.log';
+const logFile = path.join(CLAUDE_DIR, 'logs', 'qmd-refresh.log');
 
 function log(line) {
   fs.appendFileSync(logFile, `${new Date().toISOString()} ${line}\n`);

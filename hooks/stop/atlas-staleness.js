@@ -75,15 +75,20 @@ function saveState(s) { try { fs.writeFileSync(STATE_FILE, JSON.stringify(s)); }
 
 // Back up ALL regen outputs to logs/rollback/ BEFORE regenerating (Law 1/8 — restore must cover
 // every file the generators write, or a partial failure leaves unbacked outputs desynced).
-// Returns the backup dir, or null if nothing to back up.
+// Returns { dir, ok }: dir = backup location (null when no outputs existed), ok = every existing
+// output copied. ok:false → caller must NOT regenerate (Law 1: no mutation without a confirmed
+// backup) — the old `null`-return conflated "nothing to back up" with "copy failed" (codex 2026-06-10).
 function backupRenders(now) {
   const dir = path.join(CLAUDE_DIR, 'logs', 'rollback', `atlas-${now}`);
   try { fs.mkdirSync(dir, { recursive: true }); } catch {}
-  let any = false;
+  let present = 0, copied = 0;
   for (const f of REGEN_OUTPUTS) {
-    try { if (fs.existsSync(f)) { fs.copyFileSync(f, path.join(dir, path.basename(f))); any = true; } } catch {}
+    if (!fs.existsSync(f)) continue;
+    present++;
+    try { fs.copyFileSync(f, path.join(dir, path.basename(f))); copied++; } catch {}
   }
-  return any ? dir : null;
+  if (present === 0) return { dir: null, ok: true };
+  return { dir, ok: copied === present };
 }
 function restoreRenders(dir) {
   if (!dir) return;
@@ -91,6 +96,21 @@ function restoreRenders(dir) {
     const b = path.join(dir, path.basename(f));
     try { if (fs.existsSync(b)) fs.copyFileSync(b, f); } catch {}
   }
+}
+
+// Retention: keep only the newest KEEP_BACKUPS atlas-* backup dirs. Restore only ever reads the
+// backup taken in the SAME run, so older copies have zero restore value — without pruning every
+// auto-regen (≤1/6h) leaked a ~45MB dir into logs/rollback/ forever (402MB by 2026-06-09 audit).
+const KEEP_BACKUPS = 3;
+function pruneBackups() {
+  try {
+    const dir = path.join(CLAUDE_DIR, 'logs', 'rollback');
+    const stale = fs.readdirSync(dir)
+      .filter(f => /^atlas-\d+$/.test(f))
+      .sort((a, b) => Number(b.slice(6)) - Number(a.slice(6)))
+      .slice(KEEP_BACKUPS);
+    for (const d of stale) fs.rmSync(path.join(dir, d), { recursive: true, force: true });
+  } catch { /* retention is best-effort — must never disrupt the regen path */ }
 }
 
 function main() {
@@ -114,6 +134,17 @@ function main() {
   // user sees every autonomous vault write in the weekly report. Backup→regen→restore-on-failure.
   if (newerGraph.length > 0) {
     const backup = backupRenders(now);
+    if (!backup.ok) {
+      // Law 1: never mutate without a confirmed backup. Detect-only and bail.
+      appendLedger({
+        key: `atlas-staleness:backup-failed`, hook: 'atlas-staleness', kind: 'detected', severity: 'warn',
+        title: `Atlas backup to logs/rollback FAILED — auto-regen skipped (no safety net)`,
+        detail: { dir: backup.dir, sources: newerGraph },
+      });
+      console.log(`[ATLAS STALE] backup failed — auto-regen skipped, run /atlas manually`);
+      return;
+    }
+    pruneBackups(); // after backup: the just-written dir is the newest of the KEEP_BACKUPS kept
     try {
       execFileSync('node', [GEN_GRAPH], { cwd: SCRIPTS_DIR, timeout: 60000, stdio: 'pipe' });
       execFileSync('node', [GEN_EXCALI], { cwd: SCRIPTS_DIR, timeout: 60000, stdio: 'pipe' });
@@ -121,16 +152,16 @@ function main() {
         key: `atlas-staleness:graph-regen`, hook: 'atlas-staleness', kind: 'acted', severity: 'info',
         action: 'atlas-regen',
         title: `Atlas renders auto-regenerated (stale vs: ${newerGraph.join(', ')})`,
-        detail: { sources: newerGraph, backup, target: 'vault-generated-artifact' },
+        detail: { sources: newerGraph, backup: backup.dir, target: 'vault-generated-artifact' },
       });
       console.log(`[ATLAS] auto-regenerated renders (was older than: ${newerGraph.join(', ')})`);
     } catch (e) {
       // Generator failed (process.exit(1) on bad input) → restore backup, downgrade to detect-only.
-      restoreRenders(backup);
+      restoreRenders(backup.dir);
       appendLedger({
         key: `atlas-staleness:graph-regen-failed`, hook: 'atlas-staleness', kind: 'detected', severity: 'warn',
         title: `Atlas auto-regen FAILED — run /atlas manually`,
-        detail: { error: (e.message || '').slice(0, 200), sources: newerGraph, restoredFrom: backup },
+        detail: { error: (e.message || '').slice(0, 200), sources: newerGraph, restoredFrom: backup.dir },
       });
       console.log(`[ATLAS STALE] auto-regen failed (${(e.message||'').split('\n')[0]}) — backup restored, run /atlas`);
     }
