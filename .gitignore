@@ -108,6 +108,12 @@ tasks/
 tmp/
 .claude/worktrees/
 mcp-downloads/
+daemon/
+daemon.lock
+daemon.status.json
+daemon.json
+daemon.log
+jobs/
 
 # Daily-rotated LLM telemetry (obsidian-api.js)
 logs/llm-calls-*.jsonl
