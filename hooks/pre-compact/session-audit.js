@@ -740,7 +740,8 @@ Rules:
 
     // Write pending report to a per-session file. MEMORY.md is cross-session shared,
     // so writing a PENDING block there leaks another session's report into this one.
-    // compact-report-injector.js reads only `${sessionId}.txt` if session_id arrives in stdin.
+    // compact-report-injector.js reads `${sessionId}.txt` (sessionId from transcript_path),
+    // injects + deletes it, and stale-sweeps any orphan `.pending-report-*` older than 6h.
     if (sessionId) {
         const pendingFile = path.join(CLAUDE_DIR, 'hooks', `.pending-report-${sessionId}.txt`);
         try { fs.writeFileSync(pendingFile, report, 'utf8'); } catch {}

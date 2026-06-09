@@ -47,10 +47,22 @@ try {
 } catch {}
 
 // --- Compact report injection ---
-if (fs.existsSync(PENDING_FILE)) {
-    try {
-        const content = fs.readFileSync(PENDING_FILE, 'utf8').trim();
-        fs.unlinkSync(PENDING_FILE);
+// session-audit.js (PreCompact) writes a per-session report `.pending-report-${sessionId}.txt`.
+// Read THIS session's file (sessionId from transcript_path, same derivation as the ctx monitor),
+// inject it, then delete it. Fall back to the legacy shared file for reports written by older
+// hook versions. Without the per-session read these files accumulated forever (orphan-rate 100%).
+const HOOKS_DIR = path.join(CLAUDE_DIR, 'hooks');
+try {
+    const fp = (hookInput && hookInput.transcript_path) || '';
+    const sid = fp ? path.basename(fp, '.jsonl') : '';
+    const perSessionFile = sid ? path.join(HOOKS_DIR, `.pending-report-${sid}.txt`) : '';
+    let reportFile = '';
+    if (perSessionFile && fs.existsSync(perSessionFile)) reportFile = perSessionFile;
+    else if (fs.existsSync(PENDING_FILE)) reportFile = PENDING_FILE; // legacy shared fallback
+
+    if (reportFile) {
+        const content = fs.readFileSync(reportFile, 'utf8').trim();
+        fs.unlinkSync(reportFile);
 
         // PENDING block stays in MEMORY.md — Claude reads it natively
         // and removes it via Edit tool after displaying the report
@@ -60,8 +72,23 @@ if (fs.existsSync(PENDING_FILE)) {
                 `[COMPACT REPORT] Display this session compact report at the very start of your response, before answering the user. Output it verbatim as a code block:\n\n${content}`
             );
         }
-    } catch {}
-}
+    }
+} catch {}
+
+// --- Stale-sweep: drop orphaned per-session reports older than 6h ---
+// A session that compacted but never resumed via UserPromptSubmit leaves its report
+// undelivered. The per-session read above only clears THIS session — sweep the rest by age.
+try {
+    const SIX_HOURS_MS = 6 * 60 * 60 * 1000;
+    const now = Date.now();
+    for (const name of fs.readdirSync(HOOKS_DIR)) {
+        if (!name.startsWith('.pending-report-') || !name.endsWith('.txt')) continue;
+        const fpath = path.join(HOOKS_DIR, name);
+        try {
+            if (now - fs.statSync(fpath).mtimeMs > SIX_HOURS_MS) fs.unlinkSync(fpath);
+        } catch {}
+    }
+} catch {}
 
 // --- Context usage monitor ---
 // SSOT: use harness-native context_window.used_percentage from hook stdin — the SAME
