@@ -123,6 +123,9 @@ patterns/gemini-quota.json
 patterns/usage-tracker.json
 patterns/resource-homeostat.json
 
+# Plugin runtime markers (timestamp of last unused-plugin sweep)
+plugins/.last_inuse_sweep
+
 # Stray screenshots dropped in repo root (belong in tmp/ — data-home discipline)
 /atlas-*.png
 /atlas-open.png
