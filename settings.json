@@ -184,6 +184,12 @@
           },
           {
             "type": "command",
+            "command": "node C:/Users/sorte/.claude/hooks/maintenance/cred-sync.js",
+            "timeout": 60,
+            "statusMessage": "Credential sync check..."
+          },
+          {
+            "type": "command",
             "command": "node C:/Users/sorte/.claude/hooks/maintenance/observation-watch.js",
             "timeout": 15,
             "statusMessage": "Observation watch..."
