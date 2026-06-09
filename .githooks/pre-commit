@@ -1,0 +1,118 @@
+#!/usr/bin/env bash
+# .claude pre-commit guard — SECRET scan on staged text files.
+#   Rejects a commit if a staged file ADDS an API-key / token / password pattern.
+#   Created 2026-06-09 after the n8n-admin-password + video-service-token leak via
+#   references/project-facts.md into pushed git history (incident
+#   claude-repo-history-divergence-20260608 / project_vault_secret_leak_20260607).
+#   ROOT CAUSE of that leak: this repo had ONLY a commit-msg hook (codex-gate) and
+#   NO pre-commit secret scan — unlike the vault, which gained one 2026-06-07.
+#
+#   core.hooksPath=.claude/.githooks, so this file is the active pre-commit.
+#   Adapted from the hardened vault guard (ObsidianVault/.githooks/pre-commit,
+#   codex-reviewed 2026-06-07, 6 must-fix). KEY DIFFERENCE: the vault guard scans
+#   .md only; secrets in .claude leak through .js hooks, .json (settings), .cmd
+#   launchers and .txt too — so this scans all TEXT files, skipping binary/credential.
+#
+# Bypass once (only when knowingly committing a documented sample):
+#   git commit --no-verify
+
+# NOTE: deliberately NO `set -e` — grep no-match (exit 1) is normal control flow.
+
+# Secret patterns (ERE). [[:space:]] not \s for BSD/macOS portability.
+# The keyword may be JSON-quoted ("password":), bare (password=), or YAML (password:).
+# Allow an optional closing quote + whitespace between keyword and the =/: separator,
+# so `"password": "value"` (JSON) matches as well as `password=value` (env/ini).
+secret_re='(sk-[a-zA-Z0-9]{20,}|sk-ant-[a-zA-Z0-9_-]{20,}|sk-proj-[a-zA-Z0-9_-]{20,}|sk-or-v1-[a-f0-9]{32,}|AIzaSy[A-Za-z0-9_-]{30,}|AKIA[0-9A-Z]{16}|-----BEGIN[A-Z ]*PRIVATE KEY-----|(api[_-]?key|token|secret|password|passwd|pwd)["'\'']?[[:space:]]*[=:][[:space:]]*["'\'']?[A-Za-z0-9_\-]{16,})'
+
+# Redaction whitelist: a leaked-looking line is EXEMPT only when the secret-looking
+# VALUE ITSELF sits inside an angle-bracket placeholder (e.g. `<redacted - see creds>`).
+# Codex review 2026-06-09 (must-fix HIGH): the old per-line `grep -vE '<...key...>'`
+# whitelisted the WHOLE line if ANY angle-bracket phrase with a trigger word appeared
+# anywhere on it — so `api_key=sk-ant-REALSECRET  # <Key rotation>` slipped through.  (pragma: allowlist secret)
+# is_exempt() now strips every `<...>` span from the line FIRST, then re-tests for a
+# secret: if the secret only existed inside the brackets, the stripped line is clean.
+redaction_inner_re='([Rr]edact|credentials|placeholder|[Kk]ey|см\.|see )'
+is_exempt() { # arg: a single line already known to match secret_re. exit 0 = exempt.
+  local line="$1"
+  # The bracket must be a genuine redaction placeholder, not arbitrary <html>.
+  printf '%s' "$line" | grep -qE "<[^>]*${redaction_inner_re}[^>]*>" || return 1
+  # Strip ONLY redaction-placeholder spans (brackets that contain a trigger word).
+  # Codex 2026-06-09 (2nd review): stripping ALL <...> let a secret hide inside a
+  # separate non-redaction span, e.g. `<Key rotation><input value="sk-ant-REAL">` —
+  # the HTML tag got stripped too. Now an `<input value="SECRET">` span (no trigger
+  # word) is NOT stripped, so the secret survives the strip and the line is blocked.
+  local stripped
+  stripped=$(printf '%s' "$line" | sed -E "s/<[^>]*${redaction_inner_re}[^>]*>//g")
+  printf '%s' "$stripped" | grep -qiE "$secret_re" && return 1  # secret survives outside → NOT exempt
+  return 0
+}
+
+# Skip credential files (gitignored anyway, but defensive) and obvious binaries.
+skip_path_re='^(credentials/|logs/rollback/|tmp/)'
+
+secret_hits=()
+
+# Enumerate staged files fail-CLOSED. Codex review 2026-06-09 (must-fix): the old
+# `while ... done < <(git diff ...)` swallowed an enumeration failure (index lock,
+# corrupt index, git off PATH) — the loop just never ran and the hook exited 0 with a
+# secret committed.
+# Constraints learned the hard way 2026-06-09 (both verified empirically):
+#   - `mapfile < <(producer)` does NOT propagate the producer exit ($? is mapfile's,
+#     success on 0 lines) → fails-OPEN. (codex-suggested form, rejected.)
+#   - `$(producer)` DOES propagate exit but STRIPS NUL bytes → breaks -z parsing → also
+#     fails-open silently. So neither one-liner works for a fail-closed NUL stream.
+# Solution: write the NUL stream to a temp file, check the producer's exit explicitly,
+# then read the file with `read -d ''`. Temp file preserves NUL; exit is checkable.
+# diff-filter=ACMRT (not ACMR): T = type-change (symlink→file) was a confirmed bypass.
+_stg=$(mktemp 2>/dev/null) || { echo "[pre-commit] ERROR: mktemp failed — aborting." >&2; exit 1; }
+trap 'rm -f "$_stg"' EXIT
+git diff --cached --name-only -z --diff-filter=ACMRT --no-color --no-ext-diff > "$_stg"
+if [ $? -ne 0 ]; then
+  echo "[pre-commit] ERROR: could not enumerate staged files — aborting (fail-closed)." >&2
+  exit 1
+fi
+
+while IFS= read -r -d '' f; do
+  [ -n "$f" ] || continue
+  # Path-based skip (credentials are referenced by filename, never staged).
+  if printf '%s' "$f" | grep -qE "$skip_path_re"; then continue; fi
+  # Extension-based skip: binaries / lockfiles that never carry hand-written secrets.
+  case "$f" in
+    *.png|*.jpg|*.jpeg|*.gif|*.webp|*.ico|*.pdf|*.zip|*.gz|*.bundle|*.skp|*.dae|*.stl|*.obj) continue ;;
+    *.lock|package-lock.json) continue ;;
+  esac
+
+  # --- SECRET scan: ADDED lines only, read from the INDEX (not working tree) ---
+  diff_out=$(git diff --cached -U0 --diff-filter=ACMRT --no-color --no-ext-diff -- "$f")
+  if [ $? -ne 0 ]; then
+    echo "[pre-commit] ERROR: git diff failed for '$f' — aborting (fail-closed)." >&2
+    exit 1
+  fi
+  added=$(printf '%s\n' "$diff_out" | grep -E '^\+' | grep -vE '^\+\+\+')
+  if [ -n "$added" ]; then
+    # Per-line: a line is a hit only if it matches secret_re AND is not value-in-bracket exempt
+    # AND is not an explicit allowlist line. The allowlist pragma exists because a secret
+    # SCANNER (this file), docs, and tests legitimately contain example key patterns — without
+    # it the guard blocks its own edits and any documentation, forcing --no-verify (a worse
+    # habit than an auditable inline marker). Marker: `pragma: allowlist secret` on the line.
+    while IFS= read -r line; do
+      [ -n "$line" ] || continue
+      printf '%s' "$line" | grep -qiE "$secret_re" || continue
+      if is_exempt "$line"; then continue; fi
+      case "$line" in *"pragma: allowlist secret"*) continue ;; esac
+      secret_hits+=("$f")
+      break
+    done <<< "$added"
+  fi
+done < "$_stg"
+
+if [ ${#secret_hits[@]} -gt 0 ]; then
+  echo "[pre-commit] BLOCKED: possible SECRET in staged files:" >&2
+  printf '  - %s\n' "${secret_hits[@]}" >&2
+  echo "  -> Move the secret to ~/.claude/credentials/ and reference it by filename." >&2
+  echo "  -> If it is a documented placeholder, wrap it in angle brackets, e.g. <redacted - see credentials/>." >&2
+  echo "" >&2
+  echo "Bypass once (only if you are SURE): git commit --no-verify" >&2
+  exit 1
+fi
+exit 0
