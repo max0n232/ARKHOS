@@ -4,9 +4,10 @@
 (перед делегированием) — не код, справочная карта. Источники моделей: MEMORY.md
 (codex→sonnet, gemini-rest, ollama, project_codex_cli, reference_ollama_local), REGISTRY.md.
 
-**Default:** main loop = **Opus 4.8 [1M]** (этот агент). Делегируй ТОЛЬКО когда выигрыш
-конкретен (см. колонку «Почему»), иначе solo Opus. Делегирование = +overhead (spawn,
-context handoff), оправдано scope > tuning одного файла или независимым reasoning path.
+**Default:** main loop = **Fable 5 [1M]** (`claude-fable-5[1m]`, с 2026-06-09; до того Opus 4.8).
+Делегируй ТОЛЬКО когда выигрыш конкретен (см. колонку «Почему»), иначе solo main loop.
+Делегирование = +overhead (spawn, context handoff), оправдано scope > tuning одного файла
+или независимым reasoning path.
 
 ---
 
@@ -14,13 +15,13 @@ context handoff), оправдано scope > tuning одного файла ил
 
 | Класс задачи | Куда | Модель | Почему не solo Opus |
 |--------------|------|--------|---------------------|
-| Обычное reasoning / код / план / чат | **main loop** | Opus 4.8 | Дефолт. Не делегируй то, что Opus сделает за один проход |
-| Independent review критичного изменения | `codex-second-opinion` | wrapper Sonnet → Codex CLI GPT-5.5 | Другой training distribution → ловит blind spots, которые Opus разделяет с собой. Gate-enforced на hooks/settings/architecture. Читай full output, не verdict-only |
+| Обычное reasoning / код / план / чат | **main loop** | Fable 5 | Дефолт. Не делегируй то, что main loop сделает за один проход |
+| Independent review критичного изменения | `codex-second-opinion` | wrapper Sonnet → Codex CLI GPT-5.5 | Другой training distribution → ловит blind spots, которые main loop разделяет с собой. Gate-enforced на hooks/settings/architecture. Читай full output, не verdict-only. Codex-вердикты по live-фактам (пути, env) перепроверяй live-пробой |
 | Adversarial «did I miss something?» / sanity | `codex-second-opinion` | wrapper Sonnet → GPT-5.5 | One-shot, не для итеративной работы |
-| Whole-codebase / repo-wide audit, multi-PDF, full transcript | `gemini-mega-context` | Gemini 2.5 Pro (REST) | 2M context, 8K+ output. Opus 1M переполнится или дороже |
+| Whole-codebase / repo-wide audit, multi-PDF, full transcript | `gemini-mega-context` | Gemini 2.5 Pro (REST) | 2M context, 8K+ output. Main 1M переполнится или дороже |
 | Long-form output (большой README/FAQ/контент) | `gemini-mega-context` | Gemini 2.5 Pro | 8K+ output комфортнее чем у Opus |
 | Image / video / audio analysis | `gemini-multimodal` | Gemini 2.5 (REST) | Нативный multimodal без Whisper/Vision pipeline |
-| RU/ET/FI перевод-черновик, parse→JSON, reformat, OCR cleanup, short summary | `gemini-utility` | Gemini Flash (REST) | 1000 free req/day vs платные Opus токены. Routine → экономь бюджет Opus на reasoning |
+| RU/ET/FI перевод-черновик, parse→JSON, reformat, OCR cleanup, short summary | `gemini-utility` | Gemini Flash (REST) | 1000 free req/day vs платные main-loop токены. Routine → экономь бюджет на reasoning |
 | Codebase exploration / «найди паттерн» (read-only) | `researcher` | Haiku | Дёшево, fan-out, возвращает вывод не file-dumps |
 | Vault distill / routing review / maintenance | `librarian` | Sonnet | Спец-промпт + write-доступ vault. Триггер «distill» |
 | Ретроспектива / разбор ошибок сессии / incident | skill `post-mortem` | main loop | Структурный анализ → logs/post-mortem/. Триггер «post-mortem на X», НЕ inline debugging |
@@ -33,9 +34,12 @@ context handoff), оправдано scope > tuning одного файла ил
 | Домен (триггеры) | Агент / Skill | Модель |
 |------------------|---------------|--------|
 | EK/SU DC tuning, compose L/U/I kitchen | `sketchup-easykitchen-specialist` | Sonnet |
-| WordPress REST модификация | `wp-specialist` (skill `wordpress`) | Sonnet |
-| WordPress диагностика (read-only) | `wp-auditor` | Sonnet |
-| TranslatePress переводы | `translator` (skill `wp-translatepress`) | Sonnet |
+| WordPress REST модификация | `wp-specialist` (skill `wordpress`) — *project-scoped: Studiokook* | Sonnet |
+| WordPress диагностика (read-only) | `wp-auditor` — *project-scoped: Studiokook* | Sonnet |
+| TranslatePress переводы | `translator` (skill `wp-translatepress`) — *project-scoped: Studiokook* | Sonnet |
+
+*project-scoped* = живут в `~/Desktop/Studiokook/.claude/` — видны ТОЛЬКО сессии, запущенной из
+cwd Studiokook (CLAUDE.md § Projects). Из `~/.claude`-сессии их спавнить нельзя.
 | n8n build / validation-fix / debug | skill `n8n-expert` | main loop |
 | Vault search / write / route | skill `obsidian-router` | main loop |
 | Кросс-проектный статус / weekly review | skill `assistant` | main loop |
