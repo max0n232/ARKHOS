@@ -126,6 +126,9 @@ patterns/resource-homeostat.json
 # Plugin runtime markers (timestamp of last unused-plugin sweep)
 plugins/.last_inuse_sweep
 
+# Claude Code auto-update result marker (version-bump runtime artifact)
+.last-update-result.json
+
 # Stray screenshots dropped in repo root (belong in tmp/ — data-home discipline)
 /atlas-*.png
 /atlas-open.png

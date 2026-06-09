@@ -1296,8 +1296,8 @@ Lookup facts for specific projects. Not always in context.
 ## fact:trading_db_ddl_owner (2026-06-02)
 **brain_decisions + signals_v2 → owner `n8n_admin`** (были `postgres`). Вся trading-схема public теперь под n8n_admin → DDL-миграции (ALTER/CREATE) делаются через SSH `docker exec postgres psql -U n8n_admin -d n8n`, БЕЗ superuser/Portainer. Колонка `brain_decisions.engine_version TEXT DEFAULT 'v1'` добавлена (v1=Signal Brain, v2=Confluence Engine Phase 2). Confluence Engine `D8Lt8m7ghTqO1qD7` Log Decision пишет `'v2'` (verified standalone tx-test). pg container = `postgres`.
 
-## fact:anthropic_key_rotation (2026-06-02)
-Anthropic API key ротирован (старый `sk-ant-...sbgwcx87` утёк в n8n execution log №118286 через TG-сообщение). Новый = `sk-ant-api03-Br7pAg...`. Прописан: local `credentials/anthropic-api.key` + VPS `/opt/n8n/docker-compose.yml` (n8n recreated, verified env). ClaudeClaw НЕ использует API-key (OAuth setup-token, `getSessionToken()` в src/agent.ts) — `.env` ANTHROPIC_API_KEY рудимент, не трогать. Gemini billing (GCP project 58791593392) был отдельный dunning-инцидент, оплачен, restored (HTTP 200).
+## fact:anthropic_key_rotation (2026-06-09)
+Anthropic API key ротирован (2026-06-09: ключ `Br7pAg` засветился в этой сессии через сломанный curl `$(cat)` quoting + промежуточный `g32iEQAA` через файл-обмен; оба revoked в Console). Актуальный = `sk-ant-api03-...A7apWwAA` (суффикс-метка). Прописан: local `credentials/anthropic-api.key` + VPS `/opt/n8n/docker-compose.yml` (n8n recreated, verified env). Предыдущая ротация 2026-06-02: `sbgwcx87` утёк в n8n execution log №118286 через TG → `Br7pAg`. ClaudeClaw НЕ использует API-key (OAuth setup-token, `getSessionToken()` в src/agent.ts) — `.env` ANTHROPIC_API_KEY рудимент, не трогать. Gemini billing (GCP project 58791593392) был отдельный dunning-инцидент, оплачен, restored (HTTP 200).
 
 <!-- auto-appended 2026-06-02 -->
 - new live state (which key, owner change) <!-- fact:key_rotation_live_state verified:2026-06-02 -->
