@@ -18,6 +18,12 @@
  * `lastSuccess` (written only after card loop completes — used by health-check
  * to detect a silently-crashed watcher).
  *
+ * Also scans vault `10-Projects/Legal/**` frontmatter for `recheck_due: YYYY-MM-DD`
+ * (legal citation re-verification deadlines — audit 2026-06-10: 9 files carried the
+ * field with zero monitoring). Overdue → same Telegram alert. Legal files are NOT
+ * mutated; alert idempotency lives in the state file keyed by file+due, re-alert
+ * every 7 days while overdue. Files with superseded status are skipped.
+ *
  * Throttle: SessionStart, every 12h.
  */
 
@@ -31,6 +37,8 @@ const STALE_AFTER_DAYS = 7;
 const VALID_STATUSES = new Set(['watching', 'review_due', 'extended', 'stale', 'closed']);
 const STATE_FILE = path.join(CLAUDE_DIR, 'hooks', 'maintenance', '.observation-watch-state.json');
 const OBS_DIR = path.join(VAULT_DIR, '10-Projects', 'ARKHOS', 'observations');
+const LEGAL_DIR = path.join(VAULT_DIR, '10-Projects', 'Legal');
+const LEGAL_REALERT_DAYS = 7;
 const CHAT_ID = '804465999';
 
 function loadState() {
@@ -144,10 +152,48 @@ if (enumIssues.length > 0) {
   console.log(`[OBSERVATION] ⚠️  enum drift: ${enumIssues.length} files with non-standard status: ${enumIssues.join(', ')}`);
 }
 
-const fresh = expired.filter(e => e._reAlert !== false);
-const totalAlerts = fresh.length + staled.length;
+// --- Legal recheck_due scan (read-only over vault Legal/, state-file idempotency) ---
+const legalState = state.legalRecheck || {};
+const legalDue = [];
 
-console.log(`[OBSERVATION] checked=${files.length} expired=${fresh.length} staled=${staled.length} watching=${watching.length}`);
+function walkMd(dir, out = []) {
+  let entries = [];
+  try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { return out; }
+  for (const e of entries) {
+    const fp = path.join(dir, e.name);
+    if (e.isDirectory()) walkMd(fp, out);
+    else if (e.name.endsWith('.md')) out.push(fp);
+  }
+  return out;
+}
+
+if (fs.existsSync(LEGAL_DIR)) {
+  for (const fp of walkMd(LEGAL_DIR)) {
+    let fm;
+    try { fm = parseFrontmatter(fs.readFileSync(fp, 'utf8')).fm; } catch { continue; }
+    if (!fm || !fm.recheck_due) continue;
+    const due = String(fm.recheck_due).slice(0, 10);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(due) || due > today) continue;
+    const status = `${fm.verification_status || ''} ${fm.status || ''}`;
+    if (/superseded/.test(status)) continue;
+    const rel = path.relative(VAULT_DIR, fp).split(path.sep).join('/');
+    const key = `${rel}|${due}`;
+    const lastAlerted = legalState[key] || 0;
+    if (now - lastAlerted < LEGAL_REALERT_DAYS * 86400000) continue;
+    legalState[key] = now;
+    legalDue.push({ rel, due });
+  }
+  // Drop state entries for files whose due passed out of scope (re-verified or removed)
+  for (const key of Object.keys(legalState)) {
+    const [rel] = key.split('|');
+    if (!fs.existsSync(path.join(VAULT_DIR, rel))) delete legalState[key];
+  }
+}
+
+const fresh = expired.filter(e => e._reAlert !== false);
+const totalAlerts = fresh.length + staled.length + legalDue.length;
+
+console.log(`[OBSERVATION] checked=${files.length} expired=${fresh.length} staled=${staled.length} watching=${watching.length} legalRecheckDue=${legalDue.length}`);
 
 // Persist success state (used by health-check.js to verify watcher liveness)
 saveState({
@@ -156,6 +202,7 @@ saveState({
   cardsChecked: files.length,
   cardsAlerted: fresh.length,
   cardsStaled: staled.length,
+  legalRecheck: legalState,
 });
 
 if (totalAlerts === 0) process.exit(0);
@@ -167,9 +214,27 @@ const staledLines = staled.map(e =>
   `• ${e.subject} — alerted ${e.alerted}, no resolution in ${STALE_AFTER_DAYS}d → status:stale`
 );
 
+// Codex review 2026-06-10: escape '_' (parse_mode Markdown treats it as italic —
+// legal paths like _index.md would break the whole message) + cap line count.
+const LEGAL_LINES_MAX = 15;
+const legalLines = legalDue.slice(0, LEGAL_LINES_MAX)
+  .map(e => `• ${e.rel.replace(/_/g, '\\_')} — due ${e.due}`);
+if (legalDue.length > LEGAL_LINES_MAX) {
+  legalLines.push(`• … (+${legalDue.length - LEGAL_LINES_MAX} ещё — см. vault Legal/)`);
+}
+
 const parts = [`⏰ ARKHOS Observations`];
 if (fresh.length) parts.push(`Review due (${fresh.length}):\n${expiredLines.join('\n\n')}`);
 if (staled.length) parts.push(`Auto-staled (${staled.length}):\n${staledLines.join('\n')}`);
+if (legalDue.length) parts.push(`⚖️ Legal re-verification due (${legalDue.length}) — нормы могли измениться, прогнать law-ee verify:\n${legalLines.join('\n')}`);
 parts.push(`Files: ObsidianVault/10-Projects/ARKHOS/observations/`);
 
-sendTelegram(CHAT_ID, parts.join('\n\n')).catch(() => {});
+// Telegram hard limit 4096 bytes; sendTelegram swallows errors → oversized message
+// would vanish silently. Truncate by BYTES (cyrillic = 2 bytes/char).
+let message = parts.join('\n\n');
+if (Buffer.byteLength(message, 'utf8') > 3900) {
+  message = Buffer.from(message, 'utf8').subarray(0, 3700).toString('utf8')
+    .replace(/�+$/, '') + '\n… (truncated — полный список в vault)';
+}
+
+sendTelegram(CHAT_ID, message).catch(() => {});
