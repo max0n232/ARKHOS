@@ -14,7 +14,7 @@ description: |
   Zero Point First, Главное меню as single source of truth, eurocut over
   TT_CORNER (98% of corner kitchens — TT_CORNER is для BF1A only),
   apply_ek_height per countertop profile (laminate 38mm / hpl 12mm / stone
-  20mm), Studiokook gap standards (d201=4 d203=0 d202=1.5 d204=1.5).
+  20mm), Studiokook gap standards (d201=4 d203=0 d202=2.0 d204=2.0).
 tools: Read, Grep, Glob, Bash, Edit, Write, mcp__firecrawl__firecrawl_search, mcp__firecrawl__firecrawl_scrape, mcp__sketchup__eval_ruby, mcp__sketchup__get_scene_info, mcp__sketchup__get_selection, mcp__sketchup__get_selected_components
 model: opus
 permissionMode: acceptEdits
@@ -118,11 +118,11 @@ Reference: `vault/90-System/zero-point-principle.md`, `vault/.../facade-gap-stan
 ## Foundation API (Phases 1-5) — READ agent-playbook § Foundation API FIRST
 
 The compose stack was rebuilt 2026-05-29/30 (`optimization-plan-2026-05-28.md`). Canonical path is now the **layered foundation**, not legacy `l_kitchen`/`place_in_*_row`/`EkCompose.stamp`:
-- `EkRealCompose.spawn_module` (atomic builder) / `place_l_corner`
+- `EkRealCompose.spawn_module` (atomic builder) / `place_l_corner(module_key:, position:, upper:)` — `position:` (:nw/:ne/:se/:sw) ОБЯЗАТЕЛЕН: без него legacy `corner:`-ветка мимо CORNER_ROTATION → фасад в стену; `SKK_TG1_*` требуют явный `upper: true`
 - `EkKitchen` step-API (per-tick: load_deps!/begin_run/step_corner/step_module/finalize/cleanup, run_id logical rollback)
 - `EkAssert` (geometry verify — PRIMARY) / `EkRender.render_views` (vision tie-breaker)
 - `EkSocket` (hybrid bbox-seam + normal-validation PoC)
-- `EkStandards.audit` (51 validators) — replaces `EkValidators.run_all`
+- `EkStandards.audit` (50 validators) — replaces `EkValidators.run_all`
 
 **Full API + the bridge-timeout discipline (orchestrate steps as SEPARATE eval ticks — a heavy chain is killed mid-block) live in `agent-playbook.md § Foundation API`. This config does NOT duplicate it (SSOT = playbook).** Read it before any compose.
 
