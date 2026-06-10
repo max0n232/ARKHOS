@@ -62,6 +62,24 @@ const MAPPINGS = [{
   composeService: 'n8n',
   backupDir: '/opt/n8n/backups',
   backupKeep: 5,
+  backupTag: 'anthropic-sync',              // preserves pre-2026-06-10 backup naming/rotation
+}, {
+  // 2026-06-10: the 06-07 gemini rotation reached the n8n credential (mapping above) but NOT
+  // /root/.gemini/.env — the key source for VPS-side gemini-rest.js (mega-context/multimodal
+  // SSH path), which kept failing "API key expired" silently for 3 days. This mapping closes
+  // that second consumer. No composeService: gemini-rest.js reads env per invocation, nothing
+  // to reload.
+  syncType: 'env',
+  id: 'gemini-vps-env',
+  keyFile: path.join(CLAUDE_DIR, 'credentials', 'gemini-api.key'),
+  name: 'Gemini API Key (VPS ~/.gemini/.env)',
+  envVar: 'GEMINI_API_KEY',
+  envFile: '/root/.gemini/.env',
+  composeDir: '/root/.gemini',              // tmpfile + cd location (same FS as envFile)
+  composeService: null,                     // no daemon — skip recreate
+  backupDir: '/root/.gemini/backups',
+  backupKeep: 5,
+  backupTag: 'gemini-vps',
 }];
 
 function loadState() {
@@ -160,7 +178,9 @@ echo SYNC_OK
 // silently no-op; post-verify the written value and roll back from backup on mismatch.
 function pushEnvMapping(m, keyValue) {
   const ev = m.envVar, ef = m.envFile, dir = m.composeDir, svc = m.composeService;
-  const bdir = m.backupDir, keep = m.backupKeep;
+  const bdir = m.backupDir, keep = m.backupKeep, tag = m.backupTag || m.id;
+  // svc=null → no daemon caches this env, skip recreate (`:` no-op keeps `set -e` happy).
+  const reloadCmd = svc ? `docker compose up -d --force-recreate ${svc} >/dev/null 2>&1` : ':';
   const remote = `bash -c '
 set -e
 KEYTMP=$(mktemp ${dir}/.cred-key.XXXXXX)
@@ -190,9 +210,9 @@ rm -f "$CURTMP"
 # Q4 guard: exactly one uncommented assignment, else refuse (missing/dup → sed/awk would corrupt).
 MATCHES=$(grep -c "^${ev}=" ${ef})
 [ "$MATCHES" = "1" ] || { echo "BAD_ENV_MATCH=$MATCHES" >&2; exit 4; }
-# LAW 1: backup BEFORE mutate, namespaced, into the dedicated backup dir.
+# LAW 1: backup BEFORE mutate, namespaced per mapping, into the dedicated backup dir.
 mkdir -p ${bdir}
-BK=${bdir}/.env.bak-anthropic-sync-$(date +%Y%m%d-%H%M%S)
+BK=${bdir}/.env.bak-${tag}-$(date +%Y%m%d-%H%M%S)
 cp -p ${ef} "$BK"
 # LAW 2 + A4: literal substitution — awk reads the value from $KEYTMP (file), not argv.
 awk -v ev="${ev}" "
@@ -209,10 +229,11 @@ NEWTMP=$(mktemp ${dir}/.new.XXXXXX)
 grep "^${ev}=" ${ef} | head -n1 | sed "s/^${ev}=//" | tr -d "\\n" > "$NEWTMP" || true
 if ! cmp -s "$KEYTMP" "$NEWTMP"; then rm -f "$NEWTMP"; cp -p "$BK" ${ef}; echo "VERIFY_FAILED_ROLLED_BACK" >&2; exit 5; fi
 rm -f "$NEWTMP"
-# Reload: n8n caches env in-process → force-recreate (NOT restart) so the new var is read.
-docker compose up -d --force-recreate ${svc} >/dev/null 2>&1
-# Backup rotation: keep the most recent N, drop older (only our namespaced backups).
-ls -1t ${bdir}/.env.bak-anthropic-sync-* 2>/dev/null | tail -n +$((${keep} + 1)) | xargs -r rm -f
+# Reload: a daemon (n8n) caches env in-process → force-recreate; no-op when svc is null.
+${reloadCmd}
+# Backup rotation: keep the most recent N, drop older (only backups namespaced to this mapping).
+# NOTE: this whole remote script lives inside bash -c SINGLE quotes — no apostrophes anywhere here.
+ls -1t ${bdir}/.env.bak-${tag}-* 2>/dev/null | tail -n +$((${keep} + 1)) | xargs -r rm -f
 echo ENV_SYNC_OK
 '`;
 
@@ -278,7 +299,9 @@ function run() {
           lastPushedHash: hash, lastPushedAt: new Date().toISOString(), lastResult: 'ok',
         };
         pushed = true;
-        const reload = m.syncType === 'env' ? 'recreated' : (RESTART_AFTER_IMPORT ? 'restarted' : 'no-reload');
+        const reload = m.syncType === 'env'
+          ? (m.composeService ? 'recreated' : 'no-reload-needed')
+          : (RESTART_AFTER_IMPORT ? 'restarted' : 'no-reload');
         logLine(`[ok] pushed ${m.id} (key rotated), n8n ${reload}`);
         console.log(`[CRED-SYNC] ${m.name}: rotated key pushed to n8n (${reload})`);
       } else {
