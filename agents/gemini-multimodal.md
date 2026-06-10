@@ -28,11 +28,11 @@ The parent session has a media file (image, video, audio) that needs analysis. Y
    ```bash
    node ~/.claude/patterns/gemini-rest.js -m pro -p "<question>" --file <path>
    ```
-   (`-m pro` — tier alias, resolved via `patterns/llm-models.json`. VPS copy is older: keep the raw model id there until it is synced.)
+   (`-m pro` — tier alias, resolved via `patterns/llm-models.json`; VPS copy synced 2026-06-10, accepts aliases too.)
    For VPS:
    ```bash
    scp <file> root@157.180.33.253:/tmp/ && \
-   ssh root@157.180.33.253 'GEMINI_API_KEY=$(cat /root/.gemini/.env | grep -oP "GEMINI_API_KEY=\K.*") node /root/.claude/patterns/gemini-rest.js -m gemini-2.5-pro -p "..." --file /tmp/<file>'
+   ssh root@157.180.33.253 'GEMINI_API_KEY=$(cat /root/.gemini/.env | grep -oP "GEMINI_API_KEY=\K.*") node /root/.claude/patterns/gemini-rest.js -m pro -p "..." --file /tmp/<file>'
    ```
 3. **Synthesize response** with appropriate fidelity (don't paraphrase OCR — quote)
 

@@ -32,10 +32,10 @@ The parent session needs analysis or generation that exceeds Claude's comfortabl
    ```bash
    cat <files...> | node ~/.claude/patterns/gemini-rest.js -m pro -p "<question>" --max-tokens 8192
    ```
-   (`-m pro` — tier alias, resolved via `patterns/llm-models.json`. VPS copy is older: keep the raw model id there until it is synced.)
+   (`-m pro` — tier alias, resolved via `patterns/llm-models.json`; VPS copy synced 2026-06-10, accepts aliases too.)
    For VPS (Linux paths):
    ```bash
-   ssh root@157.180.33.253 'cat <files...> | GEMINI_API_KEY=$(cat /root/.gemini/.env | grep -oP "GEMINI_API_KEY=\K.*") node /root/.claude/patterns/gemini-rest.js -m gemini-2.5-pro -p "..."'
+   ssh root@157.180.33.253 'cat <files...> | GEMINI_API_KEY=$(cat /root/.gemini/.env | grep -oP "GEMINI_API_KEY=\K.*") node /root/.claude/patterns/gemini-rest.js -m pro -p "..."'
    ```
 4. **Synthesize Gemini's response** for parent session
 
