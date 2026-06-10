@@ -211,6 +211,64 @@ check('Rollback retention (30d)', () => {
   return true;
 });
 
+// 8d. Stop-failure spike — logs/stop-failures.log is written by stop-failure-handler.js and
+// read by nothing: Stop enforcement (output-critic prompt hook) skips silently on API errors
+// (Law 3; harness is fail-open on prompt-hook failures per docs). rate_limit is expected
+// background noise; non-rate_limit (oauth/auth/invalid_request/unknown) is config-class —
+// >=3 in 7d means the breakage is standing, not a blip (2026-06-07 key-rotation: 5 in 30min).
+check('Stop-failure spike (7d)', () => {
+  const log = path.join(CLAUDE_DIR, 'logs', 'stop-failures.log');
+  if (!fs.existsSync(log)) return true;
+  let lines = fs.readFileSync(log, 'utf8').split('\n').filter(Boolean);
+
+  // Retention 90d — same unbounded-growth class as rollback bloat. Size-gated (>1000 lines)
+  // rather than every run: narrows the race window against the handler's appendFileSync.
+  // temp+rename keeps the swap atomic; an unparseable line is kept (never reap blind, Law 1).
+  if (lines.length > 1000) {
+    const keepCutoff = Date.now() - 90 * 24 * 3600 * 1000;
+    const kept = lines.filter(l => {
+      try { return Date.parse(JSON.parse(l).ts) >= keepCutoff; } catch { return true; }
+    });
+    if (kept.length < lines.length) {
+      const tmp = log + '.tmp-' + process.pid;
+      try {
+        fs.writeFileSync(tmp, kept.join('\n') + '\n');
+        fs.renameSync(tmp, log); // EPERM if the handler holds the log on Windows
+        lines = kept;
+      } catch (e) {
+        try { fs.rmSync(tmp, { force: true }); } catch {} // no orphaned tmp (Law 2)
+        throw e;
+      }
+    }
+  }
+
+  const cutoff = Date.now() - 7 * 24 * 3600 * 1000;
+  const recent = [];
+  for (const l of lines) {
+    try { const e = JSON.parse(l); if (Date.parse(e.ts) >= cutoff) recent.push(e); } catch {}
+  }
+  const nonRate = recent.filter(e => e.error !== 'rate_limit');
+  if (recent.length <= 15 && nonRate.length < 3) return true;
+
+  // Watermark: the 7d window keeps the condition true for up to a week after a spike →
+  // without it, 4 TG alerts/day for 7 days. Re-fail only on entries newer than last alert.
+  // null when no entry has a parseable ts — then the gate must NOT suppress (an
+  // all-corrupt-timestamps log would otherwise mute the very alert it should fire).
+  const newest = recent.reduce((mx, e) => {
+    const t = Date.parse(e.ts);
+    return Number.isFinite(t) ? Math.max(mx ?? 0, t) : mx;
+  }, null);
+  if (newest !== null) {
+    if (newest <= (state.stopFailuresAlertedThrough || 0)) return true;
+    state.stopFailuresAlertedThrough = newest;
+  }
+
+  const byType = {};
+  for (const e of recent) byType[e.error] = (byType[e.error] || 0) + 1;
+  const top = Object.entries(byType).sort((a, b) => b[1] - a[1]).map(([k, n]) => `${k}×${n}`).join(', ');
+  throw new Error(`${recent.length} stop-hook failures in 7d (${top}) — Stop enforcement skipped`);
+});
+
 // 9. .claude size sanity (warn if >2GB — ghost archives + memory + patterns)
 check('.claude size <2GB', () => {
   const out = execSync(`powershell -NoProfile -Command "(Get-ChildItem '${CLAUDE_DIR}' -Recurse -ErrorAction SilentlyContinue | Measure-Object -Property Length -Sum).Sum"`,
@@ -225,8 +283,9 @@ for (const probe of CLI_PROBES) {
   check(`CLI: ${probe.name}`, () => probeCli(probe.cmd, probe.expect));
 }
 
-// Persist run timestamp regardless
-saveState({ lastRun: now });
+// Persist run timestamp regardless. Spread keeps fields written by checks (e.g. the
+// stop-failure watermark) — a bare {lastRun} would wipe them every run.
+saveState({ ...state, lastRun: now });
 
 const failures = results.filter(r => !r.ok);
 if (failures.length === 0) {
