@@ -67,7 +67,10 @@
       "Bash(curl *| bash*)",
       "Bash(wget *| sh*)",
       "Bash(mkfs:*)",
-      "Bash(dd if=:*)"
+      "Bash(dd if=:*)",
+      "Read(~/Desktop/Claude*.txt)",
+      "Read(~/.claude/credentials/**)",
+      "Read(~/.claude/hooks/maintenance/.cred-sync-state.json)"
     ]
   },
   "model": "claude-fable-5[1m]",
