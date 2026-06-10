@@ -248,6 +248,18 @@ function callSonnet(systemPrompt, userMessage, maxTokens) {
 // State: patterns/gemini-quota.json — { date: 'YYYY-MM-DD', calls: N }. Auto-resets daily.
 const GEMINI_DAILY_SOFT_CAP = 1400;
 
+// Default model id from the SSOT config (patterns/llm-models.json); built-in fallback
+// keeps every hook path alive if the config is missing or broken.
+function geminiDefaultModel() {
+    try {
+        const cfg = JSON.parse(fs.readFileSync(
+            path.join(__dirname, '..', '..', 'patterns', 'llm-models.json'), 'utf8'));
+        if (cfg && cfg.gemini && cfg.gemini.flash) return cfg.gemini.flash;
+    } catch {}
+    return 'gemini-2.5-flash';
+}
+const GEMINI_DEFAULT_MODEL = geminiDefaultModel();
+
 function _quotaFile() {
     return path.join(os.homedir(), '.claude', 'patterns', 'gemini-quota.json');
 }
@@ -282,10 +294,10 @@ function incrementGeminiQuota() {
 }
 
 /**
- * Call Google Gemini API. Free tier: gemini-2.5-flash.
+ * Call Google Gemini API. Free tier: flash (see patterns/llm-models.json).
  * Same interface as callAnthropic.
  */
-function callGemini(systemPrompt, userMessage, maxTokens = 2048, model = 'gemini-2.5-flash') {
+function callGemini(systemPrompt, userMessage, maxTokens = 2048, model = GEMINI_DEFAULT_MODEL) {
     return new Promise((resolve, reject) => {
         if (!checkGeminiQuota()) {
             return reject(new Error('Gemini daily soft-cap reached (1400/1500), skipping to fallback'));

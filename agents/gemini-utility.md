@@ -33,12 +33,13 @@ Parent session has a routine task that doesn't require Claude-level reasoning. Y
    - No nuanced tone calibration required
 2. **Invoke via REST wrapper** (auto thinkingBudget=0 for Flash → no reasoning overhead):
    ```bash
-   echo "<input>" | node ~/.claude/patterns/gemini-rest.js -m gemini-2.5-flash -p "<task>" --max-tokens 2048
+   echo "<input>" | node ~/.claude/patterns/gemini-rest.js -m flash -p "<task>" --max-tokens 2048
    ```
    Or for files:
    ```bash
-   cat <file> | node ~/.claude/patterns/gemini-rest.js -m gemini-2.5-flash -p "<task>"
+   cat <file> | node ~/.claude/patterns/gemini-rest.js -m flash -p "<task>"
    ```
+   (`-m flash` — tier alias, resolved via `patterns/llm-models.json`.)
 3. **Return result** to parent — caller does the validation
 
 ## Output format

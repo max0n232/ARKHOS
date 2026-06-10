@@ -1,9 +1,10 @@
 #!/usr/bin/env node
 // gemini-rest.js — direct Gemini REST API CLI replacement for `gemini` (deprecated 2026-06-18)
 // Usage:
-//   echo "context" | node gemini-rest.js -m gemini-2.5-flash -p "summarize"
-//   node gemini-rest.js -p "describe" --file image.png
-//   node gemini-rest.js -p "question" --max-tokens 8192
+//   echo "context" | node gemini-rest.js -m flash -p "summarize"
+//   node gemini-rest.js -m pro -p "describe" --file image.png
+//   node gemini-rest.js -p "question" --max-tokens 8192   (default tier: flash)
+// -m accepts tier aliases (flash|pro, resolved via patterns/llm-models.json) or a raw model id.
 // Reads key from $GEMINI_API_KEY or ~/.claude/credentials/gemini-api.key
 
 const https = require('https');
@@ -11,8 +12,22 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 
+// Built-in defaults double as fallback: the VPS copy (/root/.claude/patterns/) must work
+// standalone even when llm-models.json is absent there. On a model change update
+// llm-models.json AND these constants, then scp this script to the VPS.
+const MODEL_ALIASES = { flash: 'gemini-2.5-flash', pro: 'gemini-2.5-pro' };
+
+function resolveModel(name) {
+  let aliases = MODEL_ALIASES;
+  try {
+    const cfg = JSON.parse(fs.readFileSync(path.join(__dirname, 'llm-models.json'), 'utf8'));
+    if (cfg && cfg.gemini) aliases = { ...MODEL_ALIASES, ...cfg.gemini };
+  } catch {} // missing/broken config → built-in defaults, never fail
+  return aliases[name] || name; // raw model id passes through unchanged
+}
+
 function parseArgs(argv) {
-  const args = { model: 'gemini-2.5-flash', prompt: null, file: null, maxTokens: 8192, thinkingBudget: null };
+  const args = { model: 'flash', prompt: null, file: null, maxTokens: 8192, thinkingBudget: null };
   for (let i = 2; i < argv.length; i++) {
     const a = argv[i];
     if (a === '-m' || a === '--model') args.model = argv[++i];
@@ -21,7 +36,7 @@ function parseArgs(argv) {
     else if (a === '--max-tokens') args.maxTokens = parseInt(argv[++i], 10);
     else if (a === '--thinking-budget') args.thinkingBudget = parseInt(argv[++i], 10);
     else if (a === '-h' || a === '--help') {
-      console.error('Usage: gemini-rest.js -m <model> -p "<prompt>" [--file path] [--max-tokens N] [--thinking-budget N]');
+      console.error('Usage: gemini-rest.js -m <flash|pro|model-id> -p "<prompt>" [--file path] [--max-tokens N] [--thinking-budget N]');
       process.exit(0);
     }
   }
@@ -59,6 +74,9 @@ function detectMime(file) {
 
 async function main() {
   const args = parseArgs(process.argv);
+  // Resolve before the thinkingBudget heuristic below — it must see the real model id,
+  // not a tier alias that may not contain "flash".
+  args.model = resolveModel(args.model);
   const apiKey = readApiKey();
   const stdin = await readStdin();
 

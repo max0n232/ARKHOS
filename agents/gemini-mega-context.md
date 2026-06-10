@@ -30,8 +30,9 @@ The parent session needs analysis or generation that exceeds Claude's comfortabl
 2. **Construct Gemini prompt** — frame question + bundle relevant context
 3. **Invoke via REST wrapper** (auth = `GEMINI_API_KEY` env or `credentials/gemini-api.key`):
    ```bash
-   cat <files...> | node ~/.claude/patterns/gemini-rest.js -m gemini-2.5-pro -p "<question>" --max-tokens 8192
+   cat <files...> | node ~/.claude/patterns/gemini-rest.js -m pro -p "<question>" --max-tokens 8192
    ```
+   (`-m pro` — tier alias, resolved via `patterns/llm-models.json`. VPS copy is older: keep the raw model id there until it is synced.)
    For VPS (Linux paths):
    ```bash
    ssh root@157.180.33.253 'cat <files...> | GEMINI_API_KEY=$(cat /root/.gemini/.env | grep -oP "GEMINI_API_KEY=\K.*") node /root/.claude/patterns/gemini-rest.js -m gemini-2.5-pro -p "..."'

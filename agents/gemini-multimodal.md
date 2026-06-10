@@ -26,8 +26,9 @@ The parent session has a media file (image, video, audio) that needs analysis. Y
    - Audio: mp3, wav, ogg, m4a
 2. **Invoke via REST wrapper** (base64 inlined automatically):
    ```bash
-   node ~/.claude/patterns/gemini-rest.js -m gemini-2.5-pro -p "<question>" --file <path>
+   node ~/.claude/patterns/gemini-rest.js -m pro -p "<question>" --file <path>
    ```
+   (`-m pro` — tier alias, resolved via `patterns/llm-models.json`. VPS copy is older: keep the raw model id there until it is synced.)
    For VPS:
    ```bash
    scp <file> root@157.180.33.253:/tmp/ && \

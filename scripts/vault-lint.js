@@ -23,6 +23,16 @@ const MAX_NOTES = 15;
 const MAX_CONTENT_CHARS = 60000; // ~15K tokens
 
 // --- Gemini API (primary, free) ---
+// Model id from the SSOT config (patterns/llm-models.json), built-in fallback if absent.
+function geminiFlashModel() {
+    try {
+        const cfg = JSON.parse(fs.readFileSync(path.join(CLAUDE_DIR, 'patterns', 'llm-models.json'), 'utf8'));
+        if (cfg && cfg.gemini && cfg.gemini.flash) return cfg.gemini.flash;
+    } catch {}
+    return 'gemini-2.5-flash';
+}
+const GEMINI_FLASH = geminiFlashModel();
+
 function callGemini(systemPrompt, userMessage, maxTokens = 4096) {
     return new Promise((resolve, reject) => {
         let apiKey;
@@ -38,7 +48,7 @@ function callGemini(systemPrompt, userMessage, maxTokens = 4096) {
 
         const req = https.request({
             hostname: 'generativelanguage.googleapis.com',
-            path: `/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
+            path: `/v1beta/models/${GEMINI_FLASH}:generateContent?key=${apiKey}`,
             method: 'POST',
             headers: { 'content-type': 'application/json', 'content-length': Buffer.byteLength(body) }
         }, res => {
