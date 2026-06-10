@@ -215,9 +215,13 @@ mkdir -p ${bdir}
 BK=${bdir}/.env.bak-${tag}-$(date +%Y%m%d-%H%M%S)
 cp -p ${ef} "$BK"
 # LAW 2 + A4: literal substitution — awk reads the value from $KEYTMP (file), not argv.
-awk -v ev="${ev}" "
+# NO quote characters inside the awk program: it sits in a bash double-quoted word, where
+# embedded \" survive JS but get quote-removed by bash → awk saw broken text (live 2026-06-10;
+# the path was never exercised before — anthropic always hit ENV_NOOP above). The prefix is
+# passed via -v (var NAME + "=", not the secret) and matched with index()==1 (same ^EV= anchor).
+awk -v pre="${ev}=" "
   NR==FNR { val=\\$0; next }
-  \\$0 ~ \"^\" ev \"=\" { print ev \"=\" val; done=1; next }
+  index(\\$0, pre) == 1 { print pre val; done=1; next }
   { print }
   END { if (!done) exit 9 }
 " "$KEYTMP" ${ef} > "$ENVTMP"
@@ -243,7 +247,11 @@ echo ENV_SYNC_OK
   ], { input: keyValue, timeout: SSH_TIMEOUT_ENV_MS, encoding: 'utf8' });
 
   // ENV_NOOP (remote already current) counts as success → local hash advances, no retry loop.
-  if (res.status === 0 && /ENV_SYNC_OK|ENV_NOOP/.test(res.stdout || '')) return { ok: true };
+  // noop is surfaced so the caller logs truthfully (2026-06-10: NOOP logged as "pushed" hid the
+  // fact that the rewrite path had never actually run).
+  if (res.status === 0 && /ENV_SYNC_OK|ENV_NOOP/.test(res.stdout || '')) {
+    return { ok: true, noop: /ENV_NOOP/.test(res.stdout || '') };
+  }
   // stderr carries only markers (EMPTY_KEY / NO_ENV_FILE / BAD_ENV_MATCH / VERIFY_FAILED…) or
   // ssh-transport errors — never the key value (the key lives only in $KEY / the tmpfile).
   const err = (res.stderr && res.stderr.trim()) || (res.error && res.error.message) || `ssh exit ${res.status}`;
@@ -296,14 +304,20 @@ function run() {
       const r = pushMapping(m, raw);
       if (r.ok) {
         state.mappings[m.id] = {
-          lastPushedHash: hash, lastPushedAt: new Date().toISOString(), lastResult: 'ok',
+          lastPushedHash: hash, lastPushedAt: new Date().toISOString(),
+          lastResult: r.noop ? 'noop' : 'ok',
         };
-        pushed = true;
-        const reload = m.syncType === 'env'
-          ? (m.composeService ? 'recreated' : 'no-reload-needed')
-          : (RESTART_AFTER_IMPORT ? 'restarted' : 'no-reload');
-        logLine(`[ok] pushed ${m.id} (key rotated), n8n ${reload}`);
-        console.log(`[CRED-SYNC] ${m.name}: rotated key pushed to n8n (${reload})`);
+        if (r.noop) {
+          logLine(`[noop] ${m.id}: remote already current, hash recorded (no rewrite, no reload)`);
+          console.log(`[CRED-SYNC] ${m.name}: remote already current (noop)`);
+        } else {
+          pushed = true;
+          const reload = m.syncType === 'env'
+            ? (m.composeService ? 'recreated' : 'no-reload-needed')
+            : (RESTART_AFTER_IMPORT ? 'restarted' : 'no-reload');
+          logLine(`[ok] pushed ${m.id} (key rotated), reload: ${reload}`);
+          console.log(`[CRED-SYNC] ${m.name}: rotated key pushed (${reload})`);
+        }
       } else {
         warn(m, r.err);                       // hash NOT advanced → auto-retry next session
       }
