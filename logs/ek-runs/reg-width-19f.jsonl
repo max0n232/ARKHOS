@@ -1,0 +1,3 @@
+{"name":"19c begin_run plans steps in order, no geometry","status":"pass","prefix":"19c"}
+{"name":"19f step_module width_check: planned vs live bbox width (NOMINAL_WIDTHS drift)","status":"pass","prefix":"19f"}
+{"name":"19d live per-tick compose — step_module wire + run_id cleanup","status":"pass","prefix":"19d"}
