@@ -229,12 +229,7 @@ if (staled.length) parts.push(`Auto-staled (${staled.length}):\n${staledLines.jo
 if (legalDue.length) parts.push(`⚖️ Legal re-verification due (${legalDue.length}) — нормы могли измениться, прогнать law-ee verify:\n${legalLines.join('\n')}`);
 parts.push(`Files: ObsidianVault/10-Projects/ARKHOS/observations/`);
 
-// Telegram hard limit 4096 bytes; sendTelegram swallows errors → oversized message
-// would vanish silently. Truncate by BYTES (cyrillic = 2 bytes/char).
-let message = parts.join('\n\n');
-if (Buffer.byteLength(message, 'utf8') > 3900) {
-  message = Buffer.from(message, 'utf8').subarray(0, 3700).toString('utf8')
-    .replace(/�+$/, '') + '\n… (truncated — полный список в vault)';
-}
-
-sendTelegram(CHAT_ID, message).catch(() => {});
+// Length guard + 400-fallback live centrally in shared sendTelegram (2026-06-11):
+// 4096-code-point truncation + non-2xx reject + plain-text retry on Markdown 400.
+sendTelegram(CHAT_ID, parts.join('\n\n')).catch(e =>
+  console.error(`[OBSERVATION] telegram send failed: ${e.message}`));

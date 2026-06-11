@@ -518,13 +518,32 @@ function getTelegramToken() {
 
 /**
  * Send a Telegram message.
+ * Guards (anti-pattern 2026-06-11, "TG body exceeds limit silently"):
+ * - truncate over 4000 chars — TG hard limit is 4096 Unicode code points (tdlib utf8_length),
+ *   NOT bytes; [...str] slices at code-point boundaries (surrogate-pair safe);
+ * - non-2xx rejects instead of resolving — HTTP 400 used to look like success to every caller;
+ * - HTTP 400 retried once as plain text: Markdown-parse errors (unescaped _ etc.) and
+ *   entity breakage from truncation must degrade to plain delivery, not vanish.
  */
 function sendTelegram(chatId, message) {
+    const codePoints = [...message];
+    const text = codePoints.length > 4000
+        ? codePoints.slice(0, 3900).join('') + '\n… (truncated)'
+        : message;
+    return tgSendOnce(chatId, text, 'Markdown').catch(err => {
+        if (err && err.tgStatus === 400) return tgSendOnce(chatId, text, null);
+        throw err;
+    });
+}
+
+function tgSendOnce(chatId, text, parseMode) {
     return new Promise((resolve, reject) => {
         const token = getTelegramToken();
         if (!token) return reject(new Error('No telegram token'));
 
-        const body = JSON.stringify({ chat_id: chatId, text: message, parse_mode: 'Markdown' });
+        const payload = { chat_id: chatId, text };
+        if (parseMode) payload.parse_mode = parseMode;
+        const body = JSON.stringify(payload);
 
         const req = https.request({
             hostname: 'api.telegram.org',
@@ -535,7 +554,12 @@ function sendTelegram(chatId, message) {
             res.setEncoding('utf8');
             let data = '';
             res.on('data', chunk => data += chunk);
-            res.on('end', () => resolve(res.statusCode));
+            res.on('end', () => {
+                if (res.statusCode >= 200 && res.statusCode < 300) return resolve(res.statusCode);
+                const err = new Error(`Telegram ${res.statusCode}: ${String(data).slice(0, 200)}`);
+                err.tgStatus = res.statusCode;
+                reject(err);
+            });
         });
         req.on('error', reject);
         req.setTimeout(10000, () => { req.destroy(); reject(new Error('Telegram timeout')); });
