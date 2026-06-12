@@ -248,13 +248,22 @@ check('Stop-failure spike (7d)', () => {
     try { const e = JSON.parse(l); if (Date.parse(e.ts) >= cutoff) recent.push(e); } catch {}
   }
   const nonRate = recent.filter(e => e.error !== 'rate_limit');
-  if (recent.length <= 15 && nonRate.length < 3) return true;
+  const spikeAll = recent.length > 15;
+  const spikeNonRate = nonRate.length >= 3;
+  if (!spikeAll && !spikeNonRate) return true;
 
   // Watermark: the 7d window keeps the condition true for up to a week after a spike →
-  // without it, 4 TG alerts/day for 7 days. Re-fail only on entries newer than last alert.
-  // null when no entry has a parseable ts — then the gate must NOT suppress (an
-  // all-corrupt-timestamps log would otherwise mute the very alert it should fire).
-  const newest = recent.reduce((mx, e) => {
+  // without it, 4 TG alerts/day for 7 days. Re-fail only on entries newer than last alert,
+  // measured over the TRIGGERING class only — a fresh benign rate_limit must not re-arm an
+  // alert whose cause is an old nonRate cluster (2026-06-07 key-rotation re-fired 4 days
+  // straight off background rate_limits). spikeAll's trigger set is a superset of nonRate
+  // and the byType message covers all classes, so one shared watermark cannot silently
+  // drop an unreported nonRate entry (in the expected monotonic-append flow). newest is
+  // always non-null here: only entries with a parseable ts enter recent (cutoff filter),
+  // and an armed trigger implies a non-empty trigger set — the null guard below is a
+  // belt-and-suspenders fail-open in case that invariant ever breaks.
+  const trigger = spikeAll ? recent : nonRate;
+  const newest = trigger.reduce((mx, e) => {
     const t = Date.parse(e.ts);
     return Number.isFinite(t) ? Math.max(mx ?? 0, t) : mx;
   }, null);
