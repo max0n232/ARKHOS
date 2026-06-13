@@ -53,7 +53,9 @@ const TELEMETRY_FILE = path.join(CLAUDE_DIR, 'hooks', 'maintenance', '.skill-tel
 const REGISTRY_MD = path.join(CLAUDE_DIR, 'skills', 'REGISTRY.md');
 const USAGE_REVIEW_DAYS = 30;
 
-const SKILL_NAMES = ['assistant', 'diagram', 'n8n-expert', 'obsidian-router',
+// 'assistant' moved to REVIEW 2026-06-13 (REGISTRY) — dropped from firing-rate scan to
+// avoid permanent "⚠ zero" noise. Re-add if returned to ACTIVE.
+const SKILL_NAMES = ['diagram', 'n8n-expert', 'obsidian-router',
   'output-critic', 'post-mortem', 'strategic-critique'];
 const HOOK_MARKERS = {
   '[VAULT-AUDIT]': 'vault-audit',
