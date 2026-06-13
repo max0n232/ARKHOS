@@ -73,7 +73,7 @@
       "Read(~/.claude/hooks/maintenance/.cred-sync-state.json)"
     ]
   },
-  "model": "claude-fable-5[1m]",
+  "model": "opus",
   "hooks": {
     "UserPromptSubmit": [
       {

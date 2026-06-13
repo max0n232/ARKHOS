@@ -6,7 +6,7 @@ Updated: 2026-05-03
 
 | Skill | Priority | Status | Description |
 |-------|----------|--------|-------------|
-| assistant | P1 | ACTIVE | Cross-project coordinator, priority routing |
+| assistant | P3 | REVIEW | Cross-project coordinator (статус всех проектов, weekly review, health-чеклист). 0 вызовов >30d — вероятно вытеснен health-check hook + /atlas, но НЕ подтверждено. Ждёт первой «статус всех проектов» задачи. Ссылки целы: llm-routing.md, stack-auditor SKILL_NAMES. Review 2026-06-13 |
 | post-mortem | P3 | ACTIVE | Session error analysis, knowledge routing (Stop hook) |
 | n8n-expert | P2 | ACTIVE | n8n workflows, nodes, expressions, validation, debug |
 | output-critic | P2 | ACTIVE | Universal output quality gate — auto-critic after generation tasks |
@@ -18,16 +18,24 @@ Updated: 2026-05-03
 
 | Agent | Priority | Status | Description |
 |-------|----------|--------|-------------|
-| researcher | P2 | ACTIVE | Codebase exploration (Haiku, read-only) |
-| translator | P2 | ACTIVE | TranslatePress translations (Sonnet) |
-| wp-auditor | P2 | ACTIVE | WordPress diagnostics, read-only (Sonnet) |
-| wp-specialist | P1 | ACTIVE | WordPress REST API modifications (Sonnet) |
+| researcher | P3 | REVIEW | Codebase exploration (Haiku, read-only). 0 вызовов >30d — вероятно перекрыт встроенным Explore (та же ниша, дешевле), но НЕ подтверждено на живой задаче. Ссылка цела: llm-routing.md:25. Review 2026-06-13 |
 | librarian | P2 | ACTIVE | Vault librarian — distillation, routing review, maintenance (Sonnet) |
 | sketchup-easykitchen-specialist | P1 | ACTIVE | EasyKitchen DC tuning + L/U/I-shape kitchen composition (Opus). Dual location: Studiokook .claude/agents (canonical) + ~/.claude/agents (global mirror). Knowledge SSOT = vault agent-playbook.md |
 | codex-second-opinion | P2 | ACTIVE | Cross-check via OpenAI Codex CLI (GPT-5) — independent review (Sonnet) |
 | gemini-mega-context | P2 | ACTIVE | Large-context delegate (2M ctx, Gemini 2.5 Pro) — repo audit, transcripts (Sonnet) |
 | gemini-multimodal | P2 | ACTIVE | Native multimodal — image/video/audio analysis via Gemini (Sonnet) |
 | gemini-utility | P3 | ACTIVE | Routine cost-saving delegate — Flash translations, parsing, formatting (Sonnet) |
+
+## Studiokook agents (~/Desktop/Studiokook/.claude/agents/)
+
+_Project-scoped — видны только сессиям из Studiokook cwd. Stack-auditor telemetry (~/.claude transcripts) их НЕ видит: «0 calls / never» для них = слепота, не смерть._
+
+| Agent | Priority | Status | Description |
+|-------|----------|--------|-------------|
+| translator | P2 | ACTIVE | TranslatePress translations (Sonnet) |
+| wp-auditor | P2 | ACTIVE | WordPress diagnostics, read-only (Sonnet) |
+| wp-specialist | P1 | ACTIVE | WordPress REST API modifications (Sonnet) |
+| seo-auditor | P2 | ACTIVE | SEO audit agent (был не зарегистрирован — добавлен 2026-06-12) |
 
 ## Studiokook (~/Desktop/Studiokook/.claude/skills/)
 
